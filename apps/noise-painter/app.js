@@ -1,10 +1,17 @@
 (function () {
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
+  const canvas   = document.getElementById('canvas');
+  const ctx      = canvas.getContext('2d');
   const scaleInput = document.getElementById('scale');
-  const loading = document.getElementById('app-loading');
+  const speedInput = document.getElementById('speed');
+  const playBtn  = document.getElementById('play-btn');
+  const loading  = document.getElementById('app-loading');
 
   let currentPal = 'terrain';
+  let grid0, grid1;
+  let cols, rows, gridSize;
+  let morphT   = 0;
+  let playing  = true;
+  let rafId    = null;
 
   // Gradient stops: [t, r, g, b] — t in [0, 1]
   const PALETTES = {
@@ -62,16 +69,31 @@
     }
   }
 
-  function generate() {
-    const w = canvas.width;
-    const h = canvas.height;
-    const gridSize = parseInt(scaleInput.value, 10);
-    const cols = Math.ceil(w / gridSize) + 2;
-    const rows = Math.ceil(h / gridSize) + 2;
+  function buildGrid(c, r) {
+    const g = new Float32Array(c * r);
+    for (let i = 0; i < g.length; i++) g[i] = Math.random();
+    return g;
+  }
 
-    const grid = new Float32Array(cols * rows);
-    for (let i = 0; i < grid.length; i++) grid[i] = Math.random();
+  function sampleGrid(grid, gx, gy) {
+    const ix = Math.floor(gx);
+    const iy = Math.floor(gy);
+    const fx = smoothstep(gx - ix);
+    const fy = smoothstep(gy - iy);
+    const v00 = grid[iy * cols + ix];
+    const v10 = grid[iy * cols + (ix + 1)];
+    const v01 = grid[(iy + 1) * cols + ix];
+    const v11 = grid[(iy + 1) * cols + (ix + 1)];
+    return v00 * (1 - fx) * (1 - fy)
+         + v10 * fx       * (1 - fy)
+         + v01 * (1 - fx) * fy
+         + v11 * fx       * fy;
+  }
 
+  function renderAt(t) {
+    const w  = canvas.width;
+    const h  = canvas.height;
+    const st = smoothstep(t);
     const imageData = ctx.createImageData(w, h);
     const data = imageData.data;
 
@@ -79,21 +101,9 @@
       for (let x = 0; x < w; x++) {
         const gx = x / gridSize;
         const gy = y / gridSize;
-        const ix = Math.floor(gx);
-        const iy = Math.floor(gy);
-        const fx = smoothstep(gx - ix);
-        const fy = smoothstep(gy - iy);
-
-        const v00 = grid[iy * cols + ix];
-        const v10 = grid[iy * cols + (ix + 1)];
-        const v01 = grid[(iy + 1) * cols + ix];
-        const v11 = grid[(iy + 1) * cols + (ix + 1)];
-
-        const v = v00 * (1 - fx) * (1 - fy)
-                + v10 * fx       * (1 - fy)
-                + v01 * (1 - fx) * fy
-                + v11 * fx       * fy;
-
+        const v0 = sampleGrid(grid0, gx, gy);
+        const v1 = sampleGrid(grid1, gx, gy);
+        const v  = lerp(v0, v1, st);
         const [r, g, b] = palColor(currentPal, v);
         const idx = (y * w + x) * 4;
         data[idx]     = r;
@@ -106,13 +116,62 @@
     ctx.putImageData(imageData, 0, 0);
   }
 
+  function tick() {
+    renderAt(morphT);
+    morphT += speedInput.value / 1000;
+    if (morphT >= 1) {
+      grid0  = grid1;
+      grid1  = buildGrid(cols, rows);
+      morphT = 0;
+    }
+    if (playing) rafId = requestAnimationFrame(tick);
+  }
+
+  function initGrids() {
+    gridSize = parseInt(scaleInput.value, 10);
+    cols = Math.ceil(canvas.width  / gridSize) + 2;
+    rows = Math.ceil(canvas.height / gridSize) + 2;
+    grid0  = buildGrid(cols, rows);
+    grid1  = buildGrid(cols, rows);
+    morphT = 0;
+  }
+
+  function startAnim() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function setPlaying(val) {
+    playing = val;
+    playBtn.textContent = playing ? 'Pause' : 'Play';
+    if (playing) startAnim();
+  }
+
   function resize() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr  = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width  = Math.round(rect.width  * dpr);
     canvas.height = Math.round(rect.height * dpr);
-    generate();
+    initGrids();
+    if (playing) startAnim();
+    else renderAt(morphT);
   }
+
+  playBtn.addEventListener('click', () => setPlaying(!playing));
+
+  document.getElementById('new-btn').addEventListener('click', () => {
+    if (rafId) cancelAnimationFrame(rafId);
+    initGrids();
+    if (playing) startAnim();
+    else renderAt(0);
+  });
+
+  scaleInput.addEventListener('input', () => {
+    if (rafId) cancelAnimationFrame(rafId);
+    initGrids();
+    if (playing) startAnim();
+    else renderAt(morphT);
+  });
 
   document.getElementById('palettes').addEventListener('click', e => {
     const btn = e.target.closest('.pal');
@@ -120,14 +179,8 @@
     document.querySelectorAll('.pal').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentPal = btn.dataset.pal;
-    generate();
+    if (!playing) renderAt(morphT);
   });
-
-  scaleInput.addEventListener('input', generate);
-
-  document.getElementById('regen-btn').addEventListener('click', generate);
-
-  canvas.addEventListener('click', generate);
 
   document.getElementById('save-btn').addEventListener('click', () => {
     const a = document.createElement('a');

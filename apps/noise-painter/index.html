@@ -46,6 +46,10 @@
         <span>Scale</span>
         <input type="range" id="scale" min="4" max="120" value="32" />
       </label>
+      <label class="ctrl">
+        <span>Speed</span>
+        <input type="range" id="speed" min="1" max="20" value="4" />
+      </label>
       <div class="palettes" id="palettes">
         <button class="pal active" data-pal="terrain">Terrain</button>
         <button class="pal" data-pal="heat">Heat</button>
@@ -53,7 +57,8 @@
         <button class="pal" data-pal="void">Void</button>
       </div>
       <div class="actions">
-        <button id="regen-btn" type="button">Regenerate</button>
+        <button id="play-btn" type="button">Pause</button>
+        <button id="new-btn" type="button" class="ghost">New</button>
         <button id="save-btn" type="button" class="ghost">Save PNG</button>
         <button id="quit-btn" type="button" class="ghost">Quit</button>
       </div>
