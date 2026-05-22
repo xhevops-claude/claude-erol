@@ -75,7 +75,7 @@ Don't add `?v=` query strings manually to source HTML — they'd be redundant wi
 
 ### Always end with a clickable preview link
 
-After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://zlore-claude.github.io/claude-apps/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/apps/terrain/`). If pushed to `main`, link to the corresponding production path under `https://zlore-claude.github.io/claude-apps/`.
+After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://zlore-claude.github.io/claude-apps/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/games/snake/`). If pushed to `main`, link to the corresponding production path under `https://zlore-claude.github.io/claude-apps/`.
 
 ### Branch names — match the work
 
