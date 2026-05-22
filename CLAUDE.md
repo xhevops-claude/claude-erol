@@ -93,15 +93,6 @@ Direct pushes to `main` are blocked. To land changes on production:
 
 This applies even when the user just says "merge it" — the PR + green-checks loop is the merge mechanism, not an extra step.
 
-## Data pipeline (cdn/)
-
-Two scheduled workflows publish open data to `gh-pages` under `/cdn/`, **decoupled from the app source** — apps fetch from `https://zlore-claude.github.io/claude-apps/cdn/...`, never from a path inside this repo. The repo `.gitignore` excludes `cdn/`.
-
-- `data-refresh.yml` (05:30 UTC daily): for each `<slug> <url>` in `data-sources/maps-osm.txt`, compares the upstream `.md5` sidecar (Geofabrik) to the one currently on `gh-pages` (read via `git show origin/gh-pages:<path>`, NOT HTTP — Pages republish lag would cause races). If different, downloads the PBF, validates it (rejects HTML responses and files <100KB), verifies MD5, and republishes. Skips if all regions match.
-- `tiles-build.yml` (`workflow_run` after data-refresh): for each region, checks a `<pmtiles>.source-md5` sidecar containing `<source-md5> <BUILD_VERSION>`. If either the source MD5 or `BUILD_VERSION` changed, runs Planetiler to (re)build PMTiles. Bump the `BUILD_VERSION` env var in the workflow whenever the renderer or schema changes meaningfully — this forces every region to rebuild.
-
-Both workflows share a `concurrency: pages-deploy` group with `pages.yml` to serialize `gh-pages` writes.
-
 ## Conventions worth preserving
 
 - `escapeHTML` in `app.js` is used for any user-supplied or registry-supplied string interpolated into innerHTML. Anything that ends up in `cardHtml`/`cardInner` MUST go through it.
