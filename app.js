@@ -28,14 +28,6 @@
 
   const apps = [
     {
-      slug: 'locator',
-      name: 'Locator',
-      meta: 'Map',
-      tagline: 'See where you are, in real time.',
-      icon: '📍',
-      url: 'apps/locator/',
-    },
-    {
       slug: 'terrain',
       name: 'Terrain',
       meta: 'App',
