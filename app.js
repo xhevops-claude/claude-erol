@@ -28,6 +28,14 @@
 
   const apps = [
     {
+      slug: 'noise-painter',
+      name: 'Noise Painter',
+      meta: 'Generative',
+      tagline: 'Regenerate infinite landscapes with one tap.',
+      icon: '🏔️',
+      url: 'apps/noise-painter/',
+    },
+    {
       slug: 'directions',
       name: 'Directions',
       meta: 'Coming soon',

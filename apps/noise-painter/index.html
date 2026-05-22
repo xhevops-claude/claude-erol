@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Noise Painter</title>
+  <script>
+    if (window.self !== window.top) document.documentElement.classList.add('embedded');
+  </script>
+  <style>
+    html, body { margin: 0; padding: 0; background: #0a0a0f; color: #f0f0f0;
+      font-family: ui-sans-serif, system-ui, sans-serif; }
+    #app-loading {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0a0a0f;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 22px;
+      transition: opacity 0.4s ease;
+    }
+    #app-loading.hidden { opacity: 0; pointer-events: none; }
+    #app-loading .gl-icon { font-size: 88px; line-height: 1; }
+    #app-loading .gl-bar {
+      position: relative; width: 180px; height: 4px;
+      background: rgba(255,255,255,0.10); overflow: hidden;
+    }
+    #app-loading .gl-bar::after {
+      content: ""; position: absolute; top: 0; left: -40%;
+      width: 40%; height: 100%; background: #5eead4;
+      animation: gl-bar 1.2s cubic-bezier(0.45,0,0.55,1) infinite;
+    }
+    @keyframes gl-bar { 0% { left: -40%; } 100% { left: 100%; } }
+  </style>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app-loading">
+    <span class="gl-icon" aria-hidden="true">🏔️</span>
+    <div class="gl-bar" aria-label="Loading"></div>
+  </div>
+
+  <main class="stage">
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+      <label class="ctrl">
+        <span>Scale</span>
+        <input type="range" id="scale" min="4" max="120" value="32" />
+      </label>
+      <label class="ctrl">
+        <span>Speed</span>
+        <input type="range" id="speed" min="1" max="20" value="4" />
+      </label>
+      <div class="palettes" id="palettes">
+        <button class="pal active" data-pal="terrain">Terrain</button>
+        <button class="pal" data-pal="heat">Heat</button>
+        <button class="pal" data-pal="ocean">Ocean</button>
+        <button class="pal" data-pal="void">Void</button>
+      </div>
+      <div class="actions">
+        <button id="play-btn" type="button">Pause</button>
+        <button id="new-btn" type="button" class="ghost">New</button>
+        <button id="save-btn" type="button" class="ghost">Save PNG</button>
+        <button id="quit-btn" type="button" class="ghost">Quit</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
