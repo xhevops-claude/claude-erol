@@ -63,7 +63,7 @@ Every sub-experience's `index.html` ships a `#game-loading` (or `#app-loading`) 
 | `main` | `/` |
 | any other | `/preview/<slug>/` where `<slug>` = branch name with `/`, `_`, ` ` → `-` and lowercased |
 
-So pushing to e.g. `claude/foo-bar` deploys to `https://xhevops-claude.github.io/claude-default/preview/claude-foo-bar/`. Production and previews coexist on `gh-pages` because of `keep_files: true`.
+So pushing to e.g. `claude/foo-bar` deploys to `https://zlore-claude.github.io/claude-apps/preview/claude-foo-bar/`. Production and previews coexist on `gh-pages` because of `keep_files: true`.
 
 The `exclude_assets` list in `pages.yml` controls what gets excluded from the deploy. If you add a new top-level dev-only file/dir (lockfiles, configs, docs), append it there.
 
@@ -75,7 +75,7 @@ Don't add `?v=` query strings manually to source HTML — they'd be redundant wi
 
 ### Always end with a clickable preview link
 
-After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://xhevops-claude.github.io/claude-default/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/apps/locator/`). If pushed to `main`, link to the corresponding production path under `https://xhevops-claude.github.io/claude-default/`.
+After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://zlore-claude.github.io/claude-apps/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/apps/terrain/`). If pushed to `main`, link to the corresponding production path under `https://zlore-claude.github.io/claude-apps/`.
 
 ### Branch names — match the work
 
@@ -95,7 +95,7 @@ This applies even when the user just says "merge it" — the PR + green-checks l
 
 ## Data pipeline (cdn/)
 
-Two scheduled workflows publish open data to `gh-pages` under `/cdn/`, **decoupled from the app source** — apps fetch from `https://xhevops-claude.github.io/claude-default/cdn/...`, never from a path inside this repo. The repo `.gitignore` excludes `cdn/`.
+Two scheduled workflows publish open data to `gh-pages` under `/cdn/`, **decoupled from the app source** — apps fetch from `https://zlore-claude.github.io/claude-apps/cdn/...`, never from a path inside this repo. The repo `.gitignore` excludes `cdn/`.
 
 - `data-refresh.yml` (05:30 UTC daily): for each `<slug> <url>` in `data-sources/maps-osm.txt`, compares the upstream `.md5` sidecar (Geofabrik) to the one currently on `gh-pages` (read via `git show origin/gh-pages:<path>`, NOT HTTP — Pages republish lag would cause races). If different, downloads the PBF, validates it (rejects HTML responses and files <100KB), verifies MD5, and republishes. Skips if all regions match.
 - `tiles-build.yml` (`workflow_run` after data-refresh): for each region, checks a `<pmtiles>.source-md5` sidecar containing `<source-md5> <BUILD_VERSION>`. If either the source MD5 or `BUILD_VERSION` changed, runs Planetiler to (re)build PMTiles. Bump the `BUILD_VERSION` env var in the workflow whenever the renderer or schema changes meaningfully — this forces every region to rebuild.
