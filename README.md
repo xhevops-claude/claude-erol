@@ -1,12 +1,12 @@
-# claude-default
+# claude-apps
 
-[![CI](https://github.com/xhevops-claude/claude-default/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xhevops-claude/claude-default/actions/workflows/ci.yml)
-[![Deploy](https://github.com/xhevops-claude/claude-default/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/xhevops-claude/claude-default/actions/workflows/pages.yml)
-[![Live](https://img.shields.io/badge/live-arcade-22d3ee?style=flat&labelColor=18181b)](https://xhevops-claude.github.io/claude-default/)
+[![CI](https://github.com/zlore-claude/claude-apps/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zlore-claude/claude-apps/actions/workflows/ci.yml)
+[![Deploy](https://github.com/zlore-claude/claude-apps/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/zlore-claude/claude-apps/actions/workflows/pages.yml)
+[![Live](https://img.shields.io/badge/live-arcade-22d3ee?style=flat&labelColor=18181b)](https://zlore-claude.github.io/claude-apps/)
 
 A small static games arcade. Tap a tile, the card morphs into the game; tap home, the game morphs back into the card. Deployed to GitHub Pages.
 
-**Live**: https://xhevops-claude.github.io/claude-default/
+**Live**: https://zlore-claude.github.io/claude-apps/
 
 ## Layout
 
@@ -84,8 +84,8 @@ npm run lint:css
 
 | Branch | Path on Pages | URL |
 |---|---|---|
-| `main` | `/` (root) | `https://xhevops-claude.github.io/claude-default/` |
-| any other | `/preview/<slug>/` | `https://xhevops-claude.github.io/claude-default/preview/<slug>/` |
+| `main` | `/` (root) | `https://zlore-claude.github.io/claude-apps/` |
+| any other | `/preview/<slug>/` | `https://zlore-claude.github.io/claude-apps/preview/<slug>/` |
 
 `<slug>` is the branch name lowercased with `/`, `_`, and spaces turned into `-`. So pushing `claude/foo-bar` deploys to `…/preview/claude-foo-bar/`.
 
