@@ -49,71 +49,14 @@
     <main class="main" id="main"></main>
   </div>
 
-  <!-- Dark planning board: entered from a PI session -->
+  <!-- Light PI Planning whiteboard: static top nav + floating side rail + zoomable canvas -->
   <div class="board-screen" id="board-screen" hidden>
-    <header class="topbar">
-      <button id="board-back" class="board-back" type="button" aria-label="Back to dashboard">←</button>
-      <div class="brand">
-        <span class="logo" aria-hidden="true">🥧</span>
-        <div class="brand-text">
-          <h1 id="pi-name" spellcheck="false">PI 2026.Q3</h1>
-          <span class="sub">PI Planning Board</span>
-        </div>
-      </div>
-      <nav class="tabs" id="tabs">
-        <button data-tab="board" class="active" type="button">Board</button>
-        <button data-tab="risks" type="button">Risks <span class="tab-count" id="risk-count"></span></button>
-      </nav>
-      <div class="tools">
-        <button id="add-team" type="button">+ Team</button>
-        <button id="add-sprint" type="button">+ Sprint</button>
-        <button id="export-btn" class="ghost" type="button" title="Download JSON">Export</button>
-      </div>
-    </header>
-
-    <section id="view-board" class="view">
-      <div class="board-scroll" id="board-scroll">
-        <div class="board-content" id="board-content">
-          <div class="grid" id="grid"></div>
-          <svg id="dep-svg" aria-hidden="true">
-            <defs>
-              <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
-                      markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" />
-              </marker>
-            </defs>
-          </svg>
-        </div>
-      </div>
-      <div class="link-hint" id="link-hint" hidden>
-        <span>Linking — click a target card</span>
-        <button type="button" id="link-cancel">Cancel (Esc)</button>
-      </div>
-      <div class="legend">
-        <span class="lg" data-kind="story"><i></i>Story</span>
-        <span class="lg" data-kind="feature"><i></i>Feature</span>
-        <span class="lg" data-kind="enabler"><i></i>Enabler</span>
-        <span class="lg" data-kind="milestone"><i></i>Milestone</span>
-        <span class="lg-sep"></span>
-        <span class="lg-tip">Click a card's 🔗 to draw a dependency · drag cards between cells</span>
-      </div>
-    </section>
-
-    <section id="view-risks" class="view" hidden>
-      <div class="risks-wrap">
-        <div class="risk-add">
-          <input type="text" id="risk-input" placeholder="Describe a risk, then press Enter…" maxlength="160" />
-          <button type="button" id="risk-add-btn">Add risk</button>
-        </div>
-        <div class="roam" id="roam"></div>
-
-        <div class="confidence">
-          <h3>Confidence vote <span class="cf-sub">fist of five</span></h3>
-          <div class="cf-buttons" id="cf-buttons"></div>
-          <div class="cf-result" id="cf-result"></div>
-        </div>
-      </div>
-    </section>
+    <div class="canvas-wrap" id="canvas-wrap">
+      <div class="canvas" id="canvas"></div>
+    </div>
+    <header class="bnav" id="bnav"></header>
+    <nav class="srail" id="srail" aria-label="Boards"></nav>
+    <div class="zoomctl" id="zoomctl"></div>
   </div>
 
   <input type="file" id="import-file" accept="application/json,.json" hidden />

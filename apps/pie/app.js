@@ -24,51 +24,48 @@
   const sideEl = document.getElementById('side');
   const mainEl = document.getElementById('main');
   const boardScreen = document.getElementById('board-screen');
-  const grid = document.getElementById('grid');
-  const boardContent = document.getElementById('board-content');
-  const boardScroll = document.getElementById('board-scroll');
-  const svg = document.getElementById('dep-svg');
-  const linkHint = document.getElementById('link-hint');
-  const piName = document.getElementById('pi-name');
-  const roamEl = document.getElementById('roam');
-  const riskInput = document.getElementById('risk-input');
-  const riskCount = document.getElementById('risk-count');
-  const cfButtons = document.getElementById('cf-buttons');
-  const cfResult = document.getElementById('cf-result');
+  const bnav = document.getElementById('bnav');
+  const srail = document.getElementById('srail');
+  const canvas = document.getElementById('canvas');
+  const canvasWrap = document.getElementById('canvas-wrap');
+  const zoomctl = document.getElementById('zoomctl');
 
   // ---------- State ----------
   let state = load() || sampleState();
-  let linkSrc = null;          // card id we are linking FROM
-  let drag = null;             // active drag context
 
   function uid() { return Math.random().toString(36).slice(2, 9); }
 
   function sampleState() {
     const t = (name, capacity) => ({ id: uid(), name, capacity });
     const teams = [t('Falcon', 26), t('Otter', 22), t('Nimbus', 30)];
-    const sprints = ['Sprint 1', 'Sprint 2', 'Sprint 3', 'Sprint 4', 'IP'];
+    const sprints = ['Iteration 1', 'Iteration 2', 'Iteration 3', 'Iteration 4', 'Iteration 5', 'IP Iteration'];
     const C = (teamIdx, sprintIdx, title, points, kind) => ({
       id: uid(), teamId: teams[teamIdx].id, sprintIdx, title, points, kind,
     });
-    const cards = [
-      C(0, 0, 'Auth service spike', 5, 'enabler'),
-      C(0, 0, 'Login screen', 8, 'story'),
-      C(0, 1, 'SSO integration', 13, 'feature'),
-      C(0, 3, 'Beta launch', 0, 'milestone'),
-      C(1, 0, 'Billing API', 8, 'feature'),
-      C(1, 1, 'Invoice PDF export', 5, 'story'),
-      C(1, 2, 'Dunning emails', 5, 'story'),
-      C(2, 0, 'Event pipeline', 13, 'enabler'),
-      C(2, 1, 'Usage dashboard', 8, 'feature'),
-      C(2, 2, 'Alerts v1', 5, 'story'),
+    const titles = [
+      'Auth service spike', 'Login screen', 'SSO integration', 'Billing API',
+      'Invoice PDF export', 'Dunning emails', 'Event pipeline', 'Usage dashboard',
+      'Alerts v1', 'Search reindex', 'Profile settings', 'Audit log',
+      'Rate limiter', 'Webhook retries', 'Feature flags', 'Onboarding flow',
+      'Export to CSV', 'Mobile deep links', 'Cache warmup', 'Email templates',
     ];
-    const deps = [
-      { id: uid(), from: cards[4].id, to: cards[1].id }, // billing needs login
-      { id: uid(), from: cards[8].id, to: cards[7].id }, // dashboard needs pipeline
-    ];
+    const pts = [2, 3, 5, 8, 13];
+    const kindFor = (n) => (n % 6 === 0 ? 'feature' : n % 7 === 0 ? 'enabler' : n % 13 === 0 ? 'milestone' : 'story');
+    const cards = [];
+    let n = 0;
+    sprints.forEach((_, s) => {
+      const count = 7 + (s % 3);
+      for (let i = 0; i < count; i++, n++) {
+        cards.push(C(i % teams.length, s, titles[n % titles.length], pts[n % pts.length], kindFor(n)));
+      }
+    });
+    const objectives = [];
+    for (let i = 1; i <= 10; i++) {
+      objectives.push({ id: uid(), text: "I'm baby wayfarers hexagon small batch, chicharrones", bv: 10, links: 2, committed: i <= 5 });
+    }
     return normalize({
       piName: 'PI 2026.Q3',
-      teams, sprints, cards, deps,
+      teams, sprints, cards, deps: [], objectives,
       risks: [
         { id: uid(), text: 'Third-party SSO vendor SLA unclear', cat: 'O' },
         { id: uid(), text: 'Data migration window may slip', cat: 'A' },
@@ -91,6 +88,8 @@
     KINDS.forEach((k) => {
       s.kinds[k] = Object.assign({}, KIND_DEFAULTS[k], s.kinds[k]);
     });
+    if (!Array.isArray(s.objectives)) s.objectives = [];
+    s.context = Object.assign({ board: 'Team Board', program: 'Terra', team: 'Zürich', dates: '13 Jan - 13 Feb' }, s.context);
     // Shell / dashboard data (illustrative — distinct from the reference app)
     s.plan = Object.assign({ name: 'Team', teamLimit: 60, renews: '92d' }, s.plan);
     s.org = Object.assign({ arts: 3, users: 42 }, s.org);
@@ -163,394 +162,251 @@
   const card = (id) => state.cards.find((c) => c.id === id);
   const cellCards = (teamId, s) => state.cards.filter((c) => c.teamId === teamId && c.sprintIdx === s);
 
-  // ---------- Board render ----------
-  function renderBoard() {
-    grid.style.setProperty('--sprints', state.sprints.length);
-    grid.innerHTML = '';
-
-    // corner
-    grid.appendChild(el('div', { class: 'hcell corner' }, [
-      el('div', { class: 'ct', text: 'Teams' }),
-      el('div', { class: 'cs', text: state.teams.length + ' teams · ' + state.sprints.length + ' iterations' }),
-    ]));
-
-    // sprint headers
-    state.sprints.forEach((name, s) => {
-      const committed = state.cards
-        .filter((c) => c.sprintIdx === s)
-        .reduce((a, c) => a + (Number(c.points) || 0), 0);
-      const nameEl = el('span', { class: 'sprint-name', contenteditable: 'true', spellcheck: 'false', text: name });
-      nameEl.addEventListener('blur', () => { state.sprints[s] = nameEl.textContent.trim() || ('Sprint ' + (s + 1)); save(); });
-      nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); } });
-      grid.appendChild(el('div', { class: 'hcell' }, [
-        el('div', { class: 'h-top' }, [
-          nameEl,
-          el('button', { class: 'x-del', title: 'Remove iteration', type: 'button',
-            onclick: () => removeSprint(s) }, '×'),
-        ]),
-        el('div', { class: 'sprint-sub', text: committed + ' pts committed' }),
-      ]));
-    });
-
-    // rows
-    state.teams.forEach((tm, ti) => {
-      const nameEl = el('span', { class: 'team-name', contenteditable: 'true', spellcheck: 'false', text: tm.name });
-      nameEl.addEventListener('blur', () => { tm.name = nameEl.textContent.trim() || 'Team'; save(); });
-      nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); } });
-
-      const capIn = el('input', { type: 'number', min: '0', value: tm.capacity, 'aria-label': 'capacity' });
-      capIn.addEventListener('change', () => { tm.capacity = Math.max(0, Number(capIn.value) || 0); save(); renderBoard(); });
-
-      grid.appendChild(el('div', { class: 'team-cell' }, [
-        el('div', { class: 't-top' }, [
-          nameEl,
-          el('button', { class: 'x-del', title: 'Remove team', type: 'button', onclick: () => removeTeam(tm.id) }, '×'),
-        ]),
-        el('div', { class: 'cap-row' }, [capIn, el('span', { text: 'pts / sprint' })]),
-      ]));
-
-      state.sprints.forEach((_, s) => {
-        const cell = el('div', { class: 'cell' + (ti % 2 ? ' alt' : '') });
-        cell.dataset.team = tm.id; cell.dataset.sprint = s;
-        const cards = cellCards(tm.id, s);
-        cards.forEach((c) => cell.appendChild(renderCard(c)));
-
-        const load = cards.reduce((a, c) => a + (Number(c.points) || 0), 0);
-        const cap = Number(tm.capacity) || 0;
-        const over = cap > 0 && load > cap;
-        const pct = cap > 0 ? Math.min(100, (load / cap) * 100) : (load > 0 ? 100 : 0);
-        cell.appendChild(el('button', { class: 'add-card', title: 'Add card', type: 'button',
-          onclick: () => addCard(tm.id, s) }, '+'));
-        cell.appendChild(el('div', { class: 'load' + (over ? ' over' : '') }, [
-          el('div', { class: 'bar' }, el('div', { class: 'fill', style: 'width:' + pct + '%' })),
-          el('span', { class: 'lab', text: load + (cap ? '/' + cap : '') }),
-        ]));
-        grid.appendChild(cell);
-      });
-    });
-
-    drawDeps();
-  }
-
-  function renderCard(c) {
-    const kc = 'var(--' + c.kind + ')';
-    const node = el('div', { class: 'card', style: '--kc:' + kc });
-    node.dataset.card = c.id;
-    if (linkSrc === c.id) node.classList.add('link-src');
-
-    const dot = el('button', { class: 'dot', title: 'Type: ' + (state.kinds[c.kind] || {}).label + ' — click to change', type: 'button' });
-    dot.addEventListener('click', (e) => { e.stopPropagation(); cycleKind(c.id); });
-
-    const title = el('span', { class: 'title', contenteditable: 'true', spellcheck: 'false', text: c.title });
-    title.addEventListener('blur', () => { c.title = title.textContent.trim() || 'Untitled'; save(); });
-    title.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); title.blur(); }
-      e.stopPropagation();
-    });
-    title.addEventListener('pointerdown', (e) => e.stopPropagation());
-
-    const pts = el('input', { class: 'pts', type: 'number', min: '0', value: c.points, 'aria-label': 'points' });
-    pts.addEventListener('change', () => { c.points = Math.max(0, Number(pts.value) || 0); save(); renderBoard(); });
-    pts.addEventListener('pointerdown', (e) => e.stopPropagation());
-
-    const nDeps = state.deps.filter((d) => d.from === c.id || d.to === c.id).length;
-    const foot = el('div', { class: 'c-foot' }, [
-      pts, el('span', { class: 'pts-unit', text: 'pts' }),
-      el('span', { class: 'spacer' }),
-      nDeps ? el('span', { class: 'dep-badge', title: nDeps + ' dependencies', text: '⤳ ' + nDeps }) : null,
-      el('button', { class: 'ico-btn c-link', title: 'Link dependency', type: 'button' }, '🔗'),
-      el('button', { class: 'ico-btn c-del', title: 'Delete card', type: 'button' }, '🗑'),
-    ]);
-    foot.querySelector('.c-link').addEventListener('click', (e) => { e.stopPropagation(); startLink(c.id); });
-    foot.querySelector('.c-del').addEventListener('click', (e) => { e.stopPropagation(); deleteCard(c.id); });
-
-    node.appendChild(el('div', { class: 'c-head' }, [dot, title]));
-    node.appendChild(foot);
-
-    node.addEventListener('pointerdown', (e) => onCardPointerDown(e, c.id));
-    return node;
-  }
-
-  // ---------- Mutations ----------
-  function addCard(teamId, s) {
-    const c = { id: uid(), teamId, sprintIdx: s, title: 'New story', points: 3, kind: 'story' };
-    state.cards.push(c); save(); renderBoard();
-    const node = grid.querySelector('[data-card="' + c.id + '"] .title');
-    if (node) { node.focus(); document.getSelection().selectAllChildren(node); }
-  }
-  function deleteCard(id) {
-    state.cards = state.cards.filter((c) => c.id !== id);
-    state.deps = state.deps.filter((d) => d.from !== id && d.to !== id);
-    if (linkSrc === id) cancelLink();
-    save(); renderBoard();
-  }
-  function cycleKind(id) {
-    const c = card(id); if (!c) return;
-    c.kind = KINDS[(KINDS.indexOf(c.kind) + 1) % KINDS.length];
-    save(); renderBoard();
-  }
-  function addTeam() {
-    state.teams.push({ id: uid(), name: 'New Team', capacity: state.defaultCapacity || 20 });
-    save(); renderBoard();
-  }
-  function removeTeam(id) {
-    if (state.teams.length <= 1) return;
-    if (!confirm('Remove this team and its cards?')) return;
-    state.teams = state.teams.filter((t) => t.id !== id);
-    const removed = state.cards.filter((c) => c.teamId === id).map((c) => c.id);
-    state.cards = state.cards.filter((c) => c.teamId !== id);
-    state.deps = state.deps.filter((d) => !removed.includes(d.from) && !removed.includes(d.to));
-    save(); renderBoard();
-  }
-  function addSprint() {
-    state.sprints.push('Sprint ' + (state.sprints.length + 1));
-    save(); renderBoard();
-  }
-  function removeSprint(s) {
-    if (state.sprints.length <= 1) return;
-    if (!confirm('Remove this iteration and its cards?')) return;
-    const removed = state.cards.filter((c) => c.sprintIdx === s).map((c) => c.id);
-    state.sprints.splice(s, 1);
-    state.cards = state.cards
-      .filter((c) => c.sprintIdx !== s)
-      .map((c) => (c.sprintIdx > s ? { ...c, sprintIdx: c.sprintIdx - 1 } : c));
-    state.deps = state.deps.filter((d) => !removed.includes(d.from) && !removed.includes(d.to));
-    save(); renderBoard();
-  }
-
-  // ---------- Dependency linking ----------
-  function startLink(id) {
-    if (linkSrc === id) { cancelLink(); return; }
-    linkSrc = id;
-    boardContent.classList.add('linking');
-    linkHint.hidden = false;
-    renderBoard();
-  }
-  function cancelLink() {
-    linkSrc = null;
-    boardContent.classList.remove('linking');
-    linkHint.hidden = true;
-    renderBoard();
-  }
-  function completeLink(toId) {
-    if (!linkSrc || toId === linkSrc) { cancelLink(); return; }
-    const exists = state.deps.some((d) =>
-      (d.from === linkSrc && d.to === toId) || (d.from === toId && d.to === linkSrc));
-    if (!exists) state.deps.push({ id: uid(), from: linkSrc, to: toId });
-    save(); cancelLink();
-  }
-
-  // ---------- Dependency arrows ----------
-  function drawDeps() {
-    // clear existing path nodes (keep <defs>)
-    svg.querySelectorAll('path.dep').forEach((p) => p.remove());
-    const cr = boardContent.getBoundingClientRect();
-    svg.setAttribute('width', boardContent.scrollWidth);
-    svg.setAttribute('height', boardContent.scrollHeight);
-    svg.style.width = boardContent.scrollWidth + 'px';
-    svg.style.height = boardContent.scrollHeight + 'px';
-
-    const anchor = (id, side) => {
-      const node = grid.querySelector('[data-card="' + id + '"]');
-      if (!node) return null;
-      const r = node.getBoundingClientRect();
-      const y = r.top + r.height / 2 - cr.top;
-      const x = (side === 'right' ? r.right : r.left) - cr.left;
-      return { x, y, top: r.top - cr.top, bottom: r.bottom - cr.top, left: r.left - cr.left, right: r.right - cr.left };
+  // ---------- Whiteboard icons ----------
+  function bIcon(name, cls) {
+    const P = {
+      apps: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+      search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-3.5-3.5"/>',
+      board: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="14" rx="1"/>',
+      history: '<path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.3"/><path d="M3 3v4h4"/><path d="M12 8v4l3 2"/>',
+      view: '<rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="16" rx="1.5"/>',
+      teamboard: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 5v14M14 5v9"/>',
+      folder: '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
+      people: '<circle cx="9" cy="9" r="3"/><path d="M3.5 19a5.5 5.5 0 0111 0"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.5a4.5 4.5 0 014.5 4.5"/>',
+      camera: '<path d="M4 8a2 2 0 012-2h2l1.5-2h5L16 6h2a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><circle cx="12" cy="12.5" r="3.2"/>',
+      edit: '<path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+      chev: '<path d="M6 9l6 6 6-6"/>',
+      // side rail
+      shift: '<path d="M4 12h12"/><path d="M11 7l5 5-5 5"/><path d="M20 5v14"/>',
+      solbacklog: '<rect x="4" y="4" width="8" height="6" rx="1"/><path d="M14 7h5M16.5 4.5v5"/><rect x="4" y="14" width="8" height="6" rx="1"/><path d="M14 17h5M16.5 14.5v5"/>',
+      solplan: '<path d="M5 5v8a2 2 0 002 2h3"/><rect x="13" y="11" width="7" height="7" rx="1.5"/><rect x="3" y="3" width="5" height="5" rx="1.5"/>',
+      artbacklog: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="13" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M15 17h5M17.5 14.5v5"/>',
+      artplan: '<rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h3a2 2 0 012 2v4"/>',
+      objectives: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="1"/>',
+      risk: '<path d="M12 3l8 3v6c0 4.8-3.4 7.6-8 9-4.6-1.4-8-4.2-8-9V6z"/><path d="M12 8.5v4"/><circle cx="12" cy="15.6" r="0.6" fill="currentColor" stroke="none"/>',
+      teamrail: '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="10" cy="10.5" r="2.2"/><path d="M6.5 16.5a3.5 3.5 0 017 0"/><circle cx="16" cy="10.5" r="1.6"/>',
+      collab: '<rect x="4" y="5" width="7" height="6" rx="1"/><rect x="13" y="5" width="7" height="6" rx="1"/><rect x="8.5" y="14" width="7" height="6" rx="1"/>',
+      // panels
+      bookmark: '<path d="M6 4h12v16l-6-4-6 4z"/>',
+      cols: '<rect x="4" y="5" width="6" height="14" rx="1"/><rect x="14" y="5" width="6" height="14" rx="1"/>',
+      dots: '<circle cx="12" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+      expand: '<path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4"/>',
+      // zoom
+      plus: '<path d="M12 5v14M5 12h14"/>',
+      minus: '<path d="M5 12h14"/>',
+      fit: '<path d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4"/>',
+      help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 113.5 2.3c-.8.4-1 .8-1 1.7"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/>',
+      snap: '<rect x="4" y="6" width="16" height="13" rx="2"/><path d="M9 6l1.5-2h3L15 6"/><circle cx="12" cy="12.5" r="3"/>',
     };
-
-    state.deps.forEach((d) => {
-      const a = grid.querySelector('[data-card="' + d.from + '"]');
-      const b = grid.querySelector('[data-card="' + d.to + '"]');
-      if (!a || !b) return;
-      const ra = a.getBoundingClientRect();
-      const rb = b.getBoundingClientRect();
-      // exit from the side of A that faces B
-      const fromRight = rb.left + rb.width / 2 >= ra.left + ra.width / 2;
-      const p1 = anchor(d.from, fromRight ? 'right' : 'left');
-      const p2 = anchor(d.to, fromRight ? 'left' : 'right');
-      if (!p1 || !p2) return;
-      const dx = Math.max(28, Math.abs(p2.x - p1.x) * 0.45);
-      const c1x = p1.x + (fromRight ? dx : -dx);
-      const c2x = p2.x + (fromRight ? -dx : dx);
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('class', 'dep');
-      path.setAttribute('marker-end', 'url(#arrow)');
-      path.setAttribute('d', `M ${p1.x} ${p1.y} C ${c1x} ${p1.y}, ${c2x} ${p2.y}, ${p2.x} ${p2.y}`);
-      svg.appendChild(path);
-    });
+    return '<svg class="' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (P[name] || '') + '</svg>';
   }
 
-  // ---------- Pointer drag (cards between cells) ----------
-  function onCardPointerDown(e, id) {
-    if (e.button != null && e.button !== 0) return;
-    // editing controls handle their own pointer events
-    if (e.target.closest('input, [contenteditable="true"], .ico-btn, .dot')) return;
-    if (linkSrc) return; // in link mode, a tap completes the link instead
-
-    const node = e.currentTarget;
-    drag = {
-      id, node, startX: e.clientX, startY: e.clientY,
-      moved: false, lift: null, dropCell: null, pointerId: e.pointerId,
-    };
-    try { node.setPointerCapture(e.pointerId); } catch (_) {}
-    node.addEventListener('pointermove', onCardPointerMove);
-    node.addEventListener('pointerup', onCardPointerUp);
-    node.addEventListener('pointercancel', onCardPointerUp);
+  function hashCode(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
+  function avatar(initials, color) {
+    return '<span class="b-av" style="background:' + color + '">' + esc(initials) + '</span>';
   }
 
-  function onCardPointerMove(e) {
-    if (!drag || e.pointerId !== drag.pointerId) return;
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    if (!drag.moved && Math.hypot(dx, dy) < 6) return;
-
-    if (!drag.moved) {
-      drag.moved = true;
-      const r = drag.node.getBoundingClientRect();
-      drag.offX = drag.startX - r.left;
-      drag.offY = drag.startY - r.top;
-      drag.w = r.width;
-      drag.node.classList.add('dragging');
-      const lift = drag.node.cloneNode(true);
-      lift.classList.remove('dragging');
-      lift.classList.add('lift');
-      lift.style.width = r.width + 'px';
-      document.body.appendChild(lift);
-      drag.lift = lift;
-      svg.style.opacity = '0.25';
-    }
-    drag.lift.style.left = (e.clientX - drag.offX) + 'px';
-    drag.lift.style.top = (e.clientY - drag.offY) + 'px';
-
-    // find cell under pointer
-    drag.lift.style.display = 'none';
-    const under = document.elementFromPoint(e.clientX, e.clientY);
-    drag.lift.style.display = '';
-    const cell = under && under.closest ? under.closest('.cell') : null;
-    if (cell !== drag.dropCell) {
-      if (drag.dropCell) drag.dropCell.classList.remove('drop-on');
-      drag.dropCell = cell;
-      if (cell) cell.classList.add('drop-on');
-    }
+  // ---------- Top navigation (static) ----------
+  function renderTopNav() {
+    const c = state.context;
+    const avatars = [['AR', '#e0746a'], ['MK', '#6a9be0'], ['TS', '#6ad0a8'], ['JD', '#caa15a']]
+      .map((a) => avatar(a[0], a[1])).join('');
+    bnav.innerHTML =
+      '<div class="bn-group bn-left">' +
+        '<button class="bn-ico bn-home" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
+        '<button class="bn-ico" type="button" title="Search">' + bIcon('search') + '</button>' +
+        '<button class="bn-ico" type="button" title="Boards">' + bIcon('board') + '</button>' +
+        '<button class="bn-ico" type="button" title="History">' + bIcon('history') + '</button>' +
+      '</div>' +
+      '<div class="bn-group bn-center">' +
+        '<button class="bn-ico" type="button" title="Layout">' + bIcon('view') + '</button>' +
+        '<button class="bn-chip" type="button">' + bIcon('teamboard', 'bn-cico') + '<span>' + esc(c.board) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
+        '<button class="bn-chip" type="button">' + bIcon('folder', 'bn-cico') + '<span>' + esc(c.program) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
+        '<button class="bn-chip" type="button">' + bIcon('people', 'bn-cico') + '<span>' + esc(c.team) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
+      '</div>' +
+      '<div class="bn-group bn-right">' +
+        '<div class="bn-avs">' + avatars + '<span class="bn-more">+1</span></div>' +
+        '<button class="bn-ico" type="button" title="Snapshot">' + bIcon('snap') + '</button>' +
+        '<button class="bn-ico" type="button" title="Edit">' + bIcon('edit') + '</button>' +
+        '<button class="bn-ico bn-toggle on" type="button" title="Board view">' + bIcon('view') + '</button>' +
+        '<button class="bn-ico bn-toggle" type="button" title="List view">' + bIcon('board') + '</button>' +
+        '<span class="bn-me">' + esc(initials(state.user.name)) + '</span>' +
+      '</div>';
   }
 
-  function onCardPointerUp(e) {
-    if (!drag || e.pointerId !== drag.pointerId) return;
-    const node = drag.node;
-    node.removeEventListener('pointermove', onCardPointerMove);
-    node.removeEventListener('pointerup', onCardPointerUp);
-    node.removeEventListener('pointercancel', onCardPointerUp);
-    try { node.releasePointerCapture(e.pointerId); } catch (_) {}
-
-    if (drag.moved) {
-      if (drag.lift) drag.lift.remove();
-      node.classList.remove('dragging');
-      svg.style.opacity = '';
-      const cell = drag.dropCell;
-      if (cell) cell.classList.remove('drop-on');
-      if (cell) {
-        const c = card(drag.id);
-        const newTeam = cell.dataset.team;
-        const newSprint = Number(cell.dataset.sprint);
-        if (c && (c.teamId !== newTeam || c.sprintIdx !== newSprint)) {
-          c.teamId = newTeam; c.sprintIdx = newSprint;
-          save();
-        }
-      }
-      drag = null;
-      renderBoard();
-    } else {
-      // treated as a click — handled by document click for link completion
-      drag = null;
-    }
+  // ---------- Floating side rail (static) ----------
+  let railActive = 'team';
+  function renderSideRail() {
+    const items = [
+      ['solbacklog', 'solbacklog', 'Solution Backlog Board'],
+      ['solplan', 'solplan', 'Solution Planning Board'],
+      ['artbacklog', 'artbacklog', 'ART Backlog Board'],
+      ['artplan', 'artplan', 'ART Planning Board'],
+      ['objectives', 'objectives', 'ART Objectives'],
+      ['risk', 'risk', 'Risk Board'],
+      ['team', 'teamrail', 'Team Board'],
+      ['collab', 'collab', 'Collaboration Boards'],
+    ];
+    srail.innerHTML =
+      '<button class="sr-btn" type="button" data-rail="shift" title="Move rail to the other side">' + bIcon('shift') + '</button>' +
+      '<div class="sr-sep"></div>' +
+      items.slice(0, 2).map((it) => srBtn(it)).join('') +
+      '<div class="sr-sep"></div>' +
+      items.slice(2).map((it) => srBtn(it)).join('');
+  }
+  function srBtn(it) {
+    return '<button class="sr-btn' + (railActive === it[0] ? ' on' : '') + '" type="button" data-rail="' + it[0] + '" title="' + esc(it[2]) + '">' + bIcon(it[1]) + '</button>';
   }
 
-  // click a card (no drag) while linking -> complete link
-  grid.addEventListener('click', (e) => {
-    if (!linkSrc) return;
-    if (e.target.closest('.ico-btn, .dot, input, [contenteditable="true"]')) return;
-    const node = e.target.closest('.card');
-    if (node) completeLink(node.dataset.card);
+  // ---------- Sticky notes ----------
+  const NOTE_COLS = 4, NOTE_W = 96, NOTE_H = 66, NOTE_GX = 12, NOTE_GY = 14;
+  function noteHtml(c, i) {
+    const h = hashCode(c.id);
+    const col = i % NOTE_COLS, row = Math.floor(i / NOTE_COLS);
+    const jx = (h % 15) - 5, jy = ((h >> 4) % 13) - 5;
+    const x = 6 + col * (NOTE_W + NOTE_GX) + Math.max(-4, jx);
+    const y = 4 + row * (NOTE_H + NOTE_GY) + Math.max(-3, jy);
+    const prog = 30 + (Math.abs(h) % 60);
+    const done = Math.round(prog * 0.6);
+    return '<div class="note k-' + c.kind + '" style="left:' + x + 'px;top:' + y + 'px">' +
+      '<span class="n-tab"></span>' +
+      '<div class="n-text">' + esc(c.title) + '</div>' +
+      '<div class="n-bar"><i class="n-done" style="width:' + done + '%"></i><i class="n-doing" style="width:' + (prog - done) + '%"></i></div>' +
+    '</div>';
+  }
+
+  // ---------- Panels ----------
+  function iterPanel(idx, name) {
+    const cards = state.cards.filter((c) => c.sprintIdx === idx);
+    const load = cards.reduce((a, c) => a + (Number(c.points) || 0), 0);
+    const notes = cards.map((c, i) => noteHtml(c, i)).join('');
+    return '<div class="panel-h">' +
+        '<div class="ph-row1">' + bIcon('bookmark', 'ph-bm') + '<span class="ph-name">' + esc(name) + '</span>' +
+          '<span class="ph-dates">' + esc(state.context.dates) + '</span></div>' +
+        '<div class="ph-row2">' +
+          '<button class="cap-btn" type="button">Configure Capacity</button>' +
+          '<span class="load-pill">Load: ' + load + '</span>' +
+          '<span class="ph-sp"></span>' +
+          '<button class="ph-ico2" type="button" title="Columns">' + bIcon('cols') + '</button>' +
+          '<button class="ph-ico2" type="button" title="More">' + bIcon('dots') + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="panel-b note-area">' + notes + '</div>';
+  }
+  function objPanel() {
+    const committed = state.objectives.filter((o) => o.committed);
+    const uncommitted = state.objectives.filter((o) => !o.committed);
+    const grp = (label, list) =>
+      '<div class="op-grp"><span>' + label + '</span><span class="op-n">' + list.length + '</span></div>' +
+      list.map((o, i) =>
+        '<div class="op-item"><div class="op-t"><b>' + (i + 1) + '</b> ' + esc(o.text) + '</div>' +
+        '<div class="op-meta"><span class="op-bv">' + o.bv + ' BV</span><span class="op-lk">' + bIcon('collab', 'op-lkico') + ' ' + o.links + '</span></div></div>').join('');
+    return '<div class="panel-h obj-h"><span class="ph-name">' + bIcon('bookmark', 'ph-bm') + 'Team Objectives</span>' +
+        '<button class="ph-ico2" type="button" title="Expand">' + bIcon('expand') + '</button></div>' +
+      '<div class="panel-b op-body">' + grp('Committed', committed) + grp('Uncommitted', uncommitted) + '</div>';
+  }
+  function riskPanel() {
+    const rows = state.risks.map((r) =>
+      '<div class="rk-item"><span class="rk-badge">' + esc(r.cat || 'U') + '</span><span>' + esc(r.text) + '</span></div>').join('');
+    return '<div class="panel-h risk-h">' + bIcon('risk', 'rk-shield') + '<span class="ph-name rk-title">Risks</span></div>' +
+      '<div class="panel-b rk-body">' + (rows || '<div class="rk-empty">No risks captured yet.</div>') + '</div>';
+  }
+
+  // ---------- Canvas (whiteboard plane) ----------
+  const PW = 460, PH = 520, PCOLS = 4, PGAP = 28, PADX = 28, PADY = 28;
+  function renderCanvas() {
+    const iters = state.sprints.map((name, idx) => ({ type: 'iter', idx, name }));
+    const items = iters.slice(0, 4).concat([{ type: 'obj' }, { type: 'risk' }]).concat(iters.slice(4));
+    const rows = Math.ceil(items.length / PCOLS);
+    canvas.style.width = (PADX * 2 + PCOLS * PW + (PCOLS - 1) * PGAP) + 'px';
+    canvas.style.height = (PADY * 2 + rows * PH + (rows - 1) * PGAP) + 'px';
+    canvas.innerHTML = items.map((it, k) => {
+      const col = k % PCOLS, row = Math.floor(k / PCOLS);
+      const x = PADX + col * (PW + PGAP), y = PADY + row * (PH + PGAP);
+      const pos = 'left:' + x + 'px;top:' + y + 'px;width:' + PW + 'px;height:' + PH + 'px';
+      if (it.type === 'iter') return '<section class="wb-panel iboard" style="' + pos + '">' + iterPanel(it.idx, it.name) + '</section>';
+      if (it.type === 'obj') return '<section class="wb-panel objp" style="' + pos + '">' + objPanel() + '</section>';
+      return '<section class="wb-panel riskp" style="' + pos + '">' + riskPanel() + '</section>';
+    }).join('');
+  }
+  function renderCanvasIfVisible() { if (!boardScreen.hidden) renderCanvas(); }
+
+  // ---------- Zoom control ----------
+  function renderZoomCtl() {
+    zoomctl.innerHTML =
+      '<button class="z-btn" type="button" data-z="fit" title="Fit / reset">' + bIcon('fit') + '</button>' +
+      '<button class="z-btn" type="button" data-z="out" title="Zoom out">' + bIcon('minus') + '</button>' +
+      '<span class="z-val">100%</span>' +
+      '<button class="z-btn" type="button" data-z="in" title="Zoom in">' + bIcon('plus') + '</button>' +
+      '<button class="z-btn z-help" type="button" title="Help">' + bIcon('help') + '</button>';
+  }
+
+  // ---------- View transform (pan + zoom) ----------
+  let view = { x: 60, y: 96, scale: 0.8 };
+  let pan = null;
+  function clampN(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function applyView() {
+    canvas.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.scale + ')';
+    const z = zoomctl.querySelector('.z-val');
+    if (z) z.textContent = Math.round(view.scale * 100) + '%';
+  }
+  function resetView() { view = { x: 60, y: 96, scale: 0.8 }; applyView(); }
+  function zoomAt(mx, my, ns) {
+    ns = clampN(ns, 0.3, 2.4);
+    const wx = (mx - view.x) / view.scale, wy = (my - view.y) / view.scale;
+    view.scale = ns; view.x = mx - wx * ns; view.y = my - wy * ns;
+    applyView();
+  }
+  function zoomBy(f) { const r = canvasWrap.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, view.scale * f); }
+
+  canvasWrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = canvasWrap.getBoundingClientRect();
+    zoomAt(e.clientX - r.left, e.clientY - r.top, view.scale * (1 - e.deltaY * 0.0012));
+  }, { passive: false });
+  canvasWrap.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('button, input, a, [contenteditable="true"]')) return;
+    pan = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, id: e.pointerId };
+    canvasWrap.classList.add('grabbing');
+    try { canvasWrap.setPointerCapture(e.pointerId); } catch (_) {}
   });
-  // click empty board area cancels link
-  boardScroll.addEventListener('click', (e) => {
-    if (linkSrc && !e.target.closest('.card')) cancelLink();
+  canvasWrap.addEventListener('pointermove', (e) => {
+    if (!pan || e.pointerId !== pan.id) return;
+    view.x = pan.vx + (e.clientX - pan.x);
+    view.y = pan.vy + (e.clientY - pan.y);
+    applyView();
+  });
+  function endPan(e) { if (pan && e.pointerId === pan.id) { pan = null; canvasWrap.classList.remove('grabbing'); } }
+  canvasWrap.addEventListener('pointerup', endPan);
+  canvasWrap.addEventListener('pointercancel', endPan);
+
+  // ---------- Chrome interactions ----------
+  srail.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rail]'); if (!b) return;
+    const v = b.dataset.rail;
+    if (v === 'shift') { srail.classList.toggle('srail--right'); return; }
+    railActive = v; renderSideRail();
+  });
+  bnav.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-nav]'); if (!b) return;
+    if (b.dataset.nav === 'home') exitBoard();
+  });
+  zoomctl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-z]'); if (!b) return;
+    const z = b.dataset.z;
+    if (z === 'in') zoomBy(1.15);
+    else if (z === 'out') zoomBy(1 / 1.15);
+    else if (z === 'fit') resetView();
   });
 
-  // ---------- Risks / ROAM ----------
-  function renderRisks() {
-    roamEl.innerHTML = '';
-    const n = state.risks.length;
-    riskCount.textContent = n ? '(' + n + ')' : '';
-    ROAM.forEach(({ cat, label }) => {
-      const list = state.risks.filter((r) => (r.cat || 'U') === cat);
-      const col = el('div', { class: 'roam-col', 'data-cat': cat }, [
-        el('h4', null, [
-          el('span', { class: 'badge', text: cat }),
-          el('span', { text: label }),
-          el('span', { class: 'ct-n', text: String(list.length) }),
-        ]),
-      ]);
-      if (!list.length) col.appendChild(el('div', { class: 'empty-note', text: '—' }));
-      list.forEach((r) => col.appendChild(renderRisk(r)));
-      roamEl.appendChild(col);
-    });
+  function renderBoardView() {
+    renderTopNav();
+    renderSideRail();
+    renderZoomCtl();
+    renderCanvas();
+    applyView();
   }
-  function renderRisk(r) {
-    const node = el('div', { class: 'risk', style: '--rc:var(--' + roamColorVar((r.cat || 'U')) + ')' });
-    node.appendChild(el('div', { class: 'r-text', text: r.text }));
-    const foot = el('div', { class: 'r-foot' });
-    ['R', 'O', 'A', 'M'].forEach((cat) => {
-      foot.appendChild(el('button', {
-        class: 'roam-btn' + ((r.cat || 'U') === cat ? ' on' : ''), 'data-cat': cat, type: 'button',
-        title: ROAM.find((x) => x.cat === cat).label,
-        onclick: () => { r.cat = (r.cat === cat ? 'U' : cat); save(); renderRisks(); },
-      }, cat));
-    });
-    foot.appendChild(el('button', { class: 'r-del', title: 'Delete risk', type: 'button',
-      onclick: () => { state.risks = state.risks.filter((x) => x.id !== r.id); save(); renderRisks(); } }, '×'));
-    node.appendChild(foot);
-    return node;
-  }
-  function roamColorVar(cat) {
-    return { U: 'ink-faint', R: 'ok', O: 'story', A: 'enabler', M: 'feature' }[cat] || 'ink-faint';
-  }
-  function addRisk() {
-    const text = riskInput.value.trim();
-    if (!text) return;
-    state.risks.unshift({ id: uid(), text, cat: 'U' });
-    riskInput.value = '';
-    save(); renderRisks();
-  }
-
-  function renderVote() {
-    cfButtons.innerHTML = '';
-    for (let i = 1; i <= 5; i++) {
-      cfButtons.appendChild(el('button', {
-        class: state.vote === i ? 'on' : '', type: 'button',
-        onclick: () => { state.vote = (state.vote === i ? null : i); save(); renderVote(); },
-      }, String(i)));
-    }
-    if (state.vote) {
-      const msg = ['Low confidence — replan', 'Concerns — discuss', 'Cautious commit', 'Good confidence', 'Full commit!'][state.vote - 1];
-      cfResult.innerHTML = 'Your vote: <b>' + state.vote + '/5</b> — ' + msg;
-    } else {
-      cfResult.textContent = 'Tap a finger to register your confidence in the plan.';
-    }
-  }
-
-  // ---------- Tabs ----------
-  document.getElementById('tabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-tab]');
-    if (!btn) return;
-    document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b === btn));
-    const tab = btn.dataset.tab;
-    document.getElementById('view-board').hidden = tab !== 'board';
-    document.getElementById('view-risks').hidden = tab !== 'risks';
-    if (tab === 'board') requestAnimationFrame(drawDeps);
-    if (tab === 'risks') { renderRisks(); renderVote(); }
-  });
 
   // ---------- Theming (driven by PIE Recipe) ----------
   function hexToRgba(hex, a) {
@@ -614,17 +470,6 @@
     if (window.self !== window.top) window.parent.postMessage({ type: 'close-game' }, '*');
     else location.href = '../../';
   }
-
-  // ---------- Board toolbar ----------
-  document.getElementById('add-team').addEventListener('click', addTeam);
-  document.getElementById('add-sprint').addEventListener('click', addSprint);
-  document.getElementById('export-btn').addEventListener('click', exportPlan);
-  document.getElementById('board-back').addEventListener('click', exitBoard);
-  document.getElementById('risk-add-btn').addEventListener('click', addRisk);
-  riskInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addRisk(); });
-
-  piName.addEventListener('blur', () => { state.piName = piName.textContent.trim() || 'PI Planning'; save(); });
-  piName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); piName.blur(); } });
 
   // ---------- Light shell: sidebar + routed pages ----------
   let currentPage = 'home';
@@ -811,10 +656,9 @@
   // ---------- Board navigation ----------
   function enterBoard(name) {
     closeUserMenu();
-    if (name) { state.piName = name; piName.textContent = name; save(); }
+    if (name) { state.piName = name; save(); }
     shell.hidden = true; boardScreen.hidden = false;
-    renderBoard(); renderRisks(); renderVote(); updateLegend();
-    requestAnimationFrame(() => requestAnimationFrame(drawDeps));
+    renderBoardView();
   }
   function exitBoard() {
     boardScreen.hidden = true; shell.hidden = false;
@@ -876,9 +720,9 @@
       state.cards = state.cards.filter((c) => c.sprintIdx < n);
       state.deps = state.deps.filter((d) => !lostIds.includes(d.from) && !lostIds.includes(d.to));
     } else {
-      for (let i = cur; i < n; i++) state.sprints.push('Sprint ' + (i + 1));
+      for (let i = cur; i < n; i++) state.sprints.push('Iteration ' + (i + 1));
     }
-    save(); renderBoard(); renderSettings();
+    save(); renderCanvasIfVisible(); renderSettings();
   }
 
   function renderSettings() {
@@ -897,12 +741,12 @@
 
     // PI details
     body.appendChild(rCard('PI details', 'The increment you are planning.', [
-      rRow('PI name', '', [rText(state.piName, (v) => { state.piName = v; piName.textContent = v || 'PI Planning'; save(); })]),
+      rRow('PI name', '', [rText(state.piName, (v) => { state.piName = v; save(); })]),
       rRow('ART name', 'Agile Release Train', [rText(state.artName, (v) => { state.artName = v || 'ART'; save(); })]),
     ]));
 
     // Cadence
-    const lastIsIP = state.sprints[state.sprints.length - 1] === 'IP';
+    const lastIsIP = /IP/i.test(state.sprints[state.sprints.length - 1] || '');
     const chips = el('div', { class: 'iter-chips' }, state.sprints.map((s) => el('span', { text: s })));
     body.appendChild(rCard('Cadence', 'Shape the iterations that make up the PI.', [
       rRow('Iterations', '1–12 sprints', [rStepper(state.sprints.length, 1, 12, setIterationCount)]),
@@ -910,9 +754,9 @@
       rRow('Iteration length', 'Weeks per iteration', [rNum(state.iterationWeeks, 1, (v) => { state.iterationWeeks = v || 1; save(); }), el('span', { class: 'pts-unit', text: 'wks' })]),
       rRow('Last iteration is IP', 'Innovation & Planning buffer', [rToggle(lastIsIP, (on) => {
         const last = state.sprints.length - 1;
-        if (on) state.sprints[last] = 'IP';
-        else if (state.sprints[last] === 'IP') state.sprints[last] = 'Sprint ' + (last + 1);
-        save(); renderBoard(); renderSettings();
+        if (on) state.sprints[last] = 'IP Iteration';
+        else if (/IP/i.test(state.sprints[last])) state.sprints[last] = 'Iteration ' + (last + 1);
+        save(); renderCanvasIfVisible(); renderSettings();
       })]),
     ]));
 
@@ -921,7 +765,7 @@
       rRow('Default team capacity', 'Points / iteration for new teams', [rNum(state.defaultCapacity, 0, (v) => { state.defaultCapacity = v; save(); })]),
       rRow('Apply to existing teams', 'Overwrite every team with the default', [
         el('button', { class: 'r-btn', type: 'button', text: 'Apply to ' + state.teams.length + ' teams',
-          onclick: () => { state.teams.forEach((t) => { t.capacity = state.defaultCapacity; }); save(); renderBoard(); renderSide(); renderSettings(); } }),
+          onclick: () => { state.teams.forEach((t) => { t.capacity = state.defaultCapacity; }); save(); renderCanvasIfVisible(); renderSide(); renderSettings(); } }),
       ]),
     ]));
 
@@ -965,22 +809,14 @@
 
   // ---------- Global ----------
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    if (!boardScreen.hidden && linkSrc) { cancelLink(); return; }
-    closeUserMenu();
+    if (e.key === 'Escape') closeUserMenu();
   });
-  window.addEventListener('resize', () => { if (!boardScreen.hidden) requestAnimationFrame(drawDeps); });
-  boardScroll.addEventListener('scroll', () => { /* deps are content-relative; no redraw needed */ }, { passive: true });
 
   function fullRender() {
     applyTheme();
-    piName.textContent = state.piName || 'PI Planning';
-    renderBoard();
-    updateLegend();
-    renderRisks();
-    renderVote();
     renderSide();
     renderPage(currentPage);
+    if (!boardScreen.hidden) renderBoardView();
   }
 
   // ---------- Boot ----------
