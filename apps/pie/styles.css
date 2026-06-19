@@ -42,9 +42,9 @@ body {
   --r-line: #e6e8ee; --r-dim: #5f6775; --r-faint: #9aa1ad;
 }
 
-/* canvas viewport (pannable / zoomable) */
+/* canvas viewport (pannable / zoomable) — sits below the static top nav */
 .canvas-wrap {
-  position: absolute; inset: 0; overflow: hidden;
+  position: absolute; top: 56px; left: 0; right: 0; bottom: 0; overflow: hidden;
   background:
     radial-gradient(circle, rgba(20,30,60,.06) 1px, transparent 1px) 0 0 / 26px 26px,
     #eef0f4;
@@ -107,11 +107,20 @@ body {
 .sr-btn.on { background: #1b1f27; color: #fff; }
 .sr-sep { width: 22px; height: 1px; background: var(--r-line); margin: 4px 0; }
 
-/* ---------- Whiteboard panels ---------- */
-.wb-panel {
-  position: absolute; background: #fff; border: 1px solid #e3e6ec; border-radius: 14px;
-  box-shadow: 0 6px 20px rgba(20,30,50,.06); display: flex; flex-direction: column; overflow: hidden;
+/* ---------- One continuous board sheet ---------- */
+.board-sheet {
+  position: absolute; inset: 0; background: #fff;
+  border: 1px solid #dfe2e9; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 12px 44px rgba(20,30,50,.12);
 }
+
+/* ---------- Whiteboard panels (cells of the sheet, no gaps) ---------- */
+.wb-panel {
+  position: absolute; background: #fff; display: flex; flex-direction: column; overflow: hidden;
+  border-right: 1px solid #ebedf2; border-bottom: 1px solid #ebedf2;
+}
+.wb-panel.last-col { border-right: 0; }
+.wb-panel.last-row { border-bottom: 0; }
 .panel-h { flex: 0 0 auto; padding: 12px 14px 10px; border-bottom: 1px solid #f0f1f5; }
 .ph-row1 { display: flex; align-items: center; gap: 8px; }
 .ph-bm { width: 16px; height: 16px; stroke: #b7bdc9; flex: 0 0 auto; }

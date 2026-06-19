@@ -312,57 +312,74 @@
       '<div class="panel-b rk-body">' + (rows || '<div class="rk-empty">No risks captured yet.</div>') + '</div>';
   }
 
-  // ---------- Canvas (whiteboard plane) ----------
-  const PW = 460, PH = 520, PCOLS = 4, PGAP = 28, PADX = 28, PADY = 28;
+  // ---------- Canvas (one continuous board sheet) ----------
+  const PW = 460, PH = 520, PCOLS = 4, PAD = 26, MAXZOOM = 3;
+  let boardW = 0, boardH = 0;
   function renderCanvas() {
     const iters = state.sprints.map((name, idx) => ({ type: 'iter', idx, name }));
     const items = iters.slice(0, 4).concat([{ type: 'obj' }, { type: 'risk' }]).concat(iters.slice(4));
     const rows = Math.ceil(items.length / PCOLS);
-    canvas.style.width = (PADX * 2 + PCOLS * PW + (PCOLS - 1) * PGAP) + 'px';
-    canvas.style.height = (PADY * 2 + rows * PH + (rows - 1) * PGAP) + 'px';
-    canvas.innerHTML = items.map((it, k) => {
+    boardW = PCOLS * PW; boardH = rows * PH;
+    canvas.style.width = boardW + 'px';
+    canvas.style.height = boardH + 'px';
+    const cells = items.map((it, k) => {
       const col = k % PCOLS, row = Math.floor(k / PCOLS);
-      const x = PADX + col * (PW + PGAP), y = PADY + row * (PH + PGAP);
-      const pos = 'left:' + x + 'px;top:' + y + 'px;width:' + PW + 'px;height:' + PH + 'px';
-      if (it.type === 'iter') return '<section class="wb-panel iboard" style="' + pos + '">' + iterPanel(it.idx, it.name) + '</section>';
-      if (it.type === 'obj') return '<section class="wb-panel objp" style="' + pos + '">' + objPanel() + '</section>';
-      return '<section class="wb-panel riskp" style="' + pos + '">' + riskPanel() + '</section>';
+      const cls = 'wb-panel' + (col === PCOLS - 1 ? ' last-col' : '') + (row === rows - 1 ? ' last-row' : '');
+      const pos = 'left:' + (col * PW) + 'px;top:' + (row * PH) + 'px;width:' + PW + 'px;height:' + PH + 'px';
+      if (it.type === 'iter') return '<section class="' + cls + ' iboard" style="' + pos + '">' + iterPanel(it.idx, it.name) + '</section>';
+      if (it.type === 'obj') return '<section class="' + cls + ' objp" style="' + pos + '">' + objPanel() + '</section>';
+      return '<section class="' + cls + ' riskp" style="' + pos + '">' + riskPanel() + '</section>';
     }).join('');
+    canvas.innerHTML = '<div class="board-sheet">' + cells + '</div>';
   }
-  function renderCanvasIfVisible() { if (!boardScreen.hidden) renderCanvas(); }
+  function renderCanvasIfVisible() { if (!boardScreen.hidden) { renderCanvas(); fitView(); } }
 
   // ---------- Zoom control ----------
   function renderZoomCtl() {
     zoomctl.innerHTML =
-      '<button class="z-btn" type="button" data-z="fit" title="Fit / reset">' + bIcon('fit') + '</button>' +
+      '<button class="z-btn" type="button" data-z="fit" title="Fit board (100%)">' + bIcon('fit') + '</button>' +
       '<button class="z-btn" type="button" data-z="out" title="Zoom out">' + bIcon('minus') + '</button>' +
       '<span class="z-val">100%</span>' +
       '<button class="z-btn" type="button" data-z="in" title="Zoom in">' + bIcon('plus') + '</button>' +
       '<button class="z-btn z-help" type="button" title="Help">' + bIcon('help') + '</button>';
   }
 
-  // ---------- View transform (pan + zoom) ----------
-  let view = { x: 60, y: 96, scale: 0.8 };
+  // ---------- Bounded view transform (pan + zoom) ----------
+  // 100% = whole board fit in the viewport (with a little padding). You can
+  // only zoom IN from there; panning is clamped to the board's edges.
+  let view = { x: 0, y: 0, scale: 1 };
   let pan = null;
   function clampN(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function fitScale() {
+    const vw = canvasWrap.clientWidth, vh = canvasWrap.clientHeight;
+    if (!boardW || !boardH) return 1;
+    return Math.min((vw - PAD * 2) / boardW, (vh - PAD * 2) / boardH);
+  }
+  function clampView() {
+    const vw = canvasWrap.clientWidth, vh = canvasWrap.clientHeight;
+    const bw = boardW * view.scale, bh = boardH * view.scale;
+    view.x = bw <= vw ? (vw - bw) / 2 : clampN(view.x, vw - bw, 0);
+    view.y = bh <= vh ? (vh - bh) / 2 : clampN(view.y, vh - bh, 0);
+  }
   function applyView() {
     canvas.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.scale + ')';
     const z = zoomctl.querySelector('.z-val');
-    if (z) z.textContent = Math.round(view.scale * 100) + '%';
+    if (z) z.textContent = Math.round((view.scale / (fitScale() || 1)) * 100) + '%';
   }
-  function resetView() { view = { x: 60, y: 96, scale: 0.8 }; applyView(); }
-  function zoomAt(mx, my, ns) {
-    ns = clampN(ns, 0.3, 2.4);
+  function fitView() { view.scale = fitScale(); clampView(); applyView(); }
+  function setScale(ns, mx, my) {
+    const fs = fitScale();
+    ns = clampN(ns, fs, fs * MAXZOOM);
     const wx = (mx - view.x) / view.scale, wy = (my - view.y) / view.scale;
     view.scale = ns; view.x = mx - wx * ns; view.y = my - wy * ns;
-    applyView();
+    clampView(); applyView();
   }
-  function zoomBy(f) { const r = canvasWrap.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, view.scale * f); }
+  function zoomBy(f) { setScale(view.scale * f, canvasWrap.clientWidth / 2, canvasWrap.clientHeight / 2); }
 
   canvasWrap.addEventListener('wheel', (e) => {
     e.preventDefault();
     const r = canvasWrap.getBoundingClientRect();
-    zoomAt(e.clientX - r.left, e.clientY - r.top, view.scale * (1 - e.deltaY * 0.0012));
+    setScale(view.scale * (1 - e.deltaY * 0.0012), e.clientX - r.left, e.clientY - r.top);
   }, { passive: false });
   canvasWrap.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
@@ -375,11 +392,16 @@
     if (!pan || e.pointerId !== pan.id) return;
     view.x = pan.vx + (e.clientX - pan.x);
     view.y = pan.vy + (e.clientY - pan.y);
-    applyView();
+    clampView(); applyView();
   });
   function endPan(e) { if (pan && e.pointerId === pan.id) { pan = null; canvasWrap.classList.remove('grabbing'); } }
   canvasWrap.addEventListener('pointerup', endPan);
   canvasWrap.addEventListener('pointercancel', endPan);
+  window.addEventListener('resize', () => {
+    if (boardScreen.hidden) return;
+    if (view.scale < fitScale()) view.scale = fitScale();
+    clampView(); applyView();
+  });
 
   // ---------- Chrome interactions ----------
   srail.addEventListener('click', (e) => {
@@ -395,9 +417,9 @@
   zoomctl.addEventListener('click', (e) => {
     const b = e.target.closest('[data-z]'); if (!b) return;
     const z = b.dataset.z;
-    if (z === 'in') zoomBy(1.15);
-    else if (z === 'out') zoomBy(1 / 1.15);
-    else if (z === 'fit') resetView();
+    if (z === 'in') zoomBy(1.2);
+    else if (z === 'out') zoomBy(1 / 1.2);
+    else if (z === 'fit') fitView();
   });
 
   function renderBoardView() {
@@ -405,7 +427,7 @@
     renderSideRail();
     renderZoomCtl();
     renderCanvas();
-    applyView();
+    fitView();
   }
 
   // ---------- Theming (driven by PIE Recipe) ----------
