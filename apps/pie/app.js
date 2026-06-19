@@ -20,7 +20,10 @@
 
   // ---------- DOM ----------
   const loading = document.getElementById('app-loading');
-  const app = document.getElementById('app');
+  const shell = document.getElementById('shell');
+  const sideEl = document.getElementById('side');
+  const mainEl = document.getElementById('main');
+  const boardScreen = document.getElementById('board-screen');
   const grid = document.getElementById('grid');
   const boardContent = document.getElementById('board-content');
   const boardScroll = document.getElementById('board-scroll');
@@ -88,6 +91,37 @@
     KINDS.forEach((k) => {
       s.kinds[k] = Object.assign({}, KIND_DEFAULTS[k], s.kinds[k]);
     });
+    // Shell / dashboard data (illustrative — distinct from the reference app)
+    s.plan = Object.assign({ name: 'Team', teamLimit: 60, renews: '92d' }, s.plan);
+    s.org = Object.assign({ arts: 3, users: 42 }, s.org);
+    if (!Array.isArray(s.sessions)) {
+      s.sessions = [
+        { id: uid(), name: 'PI 2026.Q3 — Core Platform', updated: '2h ago', live: true },
+        { id: uid(), name: 'PI 2026.Q2 — Mobile ART', updated: '3d ago' },
+        { id: uid(), name: 'Hardening & launch review', updated: '5d ago' },
+        { id: uid(), name: 'PI 2026.Q1 — Payments', updated: '2w ago' },
+      ];
+      s.sessionTotal = 12;
+    }
+    if (!Array.isArray(s.connections)) {
+      s.connections = [
+        { id: uid(), name: 'platform-jira', type: 'Jira', ok: true },
+        { id: uid(), name: 'Mobile delivery board', type: 'Azure DevOps', ok: true },
+        { id: uid(), name: 'Payments RTC', type: 'Rally', ok: true },
+        { id: uid(), name: 'Insights GitLab', type: 'GitLab', ok: false },
+      ];
+      s.connectionTotal = 7;
+    }
+    if (!Array.isArray(s.events)) {
+      s.events = [
+        { id: uid(), text: 'Synced 38 features from platform-jira', source: 'platform-jira', ago: '2h', ok: true },
+        { id: uid(), text: 'Capacity recalculated for Core Platform', source: 'system', ago: '5h', ok: true },
+        { id: uid(), text: 'Webhook delivered: PI objective updated', source: 'Mobile delivery board', ago: '1d', ok: true },
+        { id: uid(), text: 'Sync failed: rate limit on Insights GitLab', source: 'Insights GitLab', ago: '1d', ok: false },
+        { id: uid(), text: '12 stories imported into Payments', source: 'Payments RTC', ago: '2d', ok: true },
+        { id: uid(), text: 'Connection check failed: auth token expired', source: 'Insights GitLab', ago: '2d', ok: false },
+      ];
+    }
     return s;
   }
 
@@ -536,18 +570,14 @@
     if (!parts.length) return 'PI';
     return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
   }
-  function updateAvatar() {
-    const ini = initials(state.user.name);
-    document.getElementById('avatar-initials').textContent = ini;
-    document.getElementById('menu-avatar').textContent = ini;
-    document.getElementById('menu-name').textContent = state.user.name;
-    document.getElementById('menu-role').textContent = state.user.role;
-  }
   function updateLegend() {
     document.querySelectorAll('.legend .lg[data-kind]').forEach((sp) => {
       const k = sp.dataset.kind;
       if (state.kinds[k] && sp.childNodes[1]) sp.childNodes[1].nodeValue = ' ' + state.kinds[k].label;
     });
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
 
   // ---------- Data operations ----------
@@ -571,51 +601,227 @@
         s.cards = s.cards || []; s.deps = s.deps || []; s.risks = s.risks || [];
         state = normalize(s);
         save(); fullRender();
-        if (!recipeEl.hidden) renderRecipe();
       } catch (_) { alert('That file is not a valid Pie plan.'); }
       importFile.value = '';
     };
     reader.readAsText(f);
   });
   function resetPlan() {
-    if (!confirm('Reset the board to the sample plan? This clears your changes.')) return;
+    if (!confirm('Reset the plan to the sample? This clears your changes.')) return;
     state = sampleState(); save(); fullRender();
-    if (!recipeEl.hidden) renderRecipe();
   }
   function quit() {
     if (window.self !== window.top) window.parent.postMessage({ type: 'close-game' }, '*');
     else location.href = '../../';
   }
 
-  // ---------- Toolbar ----------
+  // ---------- Board toolbar ----------
   document.getElementById('add-team').addEventListener('click', addTeam);
   document.getElementById('add-sprint').addEventListener('click', addSprint);
+  document.getElementById('export-btn').addEventListener('click', exportPlan);
+  document.getElementById('board-back').addEventListener('click', exitBoard);
   document.getElementById('risk-add-btn').addEventListener('click', addRisk);
   riskInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addRisk(); });
 
   piName.addEventListener('blur', () => { state.piName = piName.textContent.trim() || 'PI Planning'; save(); });
   piName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); piName.blur(); } });
 
-  // ---------- User avatar dropdown ----------
-  const avatarBtn = document.getElementById('avatar-btn');
-  const userMenu = document.getElementById('user-menu');
-  function setMenu(open) {
-    userMenu.hidden = !open;
-    avatarBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  // ---------- Light shell: sidebar + routed pages ----------
+  let currentPage = 'home';
+
+  function icon(name, cls) {
+    const P = {
+      home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
+      sessions: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="16" rx="1"/><rect x="17" y="8" width="4" height="12" rx="1"/>',
+      org: '<circle cx="12" cy="5" r="2.2"/><circle cx="5" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/><path d="M12 7.2v3.8M12 11H5v5.8M12 11h7v5.8"/>',
+      users: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0111 0"/><path d="M16 5.5a3 3 0 010 5"/><path d="M20.5 19a5 5 0 00-3.5-4.5"/>',
+      alm: '<path d="M9.5 13.5a4 4 0 005.7 0l2.3-2.3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14.5 10.5a4 4 0 00-5.7 0l-2.3 2.3a4 4 0 005.7 5.7l1-1"/>',
+      sso: '<path d="M12 3l8 3v6c0 4.8-3.4 7.6-8 9-4.6-1.4-8-4.2-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+      billing: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/>',
+      settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19"/>',
+      plus: '<path d="M12 5v14M5 12h14"/>',
+      refresh: '<path d="M20 11a8 8 0 10-1.7 5.4"/><path d="M20 4v5h-5"/>',
+    };
+    return '<svg class="' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (P[name] || '') + '</svg>';
   }
-  avatarBtn.addEventListener('click', (e) => { e.stopPropagation(); setMenu(userMenu.hidden); });
-  document.addEventListener('click', (e) => {
-    if (!userMenu.hidden && !e.target.closest('.avatar-wrap')) setMenu(false);
+
+  function closeUserMenu() { const m = document.getElementById('user-menu'); if (m) m.hidden = true; }
+
+  function renderSide() {
+    const u = state.user;
+    const teams = state.teams.length;
+    const lim = state.plan.teamLimit || 1;
+    const pct = Math.max(4, Math.min(100, Math.round((teams / lim) * 100)));
+    const nav = [
+      ['home', 'Home', 'home'], ['sessions', 'PI Sessions', 'sessions'],
+      ['org', 'Organization', 'org'], ['users', 'Users', 'users'],
+      ['connections', 'ALM Connections', 'alm'], ['sso', 'SSO', 'sso'],
+      ['billing', 'Billing', 'billing'], ['settings', 'Settings', 'settings'],
+    ];
+    sideEl.innerHTML =
+      '<div class="side-brand"><span class="logo">🥧</span><b>pieplanning</b></div>' +
+      '<button class="side-app" type="button" data-act="open-app">Pie app <span>↗</span></button>' +
+      '<nav class="side-nav">' + nav.map((n) =>
+        '<button class="nav-i' + (currentPage === n[0] ? ' active' : '') + '" type="button" data-page="' + n[0] + '">' +
+        icon(n[2]) + '<span>' + n[1] + '</span>' + (n[0] === 'org' ? '<span class="chev">▾</span>' : '') + '</button>').join('') +
+      '</nav>' +
+      '<div class="side-foot">' +
+        '<div class="plan-card"><div class="pc-label">' + esc(state.plan.name) + ' plan</div>' +
+          '<div class="pc-val"><b>' + teams + '</b> / ' + lim + ' teams</div>' +
+          '<div class="pc-bar"><i style="width:' + pct + '%"></i></div></div>' +
+        '<div class="user-chip-wrap">' +
+          '<button class="user-chip" type="button" data-act="user-menu"><span class="avatar">' + esc(initials(u.name)) + '</span>' +
+            '<span class="u-name">' + esc(u.name) + '</span><span class="u-chev">⌄</span></button>' +
+          '<div class="menu" id="user-menu" role="menu" hidden>' +
+            '<button class="menu-item" type="button" data-act="settings"><span>⚙</span> Settings</button>' +
+            '<button class="menu-item" type="button" data-act="export"><span>⤓</span> Export plan</button>' +
+            '<div class="menu-sep"></div>' +
+            '<button class="menu-item danger" type="button" data-act="quit"><span>⤴</span> Exit to arcade</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+  function updateAvatar() { renderSide(); }
+
+  sideEl.addEventListener('click', (e) => {
+    const nav = e.target.closest('.nav-i');
+    if (nav) { navigate(nav.dataset.page); return; }
+    const act = e.target.closest('[data-act]');
+    if (!act) return;
+    const a = act.dataset.act;
+    if (a === 'open-app') enterBoard(state.piName);
+    else if (a === 'user-menu') { e.stopPropagation(); const m = document.getElementById('user-menu'); m.hidden = !m.hidden; }
+    else if (a === 'settings') { closeUserMenu(); navigate('settings'); }
+    else if (a === 'export') { closeUserMenu(); exportPlan(); }
+    else if (a === 'quit') quit();
   });
-  document.getElementById('menu-export').addEventListener('click', () => { setMenu(false); exportPlan(); });
-  document.getElementById('menu-quit').addEventListener('click', quit);
-  document.getElementById('open-recipe').addEventListener('click', () => { setMenu(false); openRecipe(); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.user-chip-wrap')) closeUserMenu(); });
 
-  // ---------- PIE Recipe (Settings · RTE Cockpit) ----------
-  const recipeEl = document.getElementById('recipe');
-  function openRecipe() { renderRecipe(); recipeEl.hidden = false; recipeEl.scrollTop = 0; }
-  function closeRecipe() { recipeEl.hidden = true; renderBoard(); updateLegend(); }
+  function navigate(page) { currentPage = page; renderSide(); renderPage(page); mainEl.scrollTop = 0; }
+  function renderPage(page) {
+    if (page === 'home') return renderHome();
+    if (page === 'sessions') return renderSessions();
+    if (page === 'connections') return renderConnections();
+    if (page === 'settings') return renderSettings();
+    return renderStub(page);
+  }
 
+  function statHtml(k, v, s) {
+    return '<div class="stat"><div class="s-k">' + esc(k) + '</div><div class="s-v">' + esc(v) + '</div><div class="s-s">' + esc(s) + '</div></div>';
+  }
+  function sessionRows() {
+    return state.sessions.map((s) =>
+      '<div class="p-row" data-act="open-session" data-name="' + esc(s.name) + '">' +
+        (s.live ? '<span class="dot-ok"></span>' : '') +
+        '<span class="p-name">' + esc(s.name) + '</span>' +
+        '<span class="p-time">' + esc(s.updated || '') + '</span>' +
+        '<button class="p-kebab" type="button" data-act="kebab" aria-label="More">⋮</button>' +
+      '</div>').join('');
+  }
+  function connectionRows() {
+    return state.connections.map((c) =>
+      '<div class="p-row" data-act="goto" data-page="connections">' +
+        '<span class="' + (c.ok ? 'dot-ok' : 'dot-err') + '"></span>' +
+        '<span class="p-name">' + esc(c.name) + '</span>' +
+        '<span class="p-tag">' + esc(c.type) + '</span>' +
+        '<button class="p-kebab" type="button" data-act="kebab" aria-label="More">⋮</button>' +
+      '</div>').join('');
+  }
+  function panel(iconName, title, addAct, addPage, rows, footLabel, footTotal, footPage) {
+    return '<div class="panel">' +
+      '<div class="panel-head">' + icon(iconName, 'ph-ico') + '<h2>' + esc(title) + '</h2>' +
+        '<button class="panel-act" type="button" data-act="' + addAct + '" data-page="' + addPage + '" data-name="' + esc(state.piName) + '" aria-label="Add">' + icon('plus') + '</button></div>' +
+      '<div class="p-list">' + rows + '</div>' +
+      '<div class="panel-foot"><a data-act="goto" data-page="' + footPage + '">' + esc(footLabel) + ' ›</a><span class="pf-total">' + esc(footTotal) + '</span></div>' +
+    '</div>';
+  }
+
+  function renderHome() {
+    const u = state.user;
+    const first = esc(String(u.name).trim().split(/\s+/)[0] || 'there');
+    const date = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short' });
+    const teams = state.teams.length;
+    const events = state.events.map((ev) =>
+      '<div class="p-row">' +
+        '<span class="' + (ev.ok ? 'dot-ok' : 'dot-err') + '"></span>' +
+        '<span class="p-name">' + esc(ev.text) + '</span>' +
+        '<span class="p-tag">' + esc(ev.source) + '</span>' +
+        '<span class="p-time">' + esc(ev.ago) + '</span>' +
+      '</div>').join('');
+    mainEl.innerHTML =
+      '<section class="page">' +
+        '<div class="dash-head">' +
+          '<div class="dash-hi"><h1>Hi ' + first + '</h1><div class="d-date">' + esc(date) + '</div></div>' +
+          '<div class="stats">' +
+            statHtml('ARTS', state.org.arts, 'active') +
+            statHtml('TEAMS', teams, 'of ' + (state.plan.teamLimit)) +
+            statHtml('USERS', state.org.users, 'registered') +
+            statHtml('PLAN', state.plan.name, 'renews ' + state.plan.renews) +
+          '</div>' +
+        '</div>' +
+        '<div class="cards-2">' +
+          panel('sessions', 'PI sessions', 'open-session', '', sessionRows(), 'View all sessions', state.sessionTotal + ' total', 'sessions') +
+          panel('alm', 'ALM connections', 'goto', 'connections', connectionRows(), 'View all connections', state.connectionTotal + ' total', 'connections') +
+        '</div>' +
+        '<div class="panel events">' +
+          '<div class="panel-head">' + icon('refresh', 'ph-ico') + '<h2>Recent ALM events</h2>' +
+            '<button class="panel-act" type="button" data-act="refresh-events" aria-label="Refresh">' + icon('refresh') + '</button></div>' +
+          '<div class="p-list">' + events + '</div><div style="height:8px"></div>' +
+        '</div>' +
+      '</section>';
+  }
+  function renderSessions() {
+    mainEl.innerHTML =
+      '<section class="page"><h1 class="page-h">PI Sessions</h1>' +
+      '<p class="page-sub">Open a planning board or start a new increment.</p>' +
+      '<div class="panel"><div class="p-list" style="padding-top:8px">' + sessionRows() + '</div>' +
+      '<div class="panel-foot"><a data-act="open-session" data-name="' + esc(state.piName) + '">+ New session</a>' +
+      '<span class="pf-total">' + state.sessionTotal + ' total</span></div></div></section>';
+  }
+  function renderConnections() {
+    mainEl.innerHTML =
+      '<section class="page"><h1 class="page-h">ALM Connections</h1>' +
+      '<p class="page-sub">Where Pie syncs features, stories and objectives.</p>' +
+      '<div class="panel"><div class="p-list" style="padding-top:8px">' + connectionRows() + '</div>' +
+      '<div class="panel-foot"><span class="pf-total">' + state.connectionTotal + ' total</span></div></div></section>';
+  }
+  function renderStub(page) {
+    const meta = {
+      org: ['Organization', 'Manage ARTs, value streams and team topology.'],
+      users: ['Users', 'Invite teammates and manage their roles.'],
+      sso: ['SSO', 'Configure single sign-on for your organization.'],
+      billing: ['Billing', 'Plan, invoices and usage.'],
+    };
+    const m = meta[page] || [page, ''];
+    mainEl.innerHTML =
+      '<section class="page"><h1 class="page-h">' + esc(m[0]) + '</h1><p class="page-sub">' + esc(m[1]) + '</p>' +
+      '<div class="page-empty"><h2>Coming soon</h2><div>This area isn’t wired up yet — the PIE Recipe (Settings) and your planning board are the live surfaces for now.</div></div></section>';
+  }
+
+  mainEl.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-act]');
+    if (!a) return;
+    const act = a.dataset.act;
+    if (act === 'kebab') { e.stopPropagation(); return; }
+    if (act === 'open-session') enterBoard(a.dataset.name || state.piName);
+    else if (act === 'goto') navigate(a.dataset.page);
+    else if (act === 'refresh-events') renderHome();
+  });
+
+  // ---------- Board navigation ----------
+  function enterBoard(name) {
+    closeUserMenu();
+    if (name) { state.piName = name; piName.textContent = name; save(); }
+    shell.hidden = true; boardScreen.hidden = false;
+    renderBoard(); renderRisks(); renderVote(); updateLegend();
+    requestAnimationFrame(() => requestAnimationFrame(drawDeps));
+  }
+  function exitBoard() {
+    boardScreen.hidden = true; shell.hidden = false;
+    navigate(currentPage);
+  }
+
+  // ---------- PIE Recipe (Settings page) ----------
   // small light-form builders
   function rRow(title, sub, ctls) {
     return el('div', { class: 'r-row' }, [
@@ -672,20 +878,16 @@
     } else {
       for (let i = cur; i < n; i++) state.sprints.push('Sprint ' + (i + 1));
     }
-    save(); renderBoard(); renderRecipe();
+    save(); renderBoard(); renderSettings();
   }
 
-  function renderRecipe() {
-    recipeEl.innerHTML = '';
-    const bar = el('div', { class: 'recipe-bar' }, [
-      el('button', { class: 'r-back', type: 'button', 'aria-label': 'Back to board', text: '←', onclick: closeRecipe }),
-      el('div', { class: 'r-title' }, [
-        el('h2', { text: 'PIE Recipe' }),
-        el('span', { class: 'r-sub', text: 'RTE Cockpit · ' + state.artName }),
-      ]),
-      el('span', { class: 'r-logo', text: '🥧' }),
+  function renderSettings() {
+    mainEl.innerHTML = '';
+    const page = el('section', { class: 'page' }, [
+      el('h1', { class: 'page-h', text: 'PIE Recipe' }),
+      el('p', { class: 'page-sub', text: 'RTE Cockpit · ' + state.artName + ' · ' + state.piName }),
     ]);
-    const body = el('div', { class: 'recipe-body' });
+    const body = el('div', { class: 'recipe' });
 
     // Profile
     body.appendChild(rCard('Profile', 'Identity shown on your avatar and menu.', [
@@ -710,7 +912,7 @@
         const last = state.sprints.length - 1;
         if (on) state.sprints[last] = 'IP';
         else if (state.sprints[last] === 'IP') state.sprints[last] = 'Sprint ' + (last + 1);
-        save(); renderBoard(); renderRecipe();
+        save(); renderBoard(); renderSettings();
       })]),
     ]));
 
@@ -719,7 +921,7 @@
       rRow('Default team capacity', 'Points / iteration for new teams', [rNum(state.defaultCapacity, 0, (v) => { state.defaultCapacity = v; save(); })]),
       rRow('Apply to existing teams', 'Overwrite every team with the default', [
         el('button', { class: 'r-btn', type: 'button', text: 'Apply to ' + state.teams.length + ' teams',
-          onclick: () => { state.teams.forEach((t) => { t.capacity = state.defaultCapacity; }); save(); renderBoard(); renderRecipe(); } }),
+          onclick: () => { state.teams.forEach((t) => { t.capacity = state.defaultCapacity; }); save(); renderBoard(); renderSide(); renderSettings(); } }),
       ]),
     ]));
 
@@ -740,7 +942,7 @@
     const presetEls = el('div', { class: 'presets' }, presets.map((c) =>
       el('button', { type: 'button', class: c.toLowerCase() === state.accent.toLowerCase() ? 'on' : '',
         style: 'background:' + c, 'aria-label': c,
-        onclick: () => { state.accent = c; applyTheme(); save(); renderRecipe(); } })));
+        onclick: () => { state.accent = c; applyTheme(); save(); renderSettings(); } })));
     body.appendChild(rCard('Appearance', 'Accent color for the app chrome.', [
       rRow('Accent color', 'Pick a preset or a custom color', [
         presetEls,
@@ -757,40 +959,39 @@
 
     body.appendChild(el('div', { class: 'r-foot-note', text: '🥧 Pie · PI Planning — changes save automatically' }));
 
-    recipeEl.appendChild(bar);
-    recipeEl.appendChild(body);
+    page.appendChild(body);
+    mainEl.appendChild(page);
   }
 
   // ---------- Global ----------
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (!recipeEl.hidden) closeRecipe();
-    else if (!userMenu.hidden) setMenu(false);
-    else if (linkSrc) cancelLink();
+    if (!boardScreen.hidden && linkSrc) { cancelLink(); return; }
+    closeUserMenu();
   });
-  window.addEventListener('resize', () => requestAnimationFrame(drawDeps));
+  window.addEventListener('resize', () => { if (!boardScreen.hidden) requestAnimationFrame(drawDeps); });
   boardScroll.addEventListener('scroll', () => { /* deps are content-relative; no redraw needed */ }, { passive: true });
 
   function fullRender() {
     applyTheme();
-    updateAvatar();
     piName.textContent = state.piName || 'PI Planning';
     renderBoard();
     updateLegend();
     renderRisks();
     renderVote();
+    renderSide();
+    renderPage(currentPage);
   }
 
   // ---------- Boot ----------
   fullRender();
-  app.hidden = false;
-  // redraw once layout settles (fonts/sticky measured)
-  requestAnimationFrame(() => requestAnimationFrame(drawDeps));
+  shell.hidden = false;
+  boardScreen.hidden = true;
 
   const startTime = Date.now();
   function reveal() {
     const delay = Math.max(0, 3000 - (Date.now() - startTime));
-    setTimeout(() => { loading.classList.add('hidden'); drawDeps(); }, delay);
+    setTimeout(() => { loading.classList.add('hidden'); }, delay);
   }
   if (document.readyState === 'complete') reveal();
   else window.addEventListener('load', reveal);
