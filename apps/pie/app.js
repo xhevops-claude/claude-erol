@@ -18,6 +18,39 @@
     { cat: 'M', label: 'Mitigated' },
   ];
 
+  // Plausible PI objectives (our own copy — not lifted from the reference).
+  const OBJ_POOL = [
+    'Cut checkout latency by 30% across web and mobile.',
+    'Ship the new onboarding flow to 100% of users.',
+    'Reduce support tickets with in-app self-serve help.',
+    'Migrate billing to the new ledger service.',
+    'Improve search relevance for the top 50 queries.',
+    'Launch the partner API public beta.',
+    'Harden auth with passkeys and step-up MFA.',
+    'Roll out usage-based pricing experiments.',
+    'Halve cold-start time for the mobile app.',
+    'Deliver the redesigned reporting dashboard.',
+  ];
+  const ART_OBJ = [
+    { title: 'Unify the experience across surfaces', desc: 'Our objective is to give customers one coherent journey across web, mobile and email, removing the rough edges between channels.' },
+    { title: 'Make insights trustworthy by default', desc: 'Tighten data accuracy and freshness so every team can rely on the numbers without second-guessing the pipeline.' },
+    { title: 'Open the platform to partners', desc: 'Ship the public API and developer portal so integrators can build on top of us without hand-holding.' },
+    { title: 'Pay down the auth & billing debt', desc: 'Consolidate identity and billing onto the new services to cut incidents and unlock faster iteration.' },
+    { title: 'Grow self-serve adoption', desc: 'Lower the barrier to first value so new accounts can succeed without talking to sales.' },
+  ];
+  function genTeamObjectives(i) {
+    const C = [1, 2, 2, 3, 2, 5], U = [1, 3, 2, 2, 1, 0];
+    const bvs = [8, 10, 13, 5];
+    const mk = (committed, seed) => ({ id: uid(), text: OBJ_POOL[seed % OBJ_POOL.length], bv: bvs[seed % bvs.length], links: 2, committed });
+    const out = [];
+    for (let k = 0; k < C[i % 6]; k++) out.push(mk(true, i + k * 3));
+    for (let k = 0; k < U[i % 6]; k++) out.push(mk(false, i + 1 + k * 2));
+    return out;
+  }
+  function genArtObjectives() {
+    return ART_OBJ.map((o, i) => ({ id: uid(), title: o.title, desc: o.desc, bv: 0, links: [7, 5, 5, 5, 3][i] || 4, committed: i < 3 }));
+  }
+
   // ---------- DOM ----------
   const loading = document.getElementById('app-loading');
   const shell = document.getElementById('shell');
@@ -28,6 +61,7 @@
   const srail = document.getElementById('srail');
   const canvas = document.getElementById('canvas');
   const canvasWrap = document.getElementById('canvas-wrap');
+  const artSide = document.getElementById('art-side');
   const zoomctl = document.getElementById('zoomctl');
 
   // ---------- State ----------
@@ -37,7 +71,7 @@
 
   function sampleState() {
     const t = (name, capacity) => ({ id: uid(), name, capacity });
-    const teams = [t('Falcon', 26), t('Otter', 22), t('Nimbus', 30)];
+    const teams = [t('Falcon', 26), t('Otter', 22), t('Nimbus', 30), t('Pangolin', 24), t('Marlin', 28), t('Comet', 20)];
     const sprints = ['Iteration 1', 'Iteration 2', 'Iteration 3', 'Iteration 4', 'Iteration 5', 'IP Iteration'];
     const C = (teamIdx, sprintIdx, title, points, kind) => ({
       id: uid(), teamId: teams[teamIdx].id, sprintIdx, title, points, kind,
@@ -80,7 +114,7 @@
     s.user = s.user || {};
     s.user.name = s.user.name || 'Erol Nas';
     s.user.role = s.user.role || 'Release Train Engineer';
-    s.artName = s.artName || 'Acme ART';
+    s.artName = s.artName || 'Digital Experience ART';
     s.iterationWeeks = s.iterationWeeks || 2;
     s.defaultCapacity = s.defaultCapacity || 20;
     s.accent = s.accent || '#f59e0b';
@@ -89,6 +123,8 @@
       s.kinds[k] = Object.assign({}, KIND_DEFAULTS[k], s.kinds[k]);
     });
     if (!Array.isArray(s.objectives)) s.objectives = [];
+    s.teams.forEach((tm, i) => { if (!Array.isArray(tm.objectives)) tm.objectives = genTeamObjectives(i); });
+    if (!Array.isArray(s.artObjectives)) s.artObjectives = genArtObjectives();
     s.context = Object.assign({ board: 'Team Board', program: 'Terra', team: 'Zürich', dates: '13 Jan - 13 Feb' }, s.context);
     // Shell / dashboard data (illustrative — distinct from the reference app)
     s.plan = Object.assign({ name: 'Team', teamLimit: 60, renews: '92d' }, s.plan);
@@ -206,24 +242,36 @@
     return '<span class="b-av" style="background:' + color + '">' + esc(initials) + '</span>';
   }
 
-  // ---------- Top navigation (static) ----------
+  // ---------- Top navigation (static, contextual to the active board) ----------
   function renderTopNav() {
     const c = state.context;
+    const obj = railActive === 'objectives';
     const avatars = [['AR', '#e0746a'], ['MK', '#6a9be0'], ['TS', '#6ad0a8'], ['JD', '#caa15a']]
       .map((a) => avatar(a[0], a[1])).join('');
-    bnav.innerHTML =
-      '<div class="bn-group bn-left">' +
+    let left, center;
+    if (obj) {
+      left =
+        '<button class="bn-ico bn-home" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
+        '<button class="bn-chip" type="button" data-nav="toggle-art">' + bIcon('objectives', 'bn-cico') +
+          '<span>' + (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives</span></button>';
+      center =
+        '<button class="bn-ico" type="button" title="Layout">' + bIcon('view') + '</button>' +
+        '<span class="bn-here">' + bIcon('objectives', 'bn-cico') + '<span>ART Objectives</span></span>';
+    } else {
+      left =
         '<button class="bn-ico bn-home" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
         '<button class="bn-ico" type="button" title="Search">' + bIcon('search') + '</button>' +
         '<button class="bn-ico" type="button" title="Boards">' + bIcon('board') + '</button>' +
-        '<button class="bn-ico" type="button" title="History">' + bIcon('history') + '</button>' +
-      '</div>' +
-      '<div class="bn-group bn-center">' +
+        '<button class="bn-ico" type="button" title="History">' + bIcon('history') + '</button>';
+      center =
         '<button class="bn-ico" type="button" title="Layout">' + bIcon('view') + '</button>' +
         '<button class="bn-chip" type="button">' + bIcon('teamboard', 'bn-cico') + '<span>' + esc(c.board) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
         '<button class="bn-chip" type="button">' + bIcon('folder', 'bn-cico') + '<span>' + esc(c.program) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
-        '<button class="bn-chip" type="button">' + bIcon('people', 'bn-cico') + '<span>' + esc(c.team) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
-      '</div>' +
+        '<button class="bn-chip" type="button">' + bIcon('people', 'bn-cico') + '<span>' + esc(c.team) + '</span>' + bIcon('chev', 'bn-chev') + '</button>';
+    }
+    bnav.innerHTML =
+      '<div class="bn-group bn-left">' + left + '</div>' +
+      '<div class="bn-group bn-center">' + center + '</div>' +
       '<div class="bn-group bn-right">' +
         '<div class="bn-avs">' + avatars + '<span class="bn-more">+1</span></div>' +
         '<button class="bn-ico" type="button" title="Snapshot">' + bIcon('snap') + '</button>' +
@@ -315,7 +363,17 @@
   // ---------- Canvas (one continuous board sheet) ----------
   const PW = 460, PH = 520, PCOLS = 4, PAD = 26, MAXZOOM = 3;
   let boardW = 0, boardH = 0;
+  const RAIL_NAMES = {
+    solbacklog: 'Solution Backlog Board', solplan: 'Solution Planning Board',
+    artbacklog: 'ART Backlog Board', artplan: 'ART Planning Board',
+    objectives: 'ART Objectives', risk: 'Risk Board', collab: 'Collaboration Boards',
+  };
   function renderCanvas() {
+    if (railActive === 'objectives') return renderObjectivesBoard();
+    if (railActive === 'team') return renderTeamBoard();
+    return renderPlaceholderBoard();
+  }
+  function renderTeamBoard() {
     const iters = state.sprints.map((name, idx) => ({ type: 'iter', idx, name }));
     const items = iters.slice(0, 4).concat([{ type: 'obj' }, { type: 'risk' }]).concat(iters.slice(4));
     const rows = Math.ceil(items.length / PCOLS);
@@ -332,6 +390,75 @@
     }).join('');
     canvas.innerHTML = '<div class="board-sheet">' + cells + '</div>';
   }
+
+  // ART Objectives: team blocks in a balanced masonry (shortest column first)
+  function objRow(o, i) {
+    return '<div class="ob-item"><div class="ob-t"><b>' + (i + 1) + '</b> ' + esc(o.text) + '</div>' +
+      '<div class="ob-meta"><span class="ob-bv">' + o.bv + ' BV</span>' +
+      '<span class="ob-lk">' + bIcon('collab', 'op-lkico') + ' ' + o.links + '</span></div></div>';
+  }
+  function objGroup(label, list) {
+    return '<div class="ob-grp"><span>' + label + '</span><span class="ob-n">' + list.length + '</span></div>' +
+      list.map(objRow).join('');
+  }
+  function teamBlock(tm) {
+    const objs = tm.objectives || [];
+    const com = objs.filter((o) => o.committed), unc = objs.filter((o) => !o.committed);
+    return '<section class="obj-block"><div class="ob-head">' + esc(tm.name) + '</div>' +
+      objGroup('Commited', com) + objGroup('Uncommitted', unc) + '</section>';
+  }
+  function estBlock(tm) {
+    const objs = tm.objectives || [];
+    return 56 + 2 * 34 + objs.length * 78; // header + 2 group labels + items
+  }
+  function renderObjectivesBoard() {
+    const COLS = 3, COLW = 474;
+    const cols = [[], [], []], colH = [0, 0, 0];
+    state.teams.forEach((tm) => {
+      const ci = colH.indexOf(Math.min.apply(null, colH));
+      cols[ci].push(tm); colH[ci] += estBlock(tm);
+    });
+    boardW = COLS * COLW;
+    canvas.style.width = boardW + 'px';
+    canvas.innerHTML = '<div class="obj-sheet">' + cols.map((teams, ci) =>
+      '<div class="obj-col' + (ci === COLS - 1 ? ' last-col' : '') + '" style="width:' + COLW + 'px">' +
+      teams.map(teamBlock).join('') + '</div>').join('') + '</div>';
+    boardH = canvas.firstChild.offsetHeight;
+    canvas.style.height = boardH + 'px';
+  }
+
+  function renderPlaceholderBoard() {
+    boardW = 1180; boardH = 720;
+    canvas.style.width = boardW + 'px';
+    canvas.style.height = boardH + 'px';
+    canvas.innerHTML = '<div class="board-sheet wb-soon"><div class="soon-card">' +
+      bIcon('apps', 'soon-ic') + '<h3>' + esc(RAIL_NAMES[railActive] || 'Board') + '</h3>' +
+      '<p>This board isn’t wired up yet — coming next.</p></div></div>';
+  }
+
+  // ART Objectives side panel (collapsible)
+  let objPanelOpen = true;
+  function renderArtSide() {
+    if (railActive !== 'objectives') { artSide.innerHTML = ''; return; }
+    const list = state.artObjectives;
+    const com = list.filter((o) => o.committed), unc = list.filter((o) => !o.committed);
+    const card = (o, i) =>
+      '<div class="as-card"><div class="as-top"><span class="as-num">' + (i + 1) + '</span>' +
+        '<div class="as-title">' + esc(o.title) + '</div>' +
+        '<button class="as-ico" type="button">' + bIcon('collab') + '</button>' +
+        '<button class="as-ico" type="button">' + bIcon('dots') + '</button></div>' +
+      '<div class="as-desc">' + esc(o.desc) + '</div><span class="as-more">See more</span>' +
+      '<div class="as-foot"><span class="as-bv"><span class="as-bv-box">' + o.bv + '</span>Business Value</span>' +
+        '<span class="as-lk">' + bIcon('collab', 'op-lkico') + ' ' + o.links + '</span></div></div>';
+    const grp = (label, arr) =>
+      '<div class="as-grp"><span>' + label + '</span><span class="as-n">' + arr.length + '</span></div>' +
+      arr.map(card).join('');
+    artSide.innerHTML =
+      '<div class="as-head"><span class="as-art">' + esc(state.artName) + '</span>' +
+        '<button class="as-add" type="button" title="Add objective">' + bIcon('plus') + '</button></div>' +
+      '<div class="as-body">' + grp('Commited', com) + grp('Uncommitted', unc) + '</div>';
+  }
+
   function renderCanvasIfVisible() { if (!boardScreen.hidden) { renderCanvas(); fitView(); } }
 
   // ---------- Zoom control ----------
@@ -407,12 +534,15 @@
   srail.addEventListener('click', (e) => {
     const b = e.target.closest('[data-rail]'); if (!b) return;
     const v = b.dataset.rail;
-    if (v === 'shift') { srail.classList.toggle('srail--right'); return; }
-    railActive = v; renderSideRail();
+    if (v === 'shift') { srail.classList.toggle('srail--right'); requestAnimationFrame(fitView); return; }
+    if (v === railActive) return;
+    railActive = v; renderBoardView();
   });
   bnav.addEventListener('click', (e) => {
     const b = e.target.closest('[data-nav]'); if (!b) return;
-    if (b.dataset.nav === 'home') exitBoard();
+    const nav = b.dataset.nav;
+    if (nav === 'home') exitBoard();
+    else if (nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); }
   });
   zoomctl.addEventListener('click', (e) => {
     const b = e.target.closest('[data-z]'); if (!b) return;
@@ -423,8 +553,11 @@
   });
 
   function renderBoardView() {
+    boardScreen.classList.toggle('obj-mode', railActive === 'objectives');
+    boardScreen.classList.toggle('obj-open', railActive === 'objectives' && objPanelOpen);
     renderTopNav();
     renderSideRail();
+    renderArtSide();
     renderZoomCtl();
     renderCanvas();
     fitView();

@@ -196,6 +196,60 @@ body {
 .z-btn:hover { background: #f1f2f6; color: #1b1f27; }
 .z-val { min-width: 44px; text-align: center; font-size: 12.5px; font-weight: 700; color: #44505f; font-variant-numeric: tabular-nums; }
 
+/* ---------- ART Objectives: contextual nav + side panel + masonry ---------- */
+.bn-here { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 6px; font-weight: 700; font-size: 14px; }
+.bn-here .bn-cico { stroke: #1b1f27; }
+
+.art-side { display: none; }
+.board-screen.obj-mode.obj-open .art-side {
+  display: flex; flex-direction: column; position: absolute; top: 56px; bottom: 0; left: 0; width: 474px; z-index: 30;
+  background: #fff; border-right: 1px solid var(--r-line); overflow: hidden;
+}
+.board-screen.obj-mode.obj-open .canvas-wrap { left: 474px; }
+.board-screen.obj-mode.obj-open .srail { display: none; }
+
+.as-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; border-bottom: 1px solid var(--r-line); flex: 0 0 auto; }
+.as-art { font-size: 15px; font-weight: 800; flex: 1 1 auto; }
+.as-add { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--r-line); background: #fff; color: #6b7480; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.as-add svg { width: 16px; height: 16px; stroke: currentColor; }
+.as-add:hover { border-color: var(--accent); color: var(--accent); }
+.as-body { flex: 1 1 auto; overflow: auto; padding: 4px 14px 20px; }
+.as-grp { display: flex; align-items: center; padding: 14px 4px 8px; font-size: 13px; font-weight: 700; color: #44505f; }
+.as-grp .as-n { margin-left: auto; color: var(--r-faint); }
+.as-card { border: 1px solid var(--r-line); border-radius: 12px; padding: 12px 13px; margin-bottom: 12px; }
+.as-top { display: flex; align-items: flex-start; gap: 8px; }
+.as-num { color: var(--r-faint); font-weight: 700; font-size: 13px; line-height: 1.5; }
+.as-title { flex: 1 1 auto; font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.as-ico { width: 26px; height: 26px; border-radius: 7px; border: 1px solid transparent; background: transparent; color: #9aa1ad; cursor: pointer; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.as-ico svg { width: 15px; height: 15px; stroke: currentColor; }
+.as-ico:hover { background: #f1f2f6; color: #1b1f27; }
+.as-desc { margin-top: 8px; font-size: 12.5px; color: var(--r-dim); display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.as-more { display: inline-block; margin-top: 5px; font-size: 12.5px; color: #3b6fd6; cursor: pointer; }
+.as-foot { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+.as-bv { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--r-dim); }
+.as-bv-box { min-width: 26px; height: 26px; padding: 0 6px; border: 1px solid var(--r-line); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #1b1f27; }
+.as-lk { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--r-dim); }
+
+.obj-sheet { position: relative; display: flex; align-items: stretch; background: #fff; border: 1px solid #dfe2e9; border-radius: 16px; box-shadow: 0 12px 44px rgba(20,30,50,.12); overflow: hidden; }
+.obj-col { flex: 0 0 auto; border-right: 1px solid #ebedf2; }
+.obj-col.last-col { border-right: 0; }
+.obj-block { padding: 16px 18px 18px; border-bottom: 1px solid #ebedf2; }
+.ob-head { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+.ob-grp { display: flex; align-items: center; padding: 12px 0 4px; font-size: 13px; font-weight: 700; color: #44505f; }
+.ob-grp .ob-n { margin-left: auto; color: var(--r-faint); }
+.ob-item { padding: 10px 0; }
+.ob-t { font-size: 13px; color: #2c333f; line-height: 1.4; }
+.ob-t b { color: var(--r-faint); font-weight: 700; margin-right: 5px; }
+.ob-meta { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.ob-bv { font-size: 11.5px; font-weight: 700; color: #44505f; background: #f1f2f6; border-radius: 6px; padding: 3px 7px; }
+.ob-lk { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--r-dim); }
+.ob-lk svg { width: 13px; height: 13px; stroke: currentColor; }
+
+.wb-soon { display: flex; align-items: center; justify-content: center; }
+.soon-card { text-align: center; color: var(--r-dim); }
+.soon-card .soon-ic { width: 34px; height: 34px; stroke: #c2c8d2; }
+.soon-card h3 { margin: 10px 0 4px; color: #1b1f27; font-size: 18px; }
+
 /* ---------- Top bar ---------- */
 .topbar {
   flex: 0 0 auto;
