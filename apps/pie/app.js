@@ -361,7 +361,7 @@
   }
 
   // ---------- Canvas (one continuous board sheet) ----------
-  const PW = 460, PH = 520, PCOLS = 4, PAD = 26, MAXZOOM = 3;
+  const PCOLS = 4, PAD = 20, MAXZOOM = 3;
   let boardW = 0, boardH = 0;
   const RAIL_NAMES = {
     solbacklog: 'Solution Backlog Board', solplan: 'Solution Planning Board',
@@ -377,18 +377,19 @@
     const iters = state.sprints.map((name, idx) => ({ type: 'iter', idx, name }));
     const items = iters.slice(0, 4).concat([{ type: 'obj' }, { type: 'risk' }]).concat(iters.slice(4));
     const rows = Math.ceil(items.length / PCOLS);
-    boardW = PCOLS * PW; boardH = rows * PH;
+    boardW = canvasWrap.clientWidth - 2 * PAD;
+    boardH = canvasWrap.clientHeight - 2 * PAD;
     canvas.style.width = boardW + 'px';
     canvas.style.height = boardH + 'px';
     const cells = items.map((it, k) => {
       const col = k % PCOLS, row = Math.floor(k / PCOLS);
       const cls = 'wb-panel' + (col === PCOLS - 1 ? ' last-col' : '') + (row === rows - 1 ? ' last-row' : '');
-      const pos = 'left:' + (col * PW) + 'px;top:' + (row * PH) + 'px;width:' + PW + 'px;height:' + PH + 'px';
-      if (it.type === 'iter') return '<section class="' + cls + ' iboard" style="' + pos + '">' + iterPanel(it.idx, it.name) + '</section>';
-      if (it.type === 'obj') return '<section class="' + cls + ' objp" style="' + pos + '">' + objPanel() + '</section>';
-      return '<section class="' + cls + ' riskp" style="' + pos + '">' + riskPanel() + '</section>';
+      if (it.type === 'iter') return '<section class="' + cls + ' iboard">' + iterPanel(it.idx, it.name) + '</section>';
+      if (it.type === 'obj') return '<section class="' + cls + ' objp">' + objPanel() + '</section>';
+      return '<section class="' + cls + ' riskp">' + riskPanel() + '</section>';
     }).join('');
-    canvas.innerHTML = '<div class="board-sheet">' + cells + '</div>';
+    canvas.innerHTML = '<div class="board-sheet" style="grid-template-columns:repeat(' + PCOLS +
+      ',1fr);grid-template-rows:repeat(' + rows + ',1fr)">' + cells + '</div>';
   }
 
   // ART Objectives: team blocks in a balanced masonry (shortest column first)
@@ -412,23 +413,27 @@
     return 56 + 2 * 34 + objs.length * 78; // header + 2 group labels + items
   }
   function renderObjectivesBoard() {
-    const COLS = 3, COLW = 474;
+    const COLS = 3;
     const cols = [[], [], []], colH = [0, 0, 0];
     state.teams.forEach((tm) => {
       const ci = colH.indexOf(Math.min.apply(null, colH));
       cols[ci].push(tm); colH[ci] += estBlock(tm);
     });
-    boardW = COLS * COLW;
+    const availW = canvasWrap.clientWidth - 2 * PAD;
+    const availH = canvasWrap.clientHeight - 2 * PAD;
+    boardW = availW;
     canvas.style.width = boardW + 'px';
+    canvas.style.height = 'auto';
     canvas.innerHTML = '<div class="obj-sheet">' + cols.map((teams, ci) =>
-      '<div class="obj-col' + (ci === COLS - 1 ? ' last-col' : '') + '" style="width:' + COLW + 'px">' +
+      '<div class="obj-col' + (ci === COLS - 1 ? ' last-col' : '') + '">' +
       teams.map(teamBlock).join('') + '</div>').join('') + '</div>';
-    boardH = canvas.firstChild.offsetHeight;
+    boardH = Math.max(canvas.firstChild.scrollHeight, availH);
     canvas.style.height = boardH + 'px';
   }
 
   function renderPlaceholderBoard() {
-    boardW = 1180; boardH = 720;
+    boardW = canvasWrap.clientWidth - 2 * PAD;
+    boardH = canvasWrap.clientHeight - 2 * PAD;
     canvas.style.width = boardW + 'px';
     canvas.style.height = boardH + 'px';
     canvas.innerHTML = '<div class="board-sheet wb-soon"><div class="soon-card">' +
@@ -478,22 +483,21 @@
   let pan = null;
   function clampN(v, a, b) { return Math.min(b, Math.max(a, v)); }
   function fitScale() {
-    const vw = canvasWrap.clientWidth, vh = canvasWrap.clientHeight;
-    if (!boardW || !boardH) return 1;
-    return Math.min((vw - PAD * 2) / boardW, (vh - PAD * 2) / boardH);
+    if (!boardW) return 1;
+    return (canvasWrap.clientWidth - PAD * 2) / boardW;
   }
   function clampView() {
-    const vw = canvasWrap.clientWidth, vh = canvasWrap.clientHeight;
+    const vw = canvasWrap.clientWidth, vh = canvasWrap.clientHeight, P = PAD;
     const bw = boardW * view.scale, bh = boardH * view.scale;
-    view.x = bw <= vw ? (vw - bw) / 2 : clampN(view.x, vw - bw, 0);
-    view.y = bh <= vh ? (vh - bh) / 2 : clampN(view.y, vh - bh, 0);
+    view.x = bw <= vw - 2 * P ? (vw - bw) / 2 : clampN(view.x, vw - P - bw, P);
+    view.y = bh <= vh - 2 * P ? (vh - bh) / 2 : clampN(view.y, vh - P - bh, P);
   }
   function applyView() {
     canvas.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.scale + ')';
     const z = zoomctl.querySelector('.z-val');
     if (z) z.textContent = Math.round((view.scale / (fitScale() || 1)) * 100) + '%';
   }
-  function fitView() { view.scale = fitScale(); clampView(); applyView(); }
+  function fitView() { view.scale = fitScale(); view.x = PAD; view.y = PAD; clampView(); applyView(); }
   function setScale(ns, mx, my) {
     const fs = fitScale();
     ns = clampN(ns, fs, fs * MAXZOOM);
@@ -525,9 +529,7 @@
   canvasWrap.addEventListener('pointerup', endPan);
   canvasWrap.addEventListener('pointercancel', endPan);
   window.addEventListener('resize', () => {
-    if (boardScreen.hidden) return;
-    if (view.scale < fitScale()) view.scale = fitScale();
-    clampView(); applyView();
+    if (!boardScreen.hidden) renderBoardView();
   });
 
   // ---------- Chrome interactions ----------
