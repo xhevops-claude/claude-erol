@@ -59,10 +59,30 @@
       <div class="tools">
         <button id="add-team" type="button">+ Team</button>
         <button id="add-sprint" type="button">+ Sprint</button>
-        <button id="export-btn" type="button" class="ghost" title="Download JSON">Export</button>
-        <button id="import-btn" type="button" class="ghost" title="Load JSON">Import</button>
-        <button id="reset-btn" type="button" class="ghost" title="Reset to sample">Reset</button>
-        <button id="quit-btn" type="button" class="ghost danger">Quit</button>
+        <div class="avatar-wrap">
+          <button id="avatar-btn" class="avatar" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
+            <span id="avatar-initials">EN</span>
+          </button>
+          <div class="menu" id="user-menu" role="menu" hidden>
+            <div class="menu-head">
+              <span class="avatar lg" id="menu-avatar" aria-hidden="true">EN</span>
+              <div class="menu-id">
+                <strong id="menu-name">Erol Nas</strong>
+                <span id="menu-role">Release Train Engineer</span>
+              </div>
+            </div>
+            <button class="menu-item" id="open-recipe" type="button" role="menuitem">
+              <span aria-hidden="true">🥧</span> PIE Recipe <small>RTE Cockpit</small>
+            </button>
+            <button class="menu-item" id="menu-export" type="button" role="menuitem">
+              <span aria-hidden="true">⤓</span> Export plan
+            </button>
+            <div class="menu-sep"></div>
+            <button class="menu-item danger" id="menu-quit" type="button" role="menuitem">
+              <span aria-hidden="true">⤴</span> Exit to arcade
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -111,6 +131,9 @@
     </section>
 
     <input type="file" id="import-file" accept="application/json,.json" hidden />
+
+    <!-- PIE Recipe (Settings · RTE Cockpit) — built by app.js -->
+    <div class="recipe" id="recipe" hidden></div>
   </div>
 
   <script src="app.js"></script>

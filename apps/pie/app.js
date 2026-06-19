@@ -3,6 +3,13 @@
 
   const STORE_KEY = 'pie-pi-planning-v1';
   const KINDS = ['story', 'feature', 'enabler', 'milestone'];
+  // Default card-type palette mirrors the CSS :root fallbacks.
+  const KIND_DEFAULTS = {
+    story: { label: 'Story', color: '#38bdf8' },
+    feature: { label: 'Feature', color: '#a78bfa' },
+    enabler: { label: 'Enabler', color: '#fbbf24' },
+    milestone: { label: 'Milestone', color: '#fb7185' },
+  };
   const ROAM = [
     { cat: 'U', label: 'Unassigned' },
     { cat: 'R', label: 'Resolved' },
@@ -56,7 +63,7 @@
       { id: uid(), from: cards[4].id, to: cards[1].id }, // billing needs login
       { id: uid(), from: cards[8].id, to: cards[7].id }, // dashboard needs pipeline
     ];
-    return {
+    return normalize({
       piName: 'PI 2026.Q3',
       teams, sprints, cards, deps,
       risks: [
@@ -64,7 +71,24 @@
         { id: uid(), text: 'Data migration window may slip', cat: 'A' },
       ],
       vote: null,
-    };
+    });
+  }
+
+  // Fill in fields added after v1 so older saved plans keep working.
+  function normalize(s) {
+    s.piName = s.piName || 'PI Planning';
+    s.user = s.user || {};
+    s.user.name = s.user.name || 'Erol Nas';
+    s.user.role = s.user.role || 'Release Train Engineer';
+    s.artName = s.artName || 'Acme ART';
+    s.iterationWeeks = s.iterationWeeks || 2;
+    s.defaultCapacity = s.defaultCapacity || 20;
+    s.accent = s.accent || '#f59e0b';
+    s.kinds = s.kinds || {};
+    KINDS.forEach((k) => {
+      s.kinds[k] = Object.assign({}, KIND_DEFAULTS[k], s.kinds[k]);
+    });
+    return s;
   }
 
   function load() {
@@ -74,7 +98,7 @@
       const s = JSON.parse(raw);
       if (!s || !Array.isArray(s.teams) || !Array.isArray(s.sprints)) return null;
       s.cards = s.cards || []; s.deps = s.deps || []; s.risks = s.risks || [];
-      return s;
+      return normalize(s);
     } catch (_) { return null; }
   }
 
@@ -180,7 +204,7 @@
     node.dataset.card = c.id;
     if (linkSrc === c.id) node.classList.add('link-src');
 
-    const dot = el('button', { class: 'dot', title: 'Change type (' + c.kind + ')', type: 'button' });
+    const dot = el('button', { class: 'dot', title: 'Type: ' + (state.kinds[c.kind] || {}).label + ' — click to change', type: 'button' });
     dot.addEventListener('click', (e) => { e.stopPropagation(); cycleKind(c.id); });
 
     const title = el('span', { class: 'title', contenteditable: 'true', spellcheck: 'false', text: c.title });
@@ -232,7 +256,7 @@
     save(); renderBoard();
   }
   function addTeam() {
-    state.teams.push({ id: uid(), name: 'New Team', capacity: 20 });
+    state.teams.push({ id: uid(), name: 'New Team', capacity: state.defaultCapacity || 20 });
     save(); renderBoard();
   }
   function removeTeam(id) {
@@ -494,26 +518,48 @@
     if (tab === 'risks') { renderRisks(); renderVote(); }
   });
 
-  // ---------- Toolbar ----------
-  document.getElementById('add-team').addEventListener('click', addTeam);
-  document.getElementById('add-sprint').addEventListener('click', addSprint);
-  document.getElementById('risk-add-btn').addEventListener('click', addRisk);
-  riskInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addRisk(); });
+  // ---------- Theming (driven by PIE Recipe) ----------
+  function hexToRgba(hex, a) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+    if (!m) return 'rgba(245,158,11,' + a + ')';
+    const n = parseInt(m[1], 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  function applyTheme() {
+    const root = document.documentElement.style;
+    KINDS.forEach((k) => root.setProperty('--' + k, state.kinds[k].color));
+    root.setProperty('--accent', state.accent);
+    root.setProperty('--accent-soft', hexToRgba(state.accent, 0.16));
+  }
+  function initials(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return 'PI';
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
+  function updateAvatar() {
+    const ini = initials(state.user.name);
+    document.getElementById('avatar-initials').textContent = ini;
+    document.getElementById('menu-avatar').textContent = ini;
+    document.getElementById('menu-name').textContent = state.user.name;
+    document.getElementById('menu-role').textContent = state.user.role;
+  }
+  function updateLegend() {
+    document.querySelectorAll('.legend .lg[data-kind]').forEach((sp) => {
+      const k = sp.dataset.kind;
+      if (state.kinds[k] && sp.childNodes[1]) sp.childNodes[1].nodeValue = ' ' + state.kinds[k].label;
+    });
+  }
 
-  piName.textContent = state.piName || 'PI Planning';
-  piName.addEventListener('blur', () => { state.piName = piName.textContent.trim() || 'PI Planning'; save(); });
-  piName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); piName.blur(); } });
-
-  document.getElementById('export-btn').addEventListener('click', () => {
+  // ---------- Data operations ----------
+  const importFile = document.getElementById('import-file');
+  function exportPlan() {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = (state.piName || 'pi-plan').replace(/[^\w.-]+/g, '-') + '.json';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  });
-  const importFile = document.getElementById('import-file');
-  document.getElementById('import-btn').addEventListener('click', () => importFile.click());
+  }
   importFile.addEventListener('change', () => {
     const f = importFile.files && importFile.files[0];
     if (!f) return;
@@ -522,31 +568,215 @@
       try {
         const s = JSON.parse(reader.result);
         if (!s || !Array.isArray(s.teams) || !Array.isArray(s.sprints)) throw new Error('bad');
-        state = { piName: 'PI Planning', risks: [], deps: [], cards: [], vote: null, ...s };
+        s.cards = s.cards || []; s.deps = s.deps || []; s.risks = s.risks || [];
+        state = normalize(s);
         save(); fullRender();
+        if (!recipeEl.hidden) renderRecipe();
       } catch (_) { alert('That file is not a valid Pie plan.'); }
       importFile.value = '';
     };
     reader.readAsText(f);
   });
-  document.getElementById('reset-btn').addEventListener('click', () => {
+  function resetPlan() {
     if (!confirm('Reset the board to the sample plan? This clears your changes.')) return;
     state = sampleState(); save(); fullRender();
-  });
-
-  document.getElementById('quit-btn').addEventListener('click', () => {
+    if (!recipeEl.hidden) renderRecipe();
+  }
+  function quit() {
     if (window.self !== window.top) window.parent.postMessage({ type: 'close-game' }, '*');
     else location.href = '../../';
+  }
+
+  // ---------- Toolbar ----------
+  document.getElementById('add-team').addEventListener('click', addTeam);
+  document.getElementById('add-sprint').addEventListener('click', addSprint);
+  document.getElementById('risk-add-btn').addEventListener('click', addRisk);
+  riskInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addRisk(); });
+
+  piName.addEventListener('blur', () => { state.piName = piName.textContent.trim() || 'PI Planning'; save(); });
+  piName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); piName.blur(); } });
+
+  // ---------- User avatar dropdown ----------
+  const avatarBtn = document.getElementById('avatar-btn');
+  const userMenu = document.getElementById('user-menu');
+  function setMenu(open) {
+    userMenu.hidden = !open;
+    avatarBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  avatarBtn.addEventListener('click', (e) => { e.stopPropagation(); setMenu(userMenu.hidden); });
+  document.addEventListener('click', (e) => {
+    if (!userMenu.hidden && !e.target.closest('.avatar-wrap')) setMenu(false);
   });
+  document.getElementById('menu-export').addEventListener('click', () => { setMenu(false); exportPlan(); });
+  document.getElementById('menu-quit').addEventListener('click', quit);
+  document.getElementById('open-recipe').addEventListener('click', () => { setMenu(false); openRecipe(); });
+
+  // ---------- PIE Recipe (Settings · RTE Cockpit) ----------
+  const recipeEl = document.getElementById('recipe');
+  function openRecipe() { renderRecipe(); recipeEl.hidden = false; recipeEl.scrollTop = 0; }
+  function closeRecipe() { recipeEl.hidden = true; renderBoard(); updateLegend(); }
+
+  // small light-form builders
+  function rRow(title, sub, ctls) {
+    return el('div', { class: 'r-row' }, [
+      el('div', { class: 'r-label' }, [el('b', { text: title }), sub ? el('small', { text: sub }) : null]),
+      el('div', { class: 'r-ctl' }, ctls),
+    ]);
+  }
+  function rText(value, onInput) {
+    const i = el('input', { type: 'text' }); i.value = value;
+    i.addEventListener('input', () => onInput(i.value));
+    return i;
+  }
+  function rNum(value, min, onChange) {
+    const i = el('input', { type: 'number', min: String(min) }); i.value = value;
+    i.addEventListener('change', () => onChange(Math.max(min, Number(i.value) || 0)));
+    return i;
+  }
+  function rColor(value, onInput) {
+    const i = el('input', { type: 'color' }); i.value = value;
+    i.addEventListener('input', () => onInput(i.value));
+    return i;
+  }
+  function rStepper(value, min, max, onChange) {
+    const dec = el('button', { type: 'button', text: '−' });
+    const inc = el('button', { type: 'button', text: '+' });
+    dec.disabled = value <= min; inc.disabled = value >= max;
+    dec.addEventListener('click', () => onChange(value - 1));
+    inc.addEventListener('click', () => onChange(value + 1));
+    return el('div', { class: 'stepper' }, [dec, el('span', { class: 'val', text: String(value) }), inc]);
+  }
+  function rToggle(checked, onChange) {
+    const input = el('input', { type: 'checkbox' }); input.checked = checked;
+    input.addEventListener('change', () => onChange(input.checked));
+    return el('label', { class: 'switch' }, [input, el('span', { class: 'track' })]);
+  }
+  function rCard(title, desc, kids) {
+    return el('div', { class: 'r-card' }, [
+      el('h3', { text: title }),
+      desc ? el('p', { class: 'r-desc', text: desc }) : null,
+    ].concat(kids));
+  }
+
+  function setIterationCount(n) {
+    n = Math.max(1, Math.min(12, n));
+    const cur = state.sprints.length;
+    if (n === cur) return;
+    if (n < cur) {
+      const lost = state.cards.filter((c) => c.sprintIdx >= n);
+      if (lost.length && !confirm('Removing ' + (cur - n) + ' iteration(s) deletes ' + lost.length + ' card(s). Continue?')) return;
+      const lostIds = lost.map((c) => c.id);
+      state.sprints = state.sprints.slice(0, n);
+      state.cards = state.cards.filter((c) => c.sprintIdx < n);
+      state.deps = state.deps.filter((d) => !lostIds.includes(d.from) && !lostIds.includes(d.to));
+    } else {
+      for (let i = cur; i < n; i++) state.sprints.push('Sprint ' + (i + 1));
+    }
+    save(); renderBoard(); renderRecipe();
+  }
+
+  function renderRecipe() {
+    recipeEl.innerHTML = '';
+    const bar = el('div', { class: 'recipe-bar' }, [
+      el('button', { class: 'r-back', type: 'button', 'aria-label': 'Back to board', text: '←', onclick: closeRecipe }),
+      el('div', { class: 'r-title' }, [
+        el('h2', { text: 'PIE Recipe' }),
+        el('span', { class: 'r-sub', text: 'RTE Cockpit · ' + state.artName }),
+      ]),
+      el('span', { class: 'r-logo', text: '🥧' }),
+    ]);
+    const body = el('div', { class: 'recipe-body' });
+
+    // Profile
+    body.appendChild(rCard('Profile', 'Identity shown on your avatar and menu.', [
+      rRow('Display name', 'Initials appear on the avatar', [rText(state.user.name, (v) => { state.user.name = v; updateAvatar(); save(); })]),
+      rRow('Role', 'e.g. Release Train Engineer', [rText(state.user.role, (v) => { state.user.role = v; updateAvatar(); save(); })]),
+    ]));
+
+    // PI details
+    body.appendChild(rCard('PI details', 'The increment you are planning.', [
+      rRow('PI name', '', [rText(state.piName, (v) => { state.piName = v; piName.textContent = v || 'PI Planning'; save(); })]),
+      rRow('ART name', 'Agile Release Train', [rText(state.artName, (v) => { state.artName = v || 'ART'; save(); })]),
+    ]));
+
+    // Cadence
+    const lastIsIP = state.sprints[state.sprints.length - 1] === 'IP';
+    const chips = el('div', { class: 'iter-chips' }, state.sprints.map((s) => el('span', { text: s })));
+    body.appendChild(rCard('Cadence', 'Shape the iterations that make up the PI.', [
+      rRow('Iterations', '1–12 sprints', [rStepper(state.sprints.length, 1, 12, setIterationCount)]),
+      chips,
+      rRow('Iteration length', 'Weeks per iteration', [rNum(state.iterationWeeks, 1, (v) => { state.iterationWeeks = v || 1; save(); }), el('span', { class: 'pts-unit', text: 'wks' })]),
+      rRow('Last iteration is IP', 'Innovation & Planning buffer', [rToggle(lastIsIP, (on) => {
+        const last = state.sprints.length - 1;
+        if (on) state.sprints[last] = 'IP';
+        else if (state.sprints[last] === 'IP') state.sprints[last] = 'Sprint ' + (last + 1);
+        save(); renderBoard(); renderRecipe();
+      })]),
+    ]));
+
+    // Capacity
+    body.appendChild(rCard('Capacity', 'Defaults for team load planning.', [
+      rRow('Default team capacity', 'Points / iteration for new teams', [rNum(state.defaultCapacity, 0, (v) => { state.defaultCapacity = v; save(); })]),
+      rRow('Apply to existing teams', 'Overwrite every team with the default', [
+        el('button', { class: 'r-btn', type: 'button', text: 'Apply to ' + state.teams.length + ' teams',
+          onclick: () => { state.teams.forEach((t) => { t.capacity = state.defaultCapacity; }); save(); renderBoard(); renderRecipe(); } }),
+      ]),
+    ]));
+
+    // Card types
+    const typesCard = rCard('Card types', 'Rename and recolor the card types used across the board.', []);
+    KINDS.forEach((k) => {
+      const kd = state.kinds[k];
+      const chip = el('span', { class: 'kind-chip', style: '--kc:' + kd.color }, [el('i'), document.createTextNode(' ' + kd.label)]);
+      const txtNode = chip.lastChild;
+      const tIn = rText(kd.label, (v) => { kd.label = v || k; txtNode.nodeValue = ' ' + kd.label; updateLegend(); save(); });
+      const cIn = rColor(kd.color, (v) => { kd.color = v; chip.style.setProperty('--kc', v); applyTheme(); save(); });
+      typesCard.appendChild(el('div', { class: 'kind-row' }, [chip, tIn, cIn]));
+    });
+    body.appendChild(typesCard);
+
+    // Appearance
+    const presets = ['#f59e0b', '#38bdf8', '#a78bfa', '#34d399', '#fb7185', '#f472b6'];
+    const presetEls = el('div', { class: 'presets' }, presets.map((c) =>
+      el('button', { type: 'button', class: c.toLowerCase() === state.accent.toLowerCase() ? 'on' : '',
+        style: 'background:' + c, 'aria-label': c,
+        onclick: () => { state.accent = c; applyTheme(); save(); renderRecipe(); } })));
+    body.appendChild(rCard('Appearance', 'Accent color for the app chrome.', [
+      rRow('Accent color', 'Pick a preset or a custom color', [
+        presetEls,
+        rColor(state.accent, (v) => { state.accent = v; applyTheme(); save(); }),
+      ]),
+    ]));
+
+    // Data
+    body.appendChild(rCard('Data', 'Your plan is stored in this browser only.', [
+      rRow('Export plan', 'Download the full plan as JSON', [el('button', { class: 'r-btn', type: 'button', text: 'Export', onclick: exportPlan })]),
+      rRow('Import plan', 'Load a previously exported .json', [el('button', { class: 'r-btn', type: 'button', text: 'Import', onclick: () => importFile.click() })]),
+      rRow('Reset plan', 'Restore the built-in sample', [el('button', { class: 'r-btn danger', type: 'button', text: 'Reset', onclick: resetPlan })]),
+    ]));
+
+    body.appendChild(el('div', { class: 'r-foot-note', text: '🥧 Pie · PI Planning — changes save automatically' }));
+
+    recipeEl.appendChild(bar);
+    recipeEl.appendChild(body);
+  }
 
   // ---------- Global ----------
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && linkSrc) cancelLink(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!recipeEl.hidden) closeRecipe();
+    else if (!userMenu.hidden) setMenu(false);
+    else if (linkSrc) cancelLink();
+  });
   window.addEventListener('resize', () => requestAnimationFrame(drawDeps));
   boardScroll.addEventListener('scroll', () => { /* deps are content-relative; no redraw needed */ }, { passive: true });
 
   function fullRender() {
+    applyTheme();
+    updateAvatar();
     piName.textContent = state.piName || 'PI Planning';
     renderBoard();
+    updateLegend();
     renderRisks();
     renderVote();
   }
