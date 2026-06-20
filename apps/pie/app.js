@@ -513,7 +513,7 @@
   canvasWrap.addEventListener('wheel', (e) => {
     e.preventDefault();
     const r = canvasWrap.getBoundingClientRect();
-    setScale(view.scale * (1 - e.deltaY * 0.0012), e.clientX - r.left, e.clientY - r.top);
+    setScale(view.scale * (1 - e.deltaY * 0.0025), e.clientX - r.left, e.clientY - r.top);
   }, { passive: false });
   canvasWrap.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
@@ -558,8 +558,8 @@
   zoomctl.addEventListener('click', (e) => {
     const b = e.target.closest('[data-z]'); if (!b) return;
     const z = b.dataset.z;
-    if (z === 'in') zoomBy(1.2);
-    else if (z === 'out') zoomBy(1 / 1.2);
+    if (z === 'in') zoomBy(1.4);
+    else if (z === 'out') zoomBy(1 / 1.4);
     else if (z === 'fit') fitView();
   });
 
