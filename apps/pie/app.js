@@ -284,7 +284,10 @@
 
   // ---------- Floating side rail (static) ----------
   let railActive = 'team';
+  let railRight = false; // user's left/right preference (forced right on ART Objectives)
   function renderSideRail() {
+    const forceRight = railActive === 'objectives' && objPanelOpen;
+    srail.classList.toggle('srail--right', forceRight || railRight);
     const items = [
       ['solbacklog', 'solbacklog', 'Solution Backlog Board'],
       ['solplan', 'solplan', 'Solution Planning Board'],
@@ -296,7 +299,7 @@
       ['collab', 'collab', 'Collaboration Boards'],
     ];
     srail.innerHTML =
-      '<button class="sr-btn" type="button" data-rail="shift" title="Move rail to the other side">' + bIcon('shift') + '</button>' +
+      '<button class="sr-btn" type="button" data-rail="shift" title="Move rail to the other side"' + (forceRight ? ' disabled' : '') + '>' + bIcon('shift') + '</button>' +
       '<div class="sr-sep"></div>' +
       items.slice(0, 2).map((it) => srBtn(it)).join('') +
       '<div class="sr-sep"></div>' +
@@ -536,7 +539,13 @@
   srail.addEventListener('click', (e) => {
     const b = e.target.closest('[data-rail]'); if (!b) return;
     const v = b.dataset.rail;
-    if (v === 'shift') { srail.classList.toggle('srail--right'); requestAnimationFrame(fitView); return; }
+    if (v === 'shift') {
+      if (railActive === 'objectives' && objPanelOpen) return; // locked to the right here
+      railRight = !railRight;
+      srail.classList.toggle('srail--right', railRight);
+      requestAnimationFrame(fitView);
+      return;
+    }
     if (v === railActive) return;
     railActive = v; renderBoardView();
   });
