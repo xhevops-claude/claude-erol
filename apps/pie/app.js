@@ -255,29 +255,29 @@
         '<button class="bn-chip" type="button" data-nav="toggle-art">' + bIcon('objectives', 'bn-cico') +
           '<span>' + (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives</span></button>';
       center =
-        '<button class="bn-ico" type="button" title="Layout">' + bIcon('view') + '</button>' +
+        '<button class="bn-ico" type="button" title="Layout" disabled>' + bIcon('view') + '</button>' +
         '<span class="bn-here">' + bIcon('objectives', 'bn-cico') + '<span>ART Objectives</span></span>';
     } else {
       left =
         '<button class="bn-ico bn-home" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
-        '<button class="bn-ico" type="button" title="Search">' + bIcon('search') + '</button>' +
-        '<button class="bn-ico" type="button" title="Boards">' + bIcon('board') + '</button>' +
-        '<button class="bn-ico" type="button" title="History">' + bIcon('history') + '</button>';
+        '<button class="bn-ico" type="button" title="Search" disabled>' + bIcon('search') + '</button>' +
+        '<button class="bn-ico" type="button" title="Boards" disabled>' + bIcon('board') + '</button>' +
+        '<button class="bn-ico" type="button" title="History" disabled>' + bIcon('history') + '</button>';
       center =
-        '<button class="bn-ico" type="button" title="Layout">' + bIcon('view') + '</button>' +
-        '<button class="bn-chip" type="button">' + bIcon('teamboard', 'bn-cico') + '<span>' + esc(c.board) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
-        '<button class="bn-chip" type="button">' + bIcon('folder', 'bn-cico') + '<span>' + esc(c.program) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
-        '<button class="bn-chip" type="button">' + bIcon('people', 'bn-cico') + '<span>' + esc(c.team) + '</span>' + bIcon('chev', 'bn-chev') + '</button>';
+        '<button class="bn-ico" type="button" title="Layout" disabled>' + bIcon('view') + '</button>' +
+        '<button class="bn-chip" type="button" disabled>' + bIcon('teamboard', 'bn-cico') + '<span>' + esc(c.board) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
+        '<button class="bn-chip" type="button" disabled>' + bIcon('folder', 'bn-cico') + '<span>' + esc(c.program) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
+        '<button class="bn-chip" type="button" disabled>' + bIcon('people', 'bn-cico') + '<span>' + esc(c.team) + '</span>' + bIcon('chev', 'bn-chev') + '</button>';
     }
     bnav.innerHTML =
       '<div class="bn-group bn-left">' + left + '</div>' +
       '<div class="bn-group bn-center">' + center + '</div>' +
       '<div class="bn-group bn-right">' +
         '<div class="bn-avs">' + avatars + '<span class="bn-more">+1</span></div>' +
-        '<button class="bn-ico" type="button" title="Snapshot">' + bIcon('snap') + '</button>' +
-        '<button class="bn-ico" type="button" title="Edit">' + bIcon('edit') + '</button>' +
-        '<button class="bn-ico bn-toggle on" type="button" title="Board view">' + bIcon('view') + '</button>' +
-        '<button class="bn-ico bn-toggle" type="button" title="List view">' + bIcon('board') + '</button>' +
+        '<button class="bn-ico" type="button" title="Snapshot" disabled>' + bIcon('snap') + '</button>' +
+        '<button class="bn-ico" type="button" title="Edit" disabled>' + bIcon('edit') + '</button>' +
+        '<button class="bn-ico bn-toggle on" type="button" title="Board view" disabled>' + bIcon('view') + '</button>' +
+        '<button class="bn-ico bn-toggle" type="button" title="List view" disabled>' + bIcon('board') + '</button>' +
         '<span class="bn-me">' + esc(initials(state.user.name)) + '</span>' +
       '</div>';
   }
@@ -332,11 +332,11 @@
         '<div class="ph-row1">' + bIcon('bookmark', 'ph-bm') + '<span class="ph-name">' + esc(name) + '</span>' +
           '<span class="ph-dates">' + esc(state.context.dates) + '</span></div>' +
         '<div class="ph-row2">' +
-          '<button class="cap-btn" type="button">Configure Capacity</button>' +
+          '<button class="cap-btn" type="button" disabled>Configure Capacity</button>' +
           '<span class="load-pill">Load: ' + load + '</span>' +
           '<span class="ph-sp"></span>' +
-          '<button class="ph-ico2" type="button" title="Columns">' + bIcon('cols') + '</button>' +
-          '<button class="ph-ico2" type="button" title="More">' + bIcon('dots') + '</button>' +
+          '<button class="ph-ico2" type="button" title="Columns" disabled>' + bIcon('cols') + '</button>' +
+          '<button class="ph-ico2" type="button" title="More" disabled>' + bIcon('dots') + '</button>' +
         '</div>' +
       '</div>' +
       '<div class="panel-b note-area">' + notes + '</div>';
@@ -350,7 +350,7 @@
         '<div class="op-item"><div class="op-t"><b>' + (i + 1) + '</b> ' + esc(o.text) + '</div>' +
         '<div class="op-meta"><span class="op-bv">' + o.bv + ' BV</span><span class="op-lk">' + bIcon('collab', 'op-lkico') + ' ' + o.links + '</span></div></div>').join('');
     return '<div class="panel-h obj-h"><span class="ph-name">' + bIcon('bookmark', 'ph-bm') + 'Team Objectives</span>' +
-        '<button class="ph-ico2" type="button" title="Expand">' + bIcon('expand') + '</button></div>' +
+        '<button class="ph-ico2" type="button" title="Expand" disabled>' + bIcon('expand') + '</button></div>' +
       '<div class="panel-b op-body">' + grp('Committed', committed) + grp('Uncommitted', uncommitted) + '</div>';
   }
   function riskPanel() {
@@ -450,8 +450,8 @@
     const card = (o, i) =>
       '<div class="as-card"><div class="as-top"><span class="as-num">' + (i + 1) + '</span>' +
         '<div class="as-title">' + esc(o.title) + '</div>' +
-        '<button class="as-ico" type="button">' + bIcon('collab') + '</button>' +
-        '<button class="as-ico" type="button">' + bIcon('dots') + '</button></div>' +
+        '<button class="as-ico" type="button" disabled>' + bIcon('collab') + '</button>' +
+        '<button class="as-ico" type="button" disabled>' + bIcon('dots') + '</button></div>' +
       '<div class="as-desc">' + esc(o.desc) + '</div><span class="as-more">See more</span>' +
       '<div class="as-foot"><span class="as-bv"><span class="as-bv-box">' + o.bv + '</span>Business Value</span>' +
         '<span class="as-lk">' + bIcon('collab', 'op-lkico') + ' ' + o.links + '</span></div></div>';
@@ -460,7 +460,7 @@
       arr.map(card).join('');
     artSide.innerHTML =
       '<div class="as-head"><span class="as-art">' + esc(state.artName) + '</span>' +
-        '<button class="as-add" type="button" title="Add objective">' + bIcon('plus') + '</button></div>' +
+        '<button class="as-add" type="button" title="Add objective" disabled>' + bIcon('plus') + '</button></div>' +
       '<div class="as-body">' + grp('Commited', com) + grp('Uncommitted', unc) + '</div>';
   }
 
@@ -473,7 +473,7 @@
       '<button class="z-btn" type="button" data-z="out" title="Zoom out">' + bIcon('minus') + '</button>' +
       '<span class="z-val">100%</span>' +
       '<button class="z-btn" type="button" data-z="in" title="Zoom in">' + bIcon('plus') + '</button>' +
-      '<button class="z-btn z-help" type="button" title="Help">' + bIcon('help') + '</button>';
+      '<button class="z-btn z-help" type="button" title="Help" disabled>' + bIcon('help') + '</button>';
   }
 
   // ---------- Bounded view transform (pan + zoom) ----------
@@ -717,7 +717,7 @@
         (s.live ? '<span class="dot-ok"></span>' : '') +
         '<span class="p-name">' + esc(s.name) + '</span>' +
         '<span class="p-time">' + esc(s.updated || '') + '</span>' +
-        '<button class="p-kebab" type="button" data-act="kebab" aria-label="More">⋮</button>' +
+        '<button class="p-kebab" type="button" aria-label="More" disabled>⋮</button>' +
       '</div>').join('');
   }
   function connectionRows() {
@@ -726,7 +726,7 @@
         '<span class="' + (c.ok ? 'dot-ok' : 'dot-err') + '"></span>' +
         '<span class="p-name">' + esc(c.name) + '</span>' +
         '<span class="p-tag">' + esc(c.type) + '</span>' +
-        '<button class="p-kebab" type="button" data-act="kebab" aria-label="More">⋮</button>' +
+        '<button class="p-kebab" type="button" aria-label="More" disabled>⋮</button>' +
       '</div>').join('');
   }
   function panel(iconName, title, addAct, addPage, rows, footLabel, footTotal, footPage) {

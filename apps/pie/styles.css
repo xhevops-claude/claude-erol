@@ -24,6 +24,9 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* Buttons with no link/action are disabled and read as inert */
+button:disabled { opacity: 0.4; pointer-events: none; }
+
 html, body { height: 100%; overflow: hidden; }
 
 body {
