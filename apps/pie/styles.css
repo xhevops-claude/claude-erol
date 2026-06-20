@@ -205,11 +205,11 @@ body {
 
 .art-side { display: none; }
 .board-screen.obj-mode.obj-open .art-side {
-  display: flex; flex-direction: column; position: absolute; top: 56px; bottom: 0; left: 0; width: 474px; z-index: 30;
-  background: #fff; border-right: 1px solid var(--r-line); overflow: hidden;
+  display: flex; flex-direction: column; position: absolute; top: 66px; bottom: 14px; left: 84px; width: 474px; z-index: 30;
+  background: #fff; border: 1px solid var(--r-line); border-radius: 14px; overflow: hidden;
+  box-shadow: 0 12px 34px rgba(20,30,50,.10);
 }
-.board-screen.obj-mode.obj-open .canvas-wrap { left: 474px; }
-.board-screen.obj-mode.obj-open .srail { display: none; }
+.board-screen.obj-mode.obj-open .canvas-wrap { left: 566px; }
 
 .as-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; border-bottom: 1px solid var(--r-line); flex: 0 0 auto; }
 .as-art { font-size: 15px; font-weight: 800; flex: 1 1 auto; }
