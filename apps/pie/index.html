@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Pie · PI Planning</title>
+  <script>
+    if (window.self !== window.top) document.documentElement.classList.add('embedded');
+  </script>
+  <style>
+    html, body { margin: 0; padding: 0; background: #0f1117; color: #e9edf5;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    #app-loading {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0f1117;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 22px;
+      transition: opacity 0.4s ease;
+    }
+    #app-loading.hidden { opacity: 0; pointer-events: none; }
+    #app-loading .gl-icon { font-size: 88px; line-height: 1; animation: gl-pop 1.6s ease-in-out infinite; }
+    @keyframes gl-pop { 0%,100% { transform: scale(1) rotate(-4deg); } 50% { transform: scale(1.08) rotate(4deg); } }
+    #app-loading .gl-word { font-size: 15px; letter-spacing: 0.42em; text-transform: uppercase;
+      color: #f59e0b; font-weight: 700; padding-left: 0.42em; }
+    #app-loading .gl-bar {
+      position: relative; width: 190px; height: 4px; border-radius: 4px;
+      background: rgba(255,255,255,0.10); overflow: hidden;
+    }
+    #app-loading .gl-bar::after {
+      content: ""; position: absolute; top: 0; left: -40%;
+      width: 40%; height: 100%; background: #f59e0b; border-radius: 4px;
+      animation: gl-bar 1.2s cubic-bezier(0.45,0,0.55,1) infinite;
+    }
+    @keyframes gl-bar { 0% { left: -40%; } 100% { left: 110%; } }
+  </style>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app-loading">
+    <span class="gl-icon" aria-hidden="true">🥧</span>
+    <span class="gl-word">Pie</span>
+    <div class="gl-bar" aria-label="Loading"></div>
+  </div>
+
+  <!-- Light app shell: sidebar + routed pages (built by app.js) -->
+  <div class="shell" id="shell" hidden>
+    <aside class="side" id="side"></aside>
+    <main class="main" id="main"></main>
+  </div>
+
+  <!-- Light PI Planning whiteboard: static top nav + floating side rail + zoomable canvas -->
+  <div class="board-screen" id="board-screen" hidden>
+    <div class="canvas-wrap" id="canvas-wrap">
+      <div class="canvas" id="canvas"></div>
+    </div>
+    <aside class="art-side" id="art-side"></aside>
+    <header class="bnav" id="bnav"></header>
+    <nav class="srail" id="srail" aria-label="Boards"></nav>
+    <div class="zoomctl" id="zoomctl"></div>
+  </div>
+
+  <input type="file" id="import-file" accept="application/json,.json" hidden />
+
+  <script src="app.js"></script>
+</body>
+</html>
