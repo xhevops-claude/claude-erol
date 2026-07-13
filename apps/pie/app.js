@@ -51,6 +51,49 @@
     return ART_OBJ.map((o, i) => ({ id: uid(), title: o.title, desc: o.desc, bv: 0, links: [7, 5, 5, 5, 3][i] || 4, committed: i < 3 }));
   }
 
+  // Pages: sets of purpose-specific documents assembled from boards + conversations.
+  // Only the structure lives in state; block content is derived live at render time.
+  function defaultPages() {
+    return [
+      { id: 'art-sync', title: 'ART Sync Meeting', purpose: 'Facilitation', updated: '1h ago', blocks: [
+        { type: 'deps', title: 'Critical dependencies to discuss', src: 'ART Planning Board' },
+        { type: 'text', text: 'Focus for today: unblock the SSO handshake between Falcon and Otter, and confirm an owner for the event-pipeline schema before Iteration 3 starts.' },
+        { type: 'burndown', title: 'Current iteration burndown', src: 'Team Boards' },
+        { type: 'convo', title: 'Conversations & decisions — last 7 days', src: 'Conversations' },
+        { type: 'risk', title: 'Riskiest part of the plan', src: 'Risk Board' },
+      ] },
+      { id: 'scrum-of-scrums', title: 'Scrum of Scrums', purpose: 'Facilitation', updated: 'yesterday', blocks: [
+        { type: 'text', text: 'Round-the-room notes for team representatives. Each team gets two minutes: progress, plans, problems.' },
+        { type: 'deps', title: 'Cross-team hand-offs this week', src: 'ART Planning Board' },
+        { type: 'risk', title: 'Escalations for the RTE', src: 'Risk Board' },
+      ] },
+      { id: 'pi-okrs', title: 'PI OKRs', purpose: 'Strategy', updated: '3d ago', blocks: [
+        { type: 'text', text: 'Our ART objectives for this increment, written as OKRs and linked live to the boards that pay into them.' },
+        { type: 'okr', title: 'Objectives & key results', src: 'ART Objectives' },
+      ] },
+      { id: 'leadership-status', title: 'Leadership Status Report', purpose: 'Reporting', updated: '2d ago', blocks: [
+        { type: 'text', text: 'One-page status for business leaders: where the plan stands, what changed this week, and where we need decisions.' },
+        { type: 'burndown', title: 'Delivery trend', src: 'Team Boards' },
+        { type: 'okr', title: 'How the plan pays into our strategic themes', src: 'ART Objectives' },
+        { type: 'risk', title: 'Decisions we need from you', src: 'Risk Board' },
+      ] },
+    ];
+  }
+
+  // Conversations attach to a team, a board or a single sticky note — never a place of their own.
+  function defaultThreads() {
+    return [
+      { id: uid(), who: 'Mara Kim', ini: 'MK', color: '#6a9be0', ago: '2h', where: 'ART Planning Board',
+        text: '@Ari — the SSO handshake lands in Iteration 2. Can Falcon own the token-exchange piece?',
+        replies: [{ who: 'Ari Ruiz', ini: 'AR', color: '#e0746a', ago: '1h', text: 'Yes — moving it next to the login-screen story now.' }] },
+      { id: uid(), who: 'Tom Sato', ini: 'TS', color: '#6ad0a8', ago: '5h', where: 'Risk Board',
+        text: 'Raising the data-migration window as a risk — vendor confirmed the freeze is only 48 hours.', replies: [] },
+      { id: uid(), who: 'Jo Deng', ini: 'JD', color: '#caa15a', ago: '1d', where: 'Sticky · Billing API',
+        text: 'Should we split this into contract + implementation? 13 points feels heavy for one iteration.',
+        replies: [{ who: 'Mara Kim', ini: 'MK', color: '#6a9be0', ago: '1d', text: 'Agreed — let’s decide in the huddle tomorrow.' }] },
+    ];
+  }
+
   // ---------- DOM ----------
   const loading = document.getElementById('app-loading');
   const shell = document.getElementById('shell');
@@ -63,6 +106,8 @@
   const canvasWrap = document.getElementById('canvas-wrap');
   const artSide = document.getElementById('art-side');
   const zoomctl = document.getElementById('zoomctl');
+  const convoEl = document.getElementById('convo');
+  const paletteEl = document.getElementById('palette');
 
   // ---------- State ----------
   let state = load() || sampleState();
@@ -147,6 +192,8 @@
       ];
       s.connectionTotal = 7;
     }
+    if (!Array.isArray(s.pages) || !s.pages.length) s.pages = defaultPages();
+    if (!Array.isArray(s.threads)) s.threads = defaultThreads();
     if (!Array.isArray(s.events)) {
       s.events = [
         { id: uid(), text: 'Synced 38 features from platform-jira', source: 'platform-jira', ago: '2h', ok: true },
@@ -233,6 +280,9 @@
       fit: '<path d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4"/>',
       help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 113.5 2.3c-.8.4-1 .8-1 1.7"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/>',
       snap: '<rect x="4" y="6" width="16" height="13" rx="2"/><path d="M9 6l1.5-2h3L15 6"/><circle cx="12" cy="12.5" r="3"/>',
+      doc: '<path d="M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 16.5h6"/>',
+      chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-6l-5.2 4V6z"/><path d="M8 8.5h8M8 11.5h5"/>',
+      present: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v3M8.5 21h7"/>',
     };
     return '<svg class="' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (P[name] || '') + '</svg>';
   }
@@ -242,71 +292,128 @@
     return '<span class="b-av" style="background:' + color + '">' + esc(initials) + '</span>';
   }
 
-  // ---------- Top navigation (static, contextual to the active board) ----------
+  // ---------- Boards registry: [id, rail icon, name] ----------
+  const BOARD_LIST = [
+    ['solbacklog', 'solbacklog', 'Solution Backlog Board'],
+    ['solplan', 'solplan', 'Solution Planning Board'],
+    ['artbacklog', 'artbacklog', 'ART Backlog Board'],
+    ['artplan', 'artplan', 'ART Planning Board'],
+    ['objectives', 'objectives', 'ART Objectives'],
+    ['risk', 'risk', 'Risk Board'],
+    ['team', 'teamrail', 'Team Board'],
+    ['collab', 'collab', 'Collaboration Boards'],
+  ];
+  const boardName = (id) => { const b = BOARD_LIST.find((x) => x[0] === id); return b ? b[2] : 'Board'; };
+  const boardIcon = (id) => { const b = BOARD_LIST.find((x) => x[0] === id); return b ? b[1] : 'board'; };
+
+  // ---------- Chrome state ----------
+  let railActive = 'team';
+  let railRight = false;   // user's left/right preference (forced right on ART Objectives)
+  let mode = 'board';      // 'board' | 'page' — the two planes of a session
+  let activePage = null;   // page id when mode === 'page'
+  let teamFilter = null;   // team id, or null = all teams
+  let convoOpen = false;   // contextual conversation panel
+  let menuOpen = null;     // which top-nav dropdown is open
+
+  // ---------- Top navigation: the model's spine as live switcher chips ----------
+  function ddWrap(key, btnHtml, menuHtml) {
+    const open = menuOpen === key;
+    return '<div class="bn-dd' + (open ? ' open' : '') + '">' + btnHtml +
+      (open ? '<div class="dd-menu">' + menuHtml + '</div>' : '') + '</div>';
+  }
+  function ddChipBtn(key, icoName, label) {
+    return '<button class="bn-chip" type="button" data-dd="' + key + '">' + bIcon(icoName, 'bn-cico') +
+      '<span>' + esc(label) + '</span>' + bIcon('chev', 'bn-chev') + '</button>';
+  }
+  function ddItem(attrs, icoName, label, on, hint) {
+    return '<button class="dd-i' + (on ? ' on' : '') + '" type="button" ' + attrs + '>' +
+      bIcon(icoName, 'dd-ico') + '<span>' + esc(label) + '</span>' +
+      (on ? '<span class="dd-check">✓</span>' : hint ? '<span class="dd-hint">' + esc(hint) + '</span>' : '') +
+      '</button>';
+  }
+  function boardMenu() {
+    return '<div class="dd-h">Boards</div>' +
+      BOARD_LIST.map((b) => ddItem('data-go-board="' + b[0] + '"', b[1], b[2], mode === 'board' && railActive === b[0])).join('');
+  }
+  function pageMenu() {
+    const groups = [];
+    state.pages.forEach((p) => { if (!groups.includes(p.purpose)) groups.push(p.purpose); });
+    return groups.map((g) =>
+      '<div class="dd-h">' + esc(g) + '</div>' +
+      state.pages.filter((p) => p.purpose === g).map((p) =>
+        ddItem('data-go-page="' + p.id + '"', 'doc', p.title, mode === 'page' && activePage === p.id, p.updated)).join('')
+    ).join('');
+  }
+  function sessionMenu() {
+    return '<div class="dd-h">PI Sessions</div>' +
+      state.sessions.map((sn) => ddItem('data-go-session="' + esc(sn.name) + '"', 'folder', sn.name, sn.name === state.piName, sn.updated)).join('') +
+      '<div class="dd-sep"></div>' +
+      ddItem('data-go-shell="sessions"', 'apps', 'View all sessions', false);
+  }
+  function teamMenu() {
+    return '<div class="dd-h">Teams</div>' +
+      ddItem('data-go-team=""', 'people', 'All teams', !teamFilter) +
+      state.teams.map((t) => ddItem('data-go-team="' + t.id + '"', 'teamrail', t.name, teamFilter === t.id)).join('');
+  }
   function renderTopNav() {
-    const c = state.context;
-    const obj = railActive === 'objectives';
     const avatars = [['AR', '#e0746a'], ['MK', '#6a9be0'], ['TS', '#6ad0a8'], ['JD', '#caa15a']]
       .map((a) => avatar(a[0], a[1])).join('');
-    let left, center;
+    const obj = mode === 'board' && railActive === 'objectives';
+
+    let left =
+      '<button class="bn-ico bn-home" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
+      '<button class="bn-ico" type="button" data-nav="palette" title="Search — jump anywhere (⌘K)">' + bIcon('search') + '</button>' +
+      ddWrap('boards', '<button class="bn-ico' + (menuOpen === 'boards' ? ' on' : '') + '" type="button" data-dd="boards" title="Boards">' + bIcon('board') + '</button>', boardMenu()) +
+      '<button class="bn-ico" type="button" title="History" disabled>' + bIcon('history') + '</button>';
     if (obj) {
-      left =
-        '<button class="bn-ico bn-home" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
-        '<button class="bn-chip" type="button" data-nav="toggle-art">' + bIcon('objectives', 'bn-cico') +
-          '<span>' + (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives</span></button>';
-      center =
-        '<button class="bn-ico" type="button" title="Layout" disabled>' + bIcon('view') + '</button>' +
-        '<span class="bn-here">' + bIcon('objectives', 'bn-cico') + '<span>ART Objectives</span></span>';
-    } else {
-      left =
-        '<button class="bn-ico bn-home" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
-        '<button class="bn-ico" type="button" title="Search" disabled>' + bIcon('search') + '</button>' +
-        '<button class="bn-ico" type="button" title="Boards" disabled>' + bIcon('board') + '</button>' +
-        '<button class="bn-ico" type="button" title="History" disabled>' + bIcon('history') + '</button>';
-      center =
-        '<button class="bn-ico" type="button" title="Layout" disabled>' + bIcon('view') + '</button>' +
-        '<button class="bn-chip" type="button" disabled>' + bIcon('teamboard', 'bn-cico') + '<span>' + esc(c.board) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
-        '<button class="bn-chip" type="button" disabled>' + bIcon('folder', 'bn-cico') + '<span>' + esc(c.program) + '</span>' + bIcon('chev', 'bn-chev') + '</button>' +
-        '<button class="bn-chip" type="button" disabled>' + bIcon('people', 'bn-cico') + '<span>' + esc(c.team) + '</span>' + bIcon('chev', 'bn-chev') + '</button>';
+      left += '<button class="bn-chip" type="button" data-nav="toggle-art">' + bIcon('objectives', 'bn-cico') +
+        '<span>' + (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives</span></button>';
     }
+
+    let center;
+    if (mode === 'page') {
+      const pg = state.pages.find((p) => p.id === activePage) || state.pages[0];
+      center =
+        ddWrap('page', ddChipBtn('page', 'doc', pg ? pg.title : 'Pages'), pageMenu()) +
+        ddWrap('session', ddChipBtn('session', 'folder', state.piName), sessionMenu());
+    } else {
+      center =
+        '<button class="bn-ico" type="button" title="Layout" disabled>' + bIcon('view') + '</button>' +
+        ddWrap('board', ddChipBtn('board', boardIcon(railActive), boardName(railActive)), boardMenu()) +
+        ddWrap('session', ddChipBtn('session', 'folder', state.piName), sessionMenu()) +
+        ddWrap('team', ddChipBtn('team', 'people', teamFilter && team(teamFilter) ? team(teamFilter).name : 'All teams'), teamMenu());
+    }
+
     bnav.innerHTML =
       '<div class="bn-group bn-left">' + left + '</div>' +
       '<div class="bn-group bn-center">' + center + '</div>' +
       '<div class="bn-group bn-right">' +
         '<div class="bn-avs">' + avatars + '<span class="bn-more">+1</span></div>' +
+        '<button class="bn-ico' + (convoOpen ? ' on' : '') + '" type="button" data-nav="convo" title="Conversation">' + bIcon('chat') +
+          (state.threads.length ? '<span class="bn-badge">' + state.threads.length + '</span>' : '') + '</button>' +
         '<button class="bn-ico" type="button" title="Snapshot" disabled>' + bIcon('snap') + '</button>' +
         '<button class="bn-ico" type="button" title="Edit" disabled>' + bIcon('edit') + '</button>' +
-        '<button class="bn-ico bn-toggle on" type="button" title="Board view" disabled>' + bIcon('view') + '</button>' +
-        '<button class="bn-ico bn-toggle" type="button" title="List view" disabled>' + bIcon('board') + '</button>' +
+        '<span class="bn-plane">' +
+          '<button class="bn-ico bn-toggle' + (mode === 'board' ? ' on' : '') + '" type="button" data-plane="board" title="Boards">' + bIcon('teamboard') + '</button>' +
+          '<button class="bn-ico bn-toggle' + (mode === 'page' ? ' on' : '') + '" type="button" data-plane="page" title="Pages">' + bIcon('doc') + '</button>' +
+        '</span>' +
         '<span class="bn-me">' + esc(initials(state.user.name)) + '</span>' +
       '</div>';
   }
 
-  // ---------- Floating side rail (static) ----------
-  let railActive = 'team';
-  let railRight = false; // user's left/right preference (forced right on ART Objectives)
+  // ---------- Floating side rail (boards only — hidden on the Pages plane) ----------
   function renderSideRail() {
-    const forceRight = railActive === 'objectives' && objPanelOpen;
+    const forceRight = mode === 'board' && railActive === 'objectives' && objPanelOpen;
     srail.classList.toggle('srail--right', forceRight || railRight);
-    const items = [
-      ['solbacklog', 'solbacklog', 'Solution Backlog Board'],
-      ['solplan', 'solplan', 'Solution Planning Board'],
-      ['artbacklog', 'artbacklog', 'ART Backlog Board'],
-      ['artplan', 'artplan', 'ART Planning Board'],
-      ['objectives', 'objectives', 'ART Objectives'],
-      ['risk', 'risk', 'Risk Board'],
-      ['team', 'teamrail', 'Team Board'],
-      ['collab', 'collab', 'Collaboration Boards'],
-    ];
     srail.innerHTML =
       '<button class="sr-btn" type="button" data-rail="shift" title="Move rail to the other side"' + (forceRight ? ' disabled' : '') + '>' + bIcon('shift') + '</button>' +
       '<div class="sr-sep"></div>' +
-      items.slice(0, 2).map((it) => srBtn(it)).join('') +
+      BOARD_LIST.slice(0, 2).map(srBtn).join('') +
       '<div class="sr-sep"></div>' +
-      items.slice(2).map((it) => srBtn(it)).join('');
+      BOARD_LIST.slice(2).map(srBtn).join('');
   }
-  function srBtn(it) {
-    return '<button class="sr-btn' + (railActive === it[0] ? ' on' : '') + '" type="button" data-rail="' + it[0] + '" title="' + esc(it[2]) + '">' + bIcon(it[1]) + '</button>';
+  function srBtn(b) {
+    return '<button class="sr-btn' + (mode === 'board' && railActive === b[0] ? ' on' : '') + '" type="button" data-rail="' + b[0] + '" title="' + esc(b[2]) + '">' + bIcon(b[1]) + '</button>';
   }
 
   // ---------- Sticky notes ----------
@@ -328,7 +435,7 @@
 
   // ---------- Panels ----------
   function iterPanel(idx, name) {
-    const cards = state.cards.filter((c) => c.sprintIdx === idx);
+    const cards = state.cards.filter((c) => c.sprintIdx === idx && (!teamFilter || c.teamId === teamFilter));
     const load = cards.reduce((a, c) => a + (Number(c.points) || 0), 0);
     const notes = cards.map((c, i) => noteHtml(c, i)).join('');
     return '<div class="panel-h">' +
@@ -366,12 +473,8 @@
   // ---------- Canvas (one continuous board sheet) ----------
   const PCOLS = 4, PAD = 20, MAXZOOM = 3;
   let boardW = 0, boardH = 0;
-  const RAIL_NAMES = {
-    solbacklog: 'Solution Backlog Board', solplan: 'Solution Planning Board',
-    artbacklog: 'ART Backlog Board', artplan: 'ART Planning Board',
-    objectives: 'ART Objectives', risk: 'Risk Board', collab: 'Collaboration Boards',
-  };
   function renderCanvas() {
+    if (mode === 'page') return renderPageCanvas();
     if (railActive === 'objectives') return renderObjectivesBoard();
     if (railActive === 'team') return renderTeamBoard();
     return renderPlaceholderBoard();
@@ -418,7 +521,7 @@
   function renderObjectivesBoard() {
     const COLS = 3;
     const cols = [[], [], []], colH = [0, 0, 0];
-    state.teams.forEach((tm) => {
+    state.teams.filter((tm) => !teamFilter || tm.id === teamFilter).forEach((tm) => {
       const ci = colH.indexOf(Math.min.apply(null, colH));
       cols[ci].push(tm); colH[ci] += estBlock(tm);
     });
@@ -440,14 +543,97 @@
     canvas.style.width = boardW + 'px';
     canvas.style.height = boardH + 'px';
     canvas.innerHTML = '<div class="board-sheet wb-soon"><div class="soon-card">' +
-      bIcon('apps', 'soon-ic') + '<h3>' + esc(RAIL_NAMES[railActive] || 'Board') + '</h3>' +
+      bIcon('apps', 'soon-ic') + '<h3>' + esc(boardName(railActive)) + '</h3>' +
       '<p>This board isn’t wired up yet — coming next.</p></div></div>';
+  }
+
+  // ---------- Pages plane: documents assembled live from boards + conversations ----------
+  function sampleDeps() {
+    const n = state.teams.map((t) => t.name);
+    const nm = (i) => n[i % n.length] || 'Team';
+    return [
+      { from: nm(0), to: nm(1), what: 'SSO integration handshake', iter: 'Iteration 2', st: 'Blocked' },
+      { from: nm(2), to: nm(0), what: 'Event pipeline schema', iter: 'Iteration 3', st: 'At risk' },
+      { from: nm(3), to: nm(4), what: 'Billing API contract', iter: 'Iteration 2', st: 'On track' },
+    ];
+  }
+  function burndownSvg() {
+    const pts = [[30, 26], [90, 34], [150, 52], [210, 58], [270, 84], [330, 92], [390, 118], [450, 126], [510, 138]];
+    return '<svg class="bd-svg" viewBox="0 0 560 170" preserveAspectRatio="none">' +
+      '<line x1="30" y1="20" x2="530" y2="150" stroke="#c9cfda" stroke-width="1.5" stroke-dasharray="5 5"/>' +
+      '<polyline points="' + pts.map((p) => p.join(',')).join(' ') + '" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+      pts.map((p) => '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#f59e0b"/>').join('') +
+      '<line x1="30" y1="150" x2="530" y2="150" stroke="#e6e8ee"/>' +
+    '</svg>';
+  }
+  const ST_CLASS = { Blocked: 'st-bad', 'At risk': 'st-warn', 'On track': 'st-ok' };
+  function blockHtml(b) {
+    const head = b.title
+      ? '<div class="pd-bh"><b>' + esc(b.title) + '</b>' + (b.src ? '<span class="pd-src">from ' + esc(b.src) + '</span>' : '') + '</div>'
+      : '';
+    if (b.type === 'text') return '<div class="pd-block pd-block--text"><p class="pd-text">' + esc(b.text) + '</p></div>';
+    if (b.type === 'deps') {
+      return '<div class="pd-block">' + head + sampleDeps().map((d) =>
+        '<div class="dep-row"><span class="dep-teams">' + esc(d.from) + ' → ' + esc(d.to) + '</span>' +
+        '<span class="dep-what">' + esc(d.what) + '</span>' +
+        '<span class="dep-iter">' + esc(d.iter) + '</span>' +
+        '<span class="dep-st ' + (ST_CLASS[d.st] || 'st-ok') + '">' + esc(d.st) + '</span></div>').join('') + '</div>';
+    }
+    if (b.type === 'burndown') {
+      return '<div class="pd-block">' + head + burndownSvg() +
+        '<div class="pd-note">Iteration 2 · day 6 of 10 · slightly behind the ideal line</div></div>';
+    }
+    if (b.type === 'convo') {
+      const decisions = [
+        'Falcon owns the SSO token exchange (agreed in huddle).',
+        'Billing API story will be split into contract + implementation.',
+        'Data-migration window escalated to the vendor — answer due Friday.',
+      ];
+      return '<div class="pd-block">' + head +
+        '<p class="pd-text">' + state.threads.length + ' conversations were active this week, mostly around the SSO hand-off and the billing scope. The tone has shifted from discovery to commitments: owners are being named and two follow-up huddles are already scheduled.</p>' +
+        '<div class="pd-decisions">' + decisions.map((d) => '<div class="pd-dec">✓ ' + esc(d) + '</div>').join('') + '</div></div>';
+    }
+    if (b.type === 'risk') {
+      const r = state.risks[0];
+      return '<div class="pd-block">' + head +
+        '<div class="pd-risk"><b>Iteration 2 is the pinch point.</b> Three cross-team hand-offs land in the same week' +
+        (r ? ', and “' + esc(r.text) + '” is still ' + esc((ROAM.find((x) => x.cat === r.cat) || ROAM[0]).label.toLowerCase()) : '') +
+        '. If the SSO handshake slips, the login screen, billing and onboarding stories all move right.</div></div>';
+    }
+    if (b.type === 'okr') {
+      const rows = state.artObjectives.slice(0, 4).map((o, i) => {
+        const pct = [62, 45, 28, 70][i % 4];
+        return '<div class="okr-row"><div class="okr-t"><b>O' + (i + 1) + '</b> ' + esc(o.title) + '</div>' +
+          '<div class="okr-bar"><i style="width:' + pct + '%"></i></div><span class="okr-pct">' + pct + '%</span></div>';
+      }).join('');
+      return '<div class="pd-block">' + head + rows + '</div>';
+    }
+    return '';
+  }
+  function renderPageCanvas() {
+    const pg = state.pages.find((p) => p.id === activePage) || state.pages[0];
+    activePage = pg.id;
+    const availW = canvasWrap.clientWidth - 2 * PAD;
+    const availH = canvasWrap.clientHeight - 2 * PAD;
+    boardW = Math.min(920, availW);
+    canvas.style.width = boardW + 'px';
+    canvas.style.height = 'auto';
+    canvas.innerHTML = '<div class="page-doc">' +
+      '<div class="pd-head"><div class="pd-id"><h2>' + esc(pg.title) + '</h2>' +
+        '<div class="pd-meta"><span class="pd-tag">' + esc(pg.purpose) + '</span><span>Updated ' + esc(pg.updated) + '</span><span>' + esc(state.piName) + '</span></div></div>' +
+        '<div class="pd-actions">' +
+          '<button class="pd-btn" type="button" disabled>' + bIcon('present', 'pd-bico') + 'Present</button>' +
+          '<button class="pd-btn" type="button" disabled>' + bIcon('doc', 'pd-bico') + 'Turn into document</button>' +
+        '</div></div>' +
+      pg.blocks.map(blockHtml).join('') + '</div>';
+    boardH = Math.max(canvas.firstChild.scrollHeight, availH);
+    canvas.style.height = boardH + 'px';
   }
 
   // ART Objectives side panel (collapsible)
   let objPanelOpen = true;
   function renderArtSide() {
-    if (railActive !== 'objectives') { artSide.innerHTML = ''; return; }
+    if (mode !== 'board' || railActive !== 'objectives') { artSide.innerHTML = ''; return; }
     const list = state.artObjectives;
     const com = list.filter((o) => o.committed), unc = list.filter((o) => !o.committed);
     const card = (o, i) =>
@@ -466,6 +652,44 @@
         '<button class="as-add" type="button" title="Add objective" disabled>' + bIcon('plus') + '</button></div>' +
       '<div class="as-body">' + grp('Commited', com) + grp('Uncommitted', unc) + '</div>';
   }
+
+  // ---------- Conversation panel (contextual — it follows where you are) ----------
+  function convoContext() {
+    if (boardScreen.hidden) return 'Dashboard';
+    if (mode === 'page') { const p = state.pages.find((x) => x.id === activePage); return p ? p.title : 'Page'; }
+    return boardName(railActive);
+  }
+  function msgHtml(m) {
+    return '<div class="cv-msg"><span class="cv-av" style="background:' + (m.color || '#8b93a3') + '">' + esc(m.ini || '·') + '</span>' +
+      '<div class="cv-m-b"><div class="cv-m-h"><b>' + esc(m.who) + '</b><span>' + esc(m.ago) + '</span></div>' +
+      '<div class="cv-m-t">' + esc(m.text) + '</div></div></div>';
+  }
+  function renderConvo() {
+    if (!convoOpen) { convoEl.innerHTML = ''; return; }
+    convoEl.innerHTML =
+      '<div class="cv-head">' + bIcon('chat', 'cv-hico') + '<b>Conversation</b>' +
+        '<button class="cv-x" type="button" data-nav="convo" title="Close">✕</button></div>' +
+      '<div class="cv-sub"><span class="cv-ctx">' + esc(convoContext()) + '</span>' +
+        '<button class="cv-sum" type="button" title="Summarise & list decisions" disabled>✨ Summarise</button></div>' +
+      '<div class="cv-body">' + state.threads.map((t) =>
+        '<div class="cv-thread"><div class="cv-where">' + esc(t.where) + '</div>' + msgHtml(t) +
+        (t.replies || []).map((r) => '<div class="cv-reply">' + msgHtml(r) + '</div>').join('') +
+        '</div>').join('') + '</div>' +
+      '<form class="cv-foot" id="cv-form"><input type="text" placeholder="Comment or @mention…" aria-label="Comment" />' +
+        '<button class="cv-send" type="submit">Send</button></form>';
+    document.getElementById('cv-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = e.target.querySelector('input');
+      const text = input.value.trim();
+      if (!text) return;
+      state.threads.unshift({ id: uid(), who: state.user.name, ini: initials(state.user.name), color: state.accent, ago: 'now', where: convoContext(), text, replies: [] });
+      save(); renderConvo(); renderTopNav();
+    });
+  }
+  convoEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-nav="convo"]'); if (!b) return;
+    convoOpen = false; renderBoardView();
+  });
 
   function renderCanvasIfVisible() { if (!boardScreen.hidden) { renderCanvas(); fitView(); } }
 
@@ -546,14 +770,27 @@
       requestAnimationFrame(fitView);
       return;
     }
-    if (v === railActive) return;
-    railActive = v; renderBoardView();
+    if (v === railActive && mode === 'board') return;
+    mode = 'board'; railActive = v; renderBoardView(); updateHash();
   });
   bnav.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-nav]'); if (!b) return;
-    const nav = b.dataset.nav;
-    if (nav === 'home') exitBoard();
-    else if (nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); }
+    const dd = e.target.closest('[data-dd]');
+    if (dd) { e.stopPropagation(); menuOpen = menuOpen === dd.dataset.dd ? null : dd.dataset.dd; renderTopNav(); return; }
+    const b = e.target.closest('[data-nav],[data-plane],[data-go-board],[data-go-page],[data-go-session],[data-go-team],[data-go-shell]');
+    if (!b) return;
+    menuOpen = null;
+    const d = b.dataset;
+    if (d.nav === 'home') { exitBoard(); return; }
+    if (d.nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); return; }
+    if (d.nav === 'palette') { openPalette(); renderTopNav(); return; }
+    if (d.nav === 'convo') { convoOpen = !convoOpen; renderBoardView(); return; }
+    if (d.plane) { mode = d.plane; if (mode === 'page' && !activePage && state.pages[0]) activePage = state.pages[0].id; renderBoardView(); updateHash(); return; }
+    if (d.goBoard != null) { mode = 'board'; railActive = d.goBoard; renderBoardView(); updateHash(); return; }
+    if (d.goPage != null) { mode = 'page'; activePage = d.goPage; renderBoardView(); updateHash(); return; }
+    if (d.goSession != null) { state.piName = d.goSession; save(); renderBoardView(); return; }
+    if (d.goTeam != null) { teamFilter = d.goTeam || null; renderBoardView(); return; }
+    if (d.goShell != null) { exitBoard(); navigate(d.goShell); return; }
+    renderTopNav();
   });
   zoomctl.addEventListener('click', (e) => {
     const b = e.target.closest('[data-z]'); if (!b) return;
@@ -564,11 +801,15 @@
   });
 
   function renderBoardView() {
-    boardScreen.classList.toggle('obj-mode', railActive === 'objectives');
-    boardScreen.classList.toggle('obj-open', railActive === 'objectives' && objPanelOpen);
+    const obj = mode === 'board' && railActive === 'objectives';
+    boardScreen.classList.toggle('obj-mode', obj);
+    boardScreen.classList.toggle('obj-open', obj && objPanelOpen);
+    boardScreen.classList.toggle('page-mode', mode === 'page');
+    boardScreen.classList.toggle('convo-open', convoOpen);
     renderTopNav();
     renderSideRail();
     renderArtSide();
+    renderConvo();
     renderZoomCtl();
     renderCanvas();
     fitView();
@@ -706,9 +947,12 @@
     else if (a === 'export') { closeUserMenu(); exportPlan(); }
     else if (a === 'quit') quit();
   });
-  document.addEventListener('click', (e) => { if (!e.target.closest('.user-chip-wrap')) closeUserMenu(); });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.user-chip-wrap')) closeUserMenu();
+    if (menuOpen && !e.target.closest('.bn-dd')) { menuOpen = null; if (!boardScreen.hidden) renderTopNav(); }
+  });
 
-  function navigate(page) { currentPage = page; renderSide(); renderPage(page); mainEl.scrollTop = 0; }
+  function navigate(page) { currentPage = page; renderSide(); renderPage(page); mainEl.scrollTop = 0; updateHash(); }
   function renderPage(page) {
     if (page === 'home') return renderHome();
     if (page === 'sessions') return renderSessions();
@@ -825,10 +1069,86 @@
     if (name) { state.piName = name; save(); }
     shell.hidden = true; boardScreen.hidden = false;
     renderBoardView();
+    updateHash();
   }
   function exitBoard() {
     boardScreen.hidden = true; shell.hidden = false;
     navigate(currentPage);
+  }
+
+  // ---------- Command palette (⌘K): jump to any board, page, team or session ----------
+  let paletteOpen = false, palSel = 0, palMatches = [];
+  function showBoard() { if (boardScreen.hidden) enterBoard(); else { renderBoardView(); updateHash(); } }
+  function paletteData() {
+    const items = [];
+    BOARD_LIST.forEach((b) => items.push({ g: 'Boards', ico: b[1], label: b[2], go: () => { mode = 'board'; railActive = b[0]; showBoard(); } }));
+    state.pages.forEach((p) => items.push({ g: 'Pages', ico: 'doc', label: p.title, hint: p.purpose, go: () => { mode = 'page'; activePage = p.id; showBoard(); } }));
+    state.teams.forEach((t) => items.push({ g: 'Teams', ico: 'teamrail', label: t.name, hint: 'Team Board', go: () => { mode = 'board'; railActive = 'team'; teamFilter = t.id; showBoard(); } }));
+    state.sessions.forEach((sn) => items.push({ g: 'PI Sessions', ico: 'folder', label: sn.name, hint: sn.updated, go: () => enterBoard(sn.name) }));
+    [['home', 'Home dashboard'], ['sessions', 'PI Sessions'], ['connections', 'ALM Connections'], ['settings', 'PIE Recipe']].forEach((pgd) =>
+      items.push({ g: 'App', ico: 'apps', label: pgd[1], go: () => { exitBoard(); navigate(pgd[0]); } }));
+    items.push({ g: 'Actions', ico: 'chat', label: 'Toggle conversation panel', go: () => { convoOpen = !convoOpen; if (!boardScreen.hidden) renderBoardView(); } });
+    return items;
+  }
+  function renderPalList(q) {
+    const list = document.getElementById('pal-list');
+    q = q.trim().toLowerCase();
+    palMatches = paletteData().filter((it) => !q || (it.label + ' ' + it.g).toLowerCase().includes(q));
+    if (palSel >= palMatches.length) palSel = 0;
+    if (!palMatches.length) { list.innerHTML = '<div class="pal-empty">No matches — try a board, page or team name.</div>'; return; }
+    let html = '', lastG = '';
+    palMatches.forEach((it, i) => {
+      if (it.g !== lastG) { html += '<div class="pal-g">' + esc(it.g) + '</div>'; lastG = it.g; }
+      html += '<button class="pal-i' + (i === palSel ? ' sel' : '') + '" type="button" data-pal="' + i + '">' +
+        bIcon(it.ico, 'pal-ico') + '<span>' + esc(it.label) + '</span>' +
+        (it.hint ? '<span class="pal-k">' + esc(it.hint) + '</span>' : '') + '</button>';
+    });
+    list.innerHTML = html;
+    const sel = list.querySelector('.pal-i.sel');
+    if (sel) sel.scrollIntoView({ block: 'nearest' });
+  }
+  function openPalette() {
+    paletteOpen = true; palSel = 0;
+    paletteEl.hidden = false;
+    paletteEl.innerHTML =
+      '<div class="pal-box"><div class="pal-in">' + bIcon('search', 'pal-sico') +
+        '<input id="pal-input" type="text" placeholder="Jump to a board, page, team or session…" autocomplete="off" />' +
+        '<span class="pal-esc">esc</span></div>' +
+      '<div class="pal-list" id="pal-list"></div>' +
+      '<div class="pal-foot"><span><b>↑↓</b> navigate</span><span><b>↵</b> open</span><span><b>⌘K</b> toggle</span></div></div>';
+    renderPalList('');
+    const input = document.getElementById('pal-input');
+    input.focus();
+    input.addEventListener('input', () => { palSel = 0; renderPalList(input.value); });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palMatches.length - 1, palSel + 1); renderPalList(input.value); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); palSel = Math.max(0, palSel - 1); renderPalList(input.value); }
+      else if (e.key === 'Enter') { e.preventDefault(); palGo(palSel); }
+    });
+  }
+  function closePalette() { paletteOpen = false; paletteEl.hidden = true; paletteEl.innerHTML = ''; }
+  function palGo(i) { const it = palMatches[i]; if (!it) return; closePalette(); it.go(); }
+  paletteEl.addEventListener('click', (e) => {
+    if (e.target === paletteEl) return closePalette();
+    const b = e.target.closest('[data-pal]');
+    if (b) palGo(Number(b.dataset.pal));
+  });
+
+  // ---------- Deep links (#b/<board>, #p/<page>, #s/<shell page>) ----------
+  // The hash is only ever *replaced* (never pushed) so the arcade shell's
+  // popstate-driven close keeps working when Pie runs inside its iframe.
+  function updateHash() {
+    let h = '';
+    if (!boardScreen.hidden) h = mode === 'page' ? 'p/' + activePage : 'b/' + railActive;
+    else if (currentPage !== 'home') h = 's/' + currentPage;
+    try { history.replaceState(null, '', h ? '#' + h : location.pathname + location.search); } catch (_) {}
+  }
+  function applyHash() {
+    const m = /^#(b|p|s)\/([\w-]+)$/.exec(location.hash || '');
+    if (!m) return;
+    if (m[1] === 's') { navigate(m[2]); return; }
+    if (m[1] === 'b' && BOARD_LIST.some((b) => b[0] === m[2])) { mode = 'board'; railActive = m[2]; enterBoard(); }
+    else if (m[1] === 'p' && state.pages.some((p) => p.id === m[2])) { mode = 'page'; activePage = m[2]; enterBoard(); }
   }
 
   // ---------- PIE Recipe (Settings page) ----------
@@ -975,7 +1295,16 @@
 
   // ---------- Global ----------
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeUserMenu();
+    if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') {
+      e.preventDefault();
+      if (paletteOpen) closePalette(); else openPalette();
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (paletteOpen) { closePalette(); return; }
+      if (menuOpen) { menuOpen = null; if (!boardScreen.hidden) renderTopNav(); return; }
+      closeUserMenu();
+    }
   });
 
   function fullRender() {
@@ -989,6 +1318,7 @@
   fullRender();
   shell.hidden = false;
   boardScreen.hidden = true;
+  applyHash();
 
   const startTime = Date.now();
   function reveal() {
