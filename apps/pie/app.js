@@ -52,26 +52,38 @@
   }
 
   // Pages: sets of purpose-specific documents assembled from boards + conversations.
-  // Only the structure lives in state; block content is derived live at render time.
+  // Each page belongs to a team; the team's TYPE ('team' | 'art' | 'st') gates access,
+  // so switching context swaps the whole page catalogue.
   function defaultPages() {
     return [
-      { id: 'art-sync', title: 'ART Sync Meeting', purpose: 'Facilitation', updated: '1h ago', blocks: [
+      { id: 'strategy-doc', owner: 'st', title: 'Strategy Document', purpose: 'Strategy', updated: '2w ago', blocks: [
+        { type: 'file', name: 'strategy-2026.pdf', note: 'Uploaded as planning context — pages and reports below can cite it.' },
+        { type: 'text', text: 'Three strategic themes for 2026: one coherent customer journey across surfaces, trustworthy insights by default, and an open platform partners can build on without hand-holding.' },
+        { type: 'okr', title: 'How the portfolio pays into these themes', src: 'ART Objectives' },
+      ] },
+      { id: 'team-dashboard', owner: 'team', title: 'Team Dashboard', purpose: 'Reporting', updated: '10m ago', blocks: [
+        { type: 'text', text: 'Live metrics for this team — assembled from the Team Board and Risk Board, refreshed on open.' },
+        { type: 'stats', title: 'This increment at a glance', src: 'Team Board' },
+        { type: 'burndown', title: 'Iteration burndown', src: 'Team Board' },
+        { type: 'risk', title: 'What could hurt us next', src: 'Risk Board' },
+      ] },
+      { id: 'art-sync', owner: 'art', title: 'ART Sync Meeting', purpose: 'Facilitation', updated: '1h ago', blocks: [
         { type: 'deps', title: 'Critical dependencies to discuss', src: 'ART Planning Board' },
         { type: 'text', text: 'Focus for today: unblock the SSO handshake between Falcon and Otter, and confirm an owner for the event-pipeline schema before Iteration 3 starts.' },
         { type: 'burndown', title: 'Current iteration burndown', src: 'Team Boards' },
         { type: 'convo', title: 'Conversations & decisions — last 7 days', src: 'Conversations' },
         { type: 'risk', title: 'Riskiest part of the plan', src: 'Risk Board' },
       ] },
-      { id: 'scrum-of-scrums', title: 'Scrum of Scrums', purpose: 'Facilitation', updated: 'yesterday', blocks: [
+      { id: 'scrum-of-scrums', owner: 'art', title: 'Scrum of Scrums', purpose: 'Facilitation', updated: 'yesterday', blocks: [
         { type: 'text', text: 'Round-the-room notes for team representatives. Each team gets two minutes: progress, plans, problems.' },
         { type: 'deps', title: 'Cross-team hand-offs this week', src: 'ART Planning Board' },
         { type: 'risk', title: 'Escalations for the RTE', src: 'Risk Board' },
       ] },
-      { id: 'pi-okrs', title: 'PI OKRs', purpose: 'Strategy', updated: '3d ago', blocks: [
+      { id: 'pi-okrs', owner: 'art', title: 'PI OKRs', purpose: 'Strategy', updated: '3d ago', blocks: [
         { type: 'text', text: 'Our ART objectives for this increment, written as OKRs and linked live to the boards that pay into them.' },
         { type: 'okr', title: 'Objectives & key results', src: 'ART Objectives' },
       ] },
-      { id: 'leadership-status', title: 'Leadership Status Report', purpose: 'Reporting', updated: '2d ago', blocks: [
+      { id: 'leadership-status', owner: 'art', title: 'Leadership Status Report', purpose: 'Reporting', updated: '2d ago', blocks: [
         { type: 'text', text: 'One-page status for business leaders: where the plan stands, what changed this week, and where we need decisions.' },
         { type: 'burndown', title: 'Delivery trend', src: 'Team Boards' },
         { type: 'okr', title: 'How the plan pays into our strategic themes', src: 'ART Objectives' },
@@ -80,17 +92,20 @@
     ];
   }
 
-  // Conversations attach to a team, a board or a single sticky note — never a place of their own.
+  // Conversations belong to a team, to a single sticky note (comments), or to
+  // individual users (chat) — never a place of their own. They can fetch pages.
   function defaultThreads() {
     return [
-      { id: uid(), who: 'Mara Kim', ini: 'MK', color: '#6a9be0', ago: '2h', where: 'ART Planning Board',
+      { id: uid(), kind: 'team', who: 'Mara Kim', ini: 'MK', color: '#6a9be0', ago: '2h', where: 'ART Planning Board',
         text: '@Ari — the SSO handshake lands in Iteration 2. Can Falcon own the token-exchange piece?',
         replies: [{ who: 'Ari Ruiz', ini: 'AR', color: '#e0746a', ago: '1h', text: 'Yes — moving it next to the login-screen story now.' }] },
-      { id: uid(), who: 'Tom Sato', ini: 'TS', color: '#6ad0a8', ago: '5h', where: 'Risk Board',
-        text: 'Raising the data-migration window as a risk — vendor confirmed the freeze is only 48 hours.', replies: [] },
-      { id: uid(), who: 'Jo Deng', ini: 'JD', color: '#caa15a', ago: '1d', where: 'Sticky · Billing API',
+      { id: uid(), kind: 'team', who: 'Tom Sato', ini: 'TS', color: '#6ad0a8', ago: '5h', where: 'Risk Board', pageRef: 'art-sync',
+        text: 'Prepped tomorrow’s ART Sync page — the dependency list is pulled in already, please review.', replies: [] },
+      { id: uid(), kind: 'sticky', who: 'Jo Deng', ini: 'JD', color: '#caa15a', ago: '1d', where: 'Sticky · Billing API',
         text: 'Should we split this into contract + implementation? 13 points feels heavy for one iteration.',
         replies: [{ who: 'Mara Kim', ini: 'MK', color: '#6a9be0', ago: '1d', text: 'Agreed — let’s decide in the huddle tomorrow.' }] },
+      { id: uid(), kind: 'chat', who: 'Ari Ruiz', ini: 'AR', color: '#e0746a', ago: '30m', where: 'Chat · Ari Ruiz',
+        text: 'Got five minutes before standup? Want to huddle on the Otter dependency.', replies: [] },
     ];
   }
 
@@ -192,8 +207,18 @@
       ];
       s.connectionTotal = 7;
     }
-    if (!Array.isArray(s.pages) || !s.pages.length) s.pages = defaultPages();
-    if (!Array.isArray(s.threads)) s.threads = defaultThreads();
+    // Team hierarchy: user-teams roll up into ARTs, ARTs into a Solution Train.
+    // Every artifact (board, page, view, conversation) belongs to a team of some type.
+    if (!Array.isArray(s.arts) || !s.arts.length) {
+      const half = Math.ceil(s.teams.length / 2);
+      s.arts = [
+        { id: uid(), name: s.artName || 'Digital Experience ART', teamIds: s.teams.slice(0, half).map((t) => t.id) },
+        { id: uid(), name: 'Payments ART', teamIds: s.teams.slice(half).map((t) => t.id) },
+      ];
+    }
+    s.st = s.st || { id: uid(), name: 'Horizon Solution Train' };
+    if (!Array.isArray(s.pages) || !s.pages.length || !s.pages[0].owner) s.pages = defaultPages();
+    if (!Array.isArray(s.threads) || !s.threads.length || !s.threads[0].kind) s.threads = defaultThreads();
     if (!Array.isArray(s.events)) {
       s.events = [
         { id: uid(), text: 'Synced 38 features from platform-jira', source: 'platform-jira', ago: '2h', ok: true },
@@ -292,28 +317,95 @@
     return '<span class="b-av" style="background:' + color + '">' + esc(initials) + '</span>';
   }
 
-  // ---------- Boards registry: [id, rail icon, name] ----------
+  // ---------- Boards registry: [id, rail icon, name, owning team type] ----------
+  // Boards belong to teams; the team type decides which boards exist at that level.
   const BOARD_LIST = [
-    ['solbacklog', 'solbacklog', 'Solution Backlog Board'],
-    ['solplan', 'solplan', 'Solution Planning Board'],
-    ['artbacklog', 'artbacklog', 'ART Backlog Board'],
-    ['artplan', 'artplan', 'ART Planning Board'],
-    ['objectives', 'objectives', 'ART Objectives'],
-    ['risk', 'risk', 'Risk Board'],
-    ['team', 'teamrail', 'Team Board'],
-    ['collab', 'collab', 'Collaboration Boards'],
+    ['solbacklog', 'solbacklog', 'Solution Backlog Board', 'st'],
+    ['solplan', 'solplan', 'Solution Planning Board', 'st'],
+    ['artbacklog', 'artbacklog', 'ART Backlog Board', 'art'],
+    ['artplan', 'artplan', 'ART Planning Board', 'art'],
+    ['objectives', 'objectives', 'ART Objectives', 'art'],
+    ['risk', 'risk', 'Risk Board', 'art'],
+    ['team', 'teamrail', 'Team Board', 'team'],
+    ['collab', 'collab', 'Collaboration Boards', 'any'],
   ];
-  const boardName = (id) => { const b = BOARD_LIST.find((x) => x[0] === id); return b ? b[2] : 'Board'; };
-  const boardIcon = (id) => { const b = BOARD_LIST.find((x) => x[0] === id); return b ? b[1] : 'board'; };
+  const boardDef = (id) => BOARD_LIST.find((x) => x[0] === id);
+  const boardName = (id) => { const b = boardDef(id); return b ? b[2] : 'Board'; };
+  const boardIcon = (id) => { const b = boardDef(id); return b ? b[1] : 'board'; };
+  const boardsFor = (type) => BOARD_LIST.filter((b) => b[3] === type || b[3] === 'any');
 
   // ---------- Chrome state ----------
   let railActive = 'team';
   let railRight = false;   // user's left/right preference (forced right on ART Objectives)
   let mode = 'board';      // 'board' | 'page' — the two planes of a session
   let activePage = null;   // page id when mode === 'page'
-  let teamFilter = null;   // team id, or null = all teams
   let convoOpen = false;   // contextual conversation panel
+  let cvFilter = 'all';    // conversation kinds: all | team | sticky | chat
   let menuOpen = null;     // which top-nav dropdown is open
+
+  // Working context: WHICH TEAM you are working as — a user-team, an ART
+  // (team of teams) or the Solution Train (team of ARTs). Everything else
+  // (boards, pages, conversations) is scoped by it.
+  let ctx = { type: 'team', id: (state.teams[0] || {}).id };
+  const TYPE_LABEL = { team: 'Team', art: 'ART', st: 'Solution Train' };
+  const artById = (id) => state.arts.find((a) => a.id === id) || state.arts[0];
+  const artOf = (teamId) => state.arts.find((a) => a.teamIds.includes(teamId)) || state.arts[0];
+  function ctxArt() {
+    if (ctx.type === 'art') return artById(ctx.id);
+    if (ctx.type === 'team') return artOf(ctx.id);
+    return state.arts[0];
+  }
+  function ctxName() {
+    if (ctx.type === 'st') return state.st.name;
+    if (ctx.type === 'art') return ctxArt().name;
+    const t = team(ctx.id) || state.teams[0];
+    return t ? t.name : 'Team';
+  }
+  // The user-teams inside the current scope (one for a team, the ART's teams
+  // for an ART, everyone for the Solution Train).
+  function ctxTeams() {
+    if (ctx.type === 'team') return state.teams.filter((t) => t.id === ctx.id);
+    if (ctx.type === 'art') return state.teams.filter((t) => ctxArt().teamIds.includes(t.id));
+    return state.teams;
+  }
+  const inScope = (teamId) => ctxTeams().some((t) => t.id === teamId);
+  function ensureCtxValid() {
+    if (ctx.type === 'team' && !team(ctx.id)) ctx = { type: 'team', id: (state.teams[0] || {}).id };
+    if (ctx.type === 'art' && !state.arts.find((a) => a.id === ctx.id)) ctx = { type: 'art', id: state.arts[0].id };
+  }
+  const pagesFor = () => state.pages.filter((p) => p.owner === ctx.type);
+
+  // Switch the working context; snap board/page to something the new team owns.
+  function setCtx(type, id) {
+    ctx = { type, id };
+    const list = boardsFor(type);
+    if (!list.some((b) => b[0] === railActive)) railActive = list[0][0];
+    if (mode === 'page') {
+      const ps = pagesFor();
+      if (!ps.some((p) => p.id === activePage)) activePage = ps[0] ? ps[0].id : null;
+      if (!activePage) mode = 'board';
+    }
+  }
+  // Jump to a board; adopt the team context of whoever owns it.
+  function gotoBoard(id) {
+    const owner = (boardDef(id) || [])[3];
+    if (owner === 'st') ctx = { type: 'st', id: state.st.id };
+    else if (owner === 'art') ctx = { type: 'art', id: ctxArt().id };
+    else if (owner === 'team' && ctx.type !== 'team') {
+      const t = ctxTeams()[0] || state.teams[0];
+      ctx = { type: 'team', id: t.id };
+    }
+    mode = 'board'; railActive = id;
+  }
+  // Jump to a page; adopt the context of the team type that owns it.
+  function gotoPage(id) {
+    const p = state.pages.find((x) => x.id === id);
+    if (!p) return;
+    if (p.owner === 'st') ctx = { type: 'st', id: state.st.id };
+    else if (p.owner === 'art') ctx = { type: 'art', id: ctxArt().id };
+    else if (ctx.type !== 'team') { const t = ctxTeams()[0] || state.teams[0]; ctx = { type: 'team', id: t.id }; }
+    mode = 'page'; activePage = id;
+  }
 
   // ---------- Top navigation: the model's spine as live switcher chips ----------
   function ddWrap(key, btnHtml, menuHtml) {
@@ -332,17 +424,23 @@
       '</button>';
   }
   function boardMenu() {
-    return '<div class="dd-h">Boards</div>' +
-      BOARD_LIST.map((b) => ddItem('data-go-board="' + b[0] + '"', b[1], b[2], mode === 'board' && railActive === b[0])).join('');
+    const groups = [['st', state.st.name], ['art', ctxArt().name], ['team', 'Team boards'], ['any', 'Shared']];
+    return groups.map((g) =>
+      '<div class="dd-h">' + esc(g[1]) + '</div>' +
+      BOARD_LIST.filter((b) => b[3] === g[0]).map((b) =>
+        ddItem('data-go-board="' + b[0] + '"', b[1], b[2], mode === 'board' && railActive === b[0])).join('')
+    ).join('');
   }
   function pageMenu() {
+    const scoped = pagesFor();
     const groups = [];
-    state.pages.forEach((p) => { if (!groups.includes(p.purpose)) groups.push(p.purpose); });
-    return groups.map((g) =>
-      '<div class="dd-h">' + esc(g) + '</div>' +
-      state.pages.filter((p) => p.purpose === g).map((p) =>
-        ddItem('data-go-page="' + p.id + '"', 'doc', p.title, mode === 'page' && activePage === p.id, p.updated)).join('')
-    ).join('');
+    scoped.forEach((p) => { if (!groups.includes(p.purpose)) groups.push(p.purpose); });
+    return '<div class="dd-h">' + esc(ctxName()) + ' · Pages</div>' +
+      groups.map((g) =>
+        (groups.length > 1 ? '<div class="dd-h dd-h2">' + esc(g) + '</div>' : '') +
+        scoped.filter((p) => p.purpose === g).map((p) =>
+          ddItem('data-go-page="' + p.id + '"', 'doc', p.title, mode === 'page' && activePage === p.id, p.updated)).join('')
+      ).join('');
   }
   function sessionMenu() {
     return '<div class="dd-h">PI Sessions</div>' +
@@ -350,10 +448,16 @@
       '<div class="dd-sep"></div>' +
       ddItem('data-go-shell="sessions"', 'apps', 'View all sessions', false);
   }
+  // The context picker mirrors the team hierarchy: ST → ARTs → user-teams.
   function teamMenu() {
-    return '<div class="dd-h">Teams</div>' +
-      ddItem('data-go-team=""', 'people', 'All teams', !teamFilter) +
-      state.teams.map((t) => ddItem('data-go-team="' + t.id + '"', 'teamrail', t.name, teamFilter === t.id)).join('');
+    let h = '<div class="dd-h">Working as</div>' +
+      ddItem('data-go-ctx="st:' + state.st.id + '"', 'solplan', state.st.name, ctx.type === 'st', 'Solution Train');
+    state.arts.forEach((a) => {
+      h += ddItem('data-go-ctx="art:' + a.id + '"', 'artplan', a.name, ctx.type === 'art' && ctx.id === a.id, 'ART');
+      h += state.teams.filter((t) => a.teamIds.includes(t.id)).map((t) =>
+        '<div class="dd-ind">' + ddItem('data-go-ctx="team:' + t.id + '"', 'teamrail', t.name, ctx.type === 'team' && ctx.id === t.id, 'Team') + '</div>').join('');
+    });
+    return h;
   }
   function renderTopNav() {
     const avatars = [['AR', '#e0746a'], ['MK', '#6a9be0'], ['TS', '#6ad0a8'], ['JD', '#caa15a']]
@@ -370,18 +474,23 @@
         '<span>' + (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives</span></button>';
     }
 
+    const ctxChip = ddWrap('team',
+      '<button class="bn-chip" type="button" data-dd="team">' + bIcon('people', 'bn-cico') +
+        '<span>' + esc(ctxName()) + '</span><span class="bn-type">' + esc(TYPE_LABEL[ctx.type]) + '</span>' + bIcon('chev', 'bn-chev') + '</button>',
+      teamMenu());
     let center;
     if (mode === 'page') {
-      const pg = state.pages.find((p) => p.id === activePage) || state.pages[0];
+      const pg = pagesFor().find((p) => p.id === activePage) || pagesFor()[0];
       center =
         ddWrap('page', ddChipBtn('page', 'doc', pg ? pg.title : 'Pages'), pageMenu()) +
-        ddWrap('session', ddChipBtn('session', 'folder', state.piName), sessionMenu());
+        ddWrap('session', ddChipBtn('session', 'folder', state.piName), sessionMenu()) +
+        ctxChip;
     } else {
       center =
         '<button class="bn-ico" type="button" title="Layout" disabled>' + bIcon('view') + '</button>' +
         ddWrap('board', ddChipBtn('board', boardIcon(railActive), boardName(railActive)), boardMenu()) +
         ddWrap('session', ddChipBtn('session', 'folder', state.piName), sessionMenu()) +
-        ddWrap('team', ddChipBtn('team', 'people', teamFilter && team(teamFilter) ? team(teamFilter).name : 'All teams'), teamMenu());
+        ctxChip;
     }
 
     bnav.innerHTML =
@@ -401,16 +510,15 @@
       '</div>';
   }
 
-  // ---------- Floating side rail (boards only — hidden on the Pages plane) ----------
+  // ---------- Floating side rail: the active team's boards only ----------
   function renderSideRail() {
     const forceRight = mode === 'board' && railActive === 'objectives' && objPanelOpen;
     srail.classList.toggle('srail--right', forceRight || railRight);
+    const mine = boardsFor(ctx.type);
     srail.innerHTML =
       '<button class="sr-btn" type="button" data-rail="shift" title="Move rail to the other side"' + (forceRight ? ' disabled' : '') + '>' + bIcon('shift') + '</button>' +
       '<div class="sr-sep"></div>' +
-      BOARD_LIST.slice(0, 2).map(srBtn).join('') +
-      '<div class="sr-sep"></div>' +
-      BOARD_LIST.slice(2).map(srBtn).join('');
+      mine.map(srBtn).join('');
   }
   function srBtn(b) {
     return '<button class="sr-btn' + (mode === 'board' && railActive === b[0] ? ' on' : '') + '" type="button" data-rail="' + b[0] + '" title="' + esc(b[2]) + '">' + bIcon(b[1]) + '</button>';
@@ -435,7 +543,7 @@
 
   // ---------- Panels ----------
   function iterPanel(idx, name) {
-    const cards = state.cards.filter((c) => c.sprintIdx === idx && (!teamFilter || c.teamId === teamFilter));
+    const cards = state.cards.filter((c) => c.sprintIdx === idx && inScope(c.teamId));
     const load = cards.reduce((a, c) => a + (Number(c.points) || 0), 0);
     const notes = cards.map((c, i) => noteHtml(c, i)).join('');
     return '<div class="panel-h">' +
@@ -521,7 +629,7 @@
   function renderObjectivesBoard() {
     const COLS = 3;
     const cols = [[], [], []], colH = [0, 0, 0];
-    state.teams.filter((tm) => !teamFilter || tm.id === teamFilter).forEach((tm) => {
+    ctxTeams().forEach((tm) => {
       const ci = colH.indexOf(Math.min.apply(null, colH));
       cols[ci].push(tm); colH[ci] += estBlock(tm);
     });
@@ -549,7 +657,8 @@
 
   // ---------- Pages plane: documents assembled live from boards + conversations ----------
   function sampleDeps() {
-    const n = state.teams.map((t) => t.name);
+    const scoped = ctxTeams();
+    const n = (scoped.length > 1 ? scoped : state.teams).map((t) => t.name);
     const nm = (i) => n[i % n.length] || 'Team';
     return [
       { from: nm(0), to: nm(1), what: 'SSO integration handshake', iter: 'Iteration 2', st: 'Blocked' },
@@ -608,10 +717,30 @@
       }).join('');
       return '<div class="pd-block">' + head + rows + '</div>';
     }
+    if (b.type === 'file') {
+      return '<div class="pd-block pd-block--file"><div class="pd-file">' + bIcon('doc', 'pd-fico') +
+        '<div><b>' + esc(b.name) + '</b><span>' + esc(b.note || '') + '</span></div>' +
+        '<button class="pd-btn" type="button" disabled>Replace</button></div></div>';
+    }
+    if (b.type === 'stats') {
+      const ts = ctxTeams();
+      const ids = ts.map((t) => t.id);
+      const load = state.cards.filter((c) => ids.includes(c.teamId)).reduce((a, c) => a + (Number(c.points) || 0), 0);
+      const cap = ts.reduce((a, t) => a + (Number(t.capacity) || 0), 0) * state.sprints.length;
+      const committed = ts.reduce((a, t) => a + ((t.objectives || []).filter((o) => o.committed).length), 0);
+      const tiles = [
+        ['Load', load, 'points planned'],
+        ['Capacity', cap, 'points available'],
+        ['Objectives', committed, 'committed'],
+        ['Risks', state.risks.length, 'open'],
+      ].map((t) => '<div class="pd-stat"><span class="pd-sk">' + t[0] + '</span><span class="pd-sv">' + t[1] + '</span><span class="pd-ss">' + t[2] + '</span></div>').join('');
+      return '<div class="pd-block">' + head + '<div class="pd-stats">' + tiles + '</div></div>';
+    }
     return '';
   }
   function renderPageCanvas() {
-    const pg = state.pages.find((p) => p.id === activePage) || state.pages[0];
+    const scoped = pagesFor();
+    const pg = scoped.find((p) => p.id === activePage) || scoped[0] || state.pages[0];
     activePage = pg.id;
     const availW = canvasWrap.clientWidth - 2 * PAD;
     const availH = canvasWrap.clientHeight - 2 * PAD;
@@ -620,7 +749,7 @@
     canvas.style.height = 'auto';
     canvas.innerHTML = '<div class="page-doc">' +
       '<div class="pd-head"><div class="pd-id"><h2>' + esc(pg.title) + '</h2>' +
-        '<div class="pd-meta"><span class="pd-tag">' + esc(pg.purpose) + '</span><span>Updated ' + esc(pg.updated) + '</span><span>' + esc(state.piName) + '</span></div></div>' +
+        '<div class="pd-meta"><span class="pd-tag">' + esc(pg.purpose) + '</span><span>' + esc(ctxName()) + '</span><span>Updated ' + esc(pg.updated) + '</span><span>' + esc(state.piName) + '</span></div></div>' +
         '<div class="pd-actions">' +
           '<button class="pd-btn" type="button" disabled>' + bIcon('present', 'pd-bico') + 'Present</button>' +
           '<button class="pd-btn" type="button" disabled>' + bIcon('doc', 'pd-bico') + 'Turn into document</button>' +
@@ -648,7 +777,7 @@
       '<div class="as-grp"><span>' + label + '</span><span class="as-n">' + arr.length + '</span></div>' +
       arr.map(card).join('');
     artSide.innerHTML =
-      '<div class="as-head"><span class="as-art">' + esc(state.artName) + '</span>' +
+      '<div class="as-head"><span class="as-art">' + esc(ctxArt().name) + '</span>' +
         '<button class="as-add" type="button" title="Add objective" disabled>' + bIcon('plus') + '</button></div>' +
       '<div class="as-body">' + grp('Commited', com) + grp('Uncommitted', unc) + '</div>';
   }
@@ -664,17 +793,24 @@
       '<div class="cv-m-b"><div class="cv-m-h"><b>' + esc(m.who) + '</b><span>' + esc(m.ago) + '</span></div>' +
       '<div class="cv-m-t">' + esc(m.text) + '</div></div></div>';
   }
+  const CV_TABS = [['all', 'All'], ['team', 'Team'], ['sticky', 'Stickies'], ['chat', 'Chats']];
   function renderConvo() {
     if (!convoOpen) { convoEl.innerHTML = ''; return; }
+    const threads = state.threads.filter((t) => cvFilter === 'all' || t.kind === cvFilter);
     convoEl.innerHTML =
       '<div class="cv-head">' + bIcon('chat', 'cv-hico') + '<b>Conversation</b>' +
         '<button class="cv-x" type="button" data-nav="convo" title="Close">✕</button></div>' +
-      '<div class="cv-sub"><span class="cv-ctx">' + esc(convoContext()) + '</span>' +
+      '<div class="cv-sub"><span class="cv-ctx">' + esc(ctxName()) + '</span><span class="cv-ctx cv-ctx2">' + esc(convoContext()) + '</span>' +
         '<button class="cv-sum" type="button" title="Summarise & list decisions" disabled>✨ Summarise</button></div>' +
-      '<div class="cv-body">' + state.threads.map((t) =>
-        '<div class="cv-thread"><div class="cv-where">' + esc(t.where) + '</div>' + msgHtml(t) +
-        (t.replies || []).map((r) => '<div class="cv-reply">' + msgHtml(r) + '</div>').join('') +
-        '</div>').join('') + '</div>' +
+      '<div class="cv-tabs">' + CV_TABS.map((t) =>
+        '<button class="cv-tab' + (cvFilter === t[0] ? ' on' : '') + '" type="button" data-cv-tab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
+      '<div class="cv-body">' + (threads.map((t) => {
+        const pageRef = t.pageRef && state.pages.find((p) => p.id === t.pageRef);
+        return '<div class="cv-thread"><div class="cv-where">' + esc(t.where) + '</div>' + msgHtml(t) +
+          (pageRef ? '<button class="cv-page" type="button" data-open-page="' + pageRef.id + '">' + bIcon('doc', 'cv-pico') + esc(pageRef.title) + ' ↗</button>' : '') +
+          (t.replies || []).map((r) => '<div class="cv-reply">' + msgHtml(r) + '</div>').join('') +
+          '</div>';
+      }).join('') || '<div class="cv-empty">Nothing here yet.</div>') + '</div>' +
       '<form class="cv-foot" id="cv-form"><input type="text" placeholder="Comment or @mention…" aria-label="Comment" />' +
         '<button class="cv-send" type="submit">Send</button></form>';
     document.getElementById('cv-form').addEventListener('submit', (e) => {
@@ -682,11 +818,15 @@
       const input = e.target.querySelector('input');
       const text = input.value.trim();
       if (!text) return;
-      state.threads.unshift({ id: uid(), who: state.user.name, ini: initials(state.user.name), color: state.accent, ago: 'now', where: convoContext(), text, replies: [] });
+      state.threads.unshift({ id: uid(), kind: 'team', who: state.user.name, ini: initials(state.user.name), color: state.accent, ago: 'now', where: convoContext(), text, replies: [] });
       save(); renderConvo(); renderTopNav();
     });
   }
   convoEl.addEventListener('click', (e) => {
+    const tab = e.target.closest('[data-cv-tab]');
+    if (tab) { cvFilter = tab.dataset.cvTab; renderConvo(); return; }
+    const pg = e.target.closest('[data-open-page]');
+    if (pg) { gotoPage(pg.dataset.openPage); showBoard(); return; }
     const b = e.target.closest('[data-nav="convo"]'); if (!b) return;
     convoOpen = false; renderBoardView();
   });
@@ -771,12 +911,12 @@
       return;
     }
     if (v === railActive && mode === 'board') return;
-    mode = 'board'; railActive = v; renderBoardView(); updateHash();
+    gotoBoard(v); renderBoardView(); updateHash();
   });
   bnav.addEventListener('click', (e) => {
     const dd = e.target.closest('[data-dd]');
     if (dd) { e.stopPropagation(); menuOpen = menuOpen === dd.dataset.dd ? null : dd.dataset.dd; renderTopNav(); return; }
-    const b = e.target.closest('[data-nav],[data-plane],[data-go-board],[data-go-page],[data-go-session],[data-go-team],[data-go-shell]');
+    const b = e.target.closest('[data-nav],[data-plane],[data-go-board],[data-go-page],[data-go-session],[data-go-ctx],[data-go-shell]');
     if (!b) return;
     menuOpen = null;
     const d = b.dataset;
@@ -784,11 +924,14 @@
     if (d.nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); return; }
     if (d.nav === 'palette') { openPalette(); renderTopNav(); return; }
     if (d.nav === 'convo') { convoOpen = !convoOpen; renderBoardView(); return; }
-    if (d.plane) { mode = d.plane; if (mode === 'page' && !activePage && state.pages[0]) activePage = state.pages[0].id; renderBoardView(); updateHash(); return; }
-    if (d.goBoard != null) { mode = 'board'; railActive = d.goBoard; renderBoardView(); updateHash(); return; }
-    if (d.goPage != null) { mode = 'page'; activePage = d.goPage; renderBoardView(); updateHash(); return; }
+    if (d.plane) {
+      if (d.plane === 'page') { const ps = pagesFor(); if (!ps.some((p) => p.id === activePage)) activePage = ps[0] ? ps[0].id : null; if (!activePage) return; }
+      mode = d.plane; renderBoardView(); updateHash(); return;
+    }
+    if (d.goBoard != null) { gotoBoard(d.goBoard); renderBoardView(); updateHash(); return; }
+    if (d.goPage != null) { gotoPage(d.goPage); renderBoardView(); updateHash(); return; }
     if (d.goSession != null) { state.piName = d.goSession; save(); renderBoardView(); return; }
-    if (d.goTeam != null) { teamFilter = d.goTeam || null; renderBoardView(); return; }
+    if (d.goCtx != null) { const p = d.goCtx.split(':'); setCtx(p[0], p[1]); renderBoardView(); updateHash(); return; }
     if (d.goShell != null) { exitBoard(); navigate(d.goShell); return; }
     renderTopNav();
   });
@@ -1081,9 +1224,12 @@
   function showBoard() { if (boardScreen.hidden) enterBoard(); else { renderBoardView(); updateHash(); } }
   function paletteData() {
     const items = [];
-    BOARD_LIST.forEach((b) => items.push({ g: 'Boards', ico: b[1], label: b[2], go: () => { mode = 'board'; railActive = b[0]; showBoard(); } }));
-    state.pages.forEach((p) => items.push({ g: 'Pages', ico: 'doc', label: p.title, hint: p.purpose, go: () => { mode = 'page'; activePage = p.id; showBoard(); } }));
-    state.teams.forEach((t) => items.push({ g: 'Teams', ico: 'teamrail', label: t.name, hint: 'Team Board', go: () => { mode = 'board'; railActive = 'team'; teamFilter = t.id; showBoard(); } }));
+    const OWNER_HINT = { st: state.st.name, art: 'ART', team: 'Team', any: 'Shared' };
+    BOARD_LIST.forEach((b) => items.push({ g: 'Boards', ico: b[1], label: b[2], hint: OWNER_HINT[b[3]], go: () => { gotoBoard(b[0]); showBoard(); } }));
+    state.pages.forEach((p) => items.push({ g: 'Pages', ico: 'doc', label: p.title, hint: TYPE_LABEL[p.owner], go: () => { gotoPage(p.id); showBoard(); } }));
+    items.push({ g: 'Working as', ico: 'solplan', label: state.st.name, hint: 'Solution Train', go: () => { setCtx('st', state.st.id); showBoard(); } });
+    state.arts.forEach((a) => items.push({ g: 'Working as', ico: 'artplan', label: a.name, hint: 'ART', go: () => { setCtx('art', a.id); showBoard(); } }));
+    state.teams.forEach((t) => items.push({ g: 'Working as', ico: 'teamrail', label: t.name, hint: 'Team', go: () => { setCtx('team', t.id); showBoard(); } }));
     state.sessions.forEach((sn) => items.push({ g: 'PI Sessions', ico: 'folder', label: sn.name, hint: sn.updated, go: () => enterBoard(sn.name) }));
     [['home', 'Home dashboard'], ['sessions', 'PI Sessions'], ['connections', 'ALM Connections'], ['settings', 'PIE Recipe']].forEach((pgd) =>
       items.push({ g: 'App', ico: 'apps', label: pgd[1], go: () => { exitBoard(); navigate(pgd[0]); } }));
@@ -1147,8 +1293,8 @@
     const m = /^#(b|p|s)\/([\w-]+)$/.exec(location.hash || '');
     if (!m) return;
     if (m[1] === 's') { navigate(m[2]); return; }
-    if (m[1] === 'b' && BOARD_LIST.some((b) => b[0] === m[2])) { mode = 'board'; railActive = m[2]; enterBoard(); }
-    else if (m[1] === 'p' && state.pages.some((p) => p.id === m[2])) { mode = 'page'; activePage = m[2]; enterBoard(); }
+    if (m[1] === 'b' && BOARD_LIST.some((b) => b[0] === m[2])) { gotoBoard(m[2]); enterBoard(); }
+    else if (m[1] === 'p' && state.pages.some((p) => p.id === m[2])) { gotoPage(m[2]); enterBoard(); }
   }
 
   // ---------- PIE Recipe (Settings page) ----------
@@ -1309,6 +1455,7 @@
 
   function fullRender() {
     applyTheme();
+    ensureCtxValid();
     renderSide();
     renderPage(currentPage);
     if (!boardScreen.hidden) renderBoardView();
