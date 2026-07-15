@@ -122,6 +122,7 @@
   const artSide = document.getElementById('art-side');
   const zoomctl = document.getElementById('zoomctl');
   const convoEl = document.getElementById('convo');
+  const navEl = document.getElementById('navtree');
   const paletteEl = document.getElementById('palette');
 
   // ---------- State ----------
@@ -217,6 +218,7 @@
       ];
     }
     s.st = s.st || { id: uid(), name: 'Horizon Solution Train' };
+    s.navVersion = s.navVersion === 'v2' ? 'v2' : 'v1';
     if (!Array.isArray(s.pages) || !s.pages.length || !s.pages[0].owner) s.pages = defaultPages();
     if (!Array.isArray(s.threads) || !s.threads.length || !s.threads[0].kind) s.threads = defaultThreads();
     if (!Array.isArray(s.events)) {
@@ -306,6 +308,7 @@
       help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 113.5 2.3c-.8.4-1 .8-1 1.7"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/>',
       snap: '<rect x="4" y="6" width="16" height="13" rx="2"/><path d="M9 6l1.5-2h3L15 6"/><circle cx="12" cy="12.5" r="3"/>',
       doc: '<path d="M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 16.5h6"/>',
+      menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
       chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-6l-5.2 4V6z"/><path d="M8 8.5h8M8 11.5h5"/>',
       present: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v3M8.5 21h7"/>',
     };
@@ -459,38 +462,56 @@
     });
     return h;
   }
+  function activeArtifactName() {
+    if (mode === 'page') { const p = state.pages.find((x) => x.id === activePage); return p ? p.title : 'Page'; }
+    return boardName(railActive);
+  }
   function renderTopNav() {
+    const v2 = state.navVersion === 'v2';
     const avatars = [['AR', '#e0746a'], ['MK', '#6a9be0'], ['TS', '#6ad0a8'], ['JD', '#caa15a']]
       .map((a) => avatar(a[0], a[1])).join('');
     const obj = mode === 'board' && railActive === 'objectives';
 
     let left =
-      '<button class="bn-ico bn-home" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
-      '<button class="bn-ico" type="button" data-nav="palette" title="Search — jump anywhere (⌘K)">' + bIcon('search') + '</button>' +
-      ddWrap('boards', '<button class="bn-ico' + (menuOpen === 'boards' ? ' on' : '') + '" type="button" data-dd="boards" title="Boards">' + bIcon('board') + '</button>', boardMenu()) +
-      '<button class="bn-ico" type="button" title="History" disabled>' + bIcon('history') + '</button>';
+      '<button class="bn-ico bn-home" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>';
+    if (v2) {
+      left +=
+        '<button class="bn-ico' + (navOpen ? ' on' : '') + '" type="button" data-nav="tree" title="Navigator">' + bIcon('menu') + '</button>' +
+        '<button class="bn-ico" type="button" data-nav="palette" title="Search — jump anywhere (⌘K)">' + bIcon('search') + '</button>';
+    } else {
+      left +=
+        '<button class="bn-ico" type="button" data-nav="palette" title="Search — jump anywhere (⌘K)">' + bIcon('search') + '</button>' +
+        ddWrap('boards', '<button class="bn-ico' + (menuOpen === 'boards' ? ' on' : '') + '" type="button" data-dd="boards" title="Boards">' + bIcon('board') + '</button>', boardMenu()) +
+        '<button class="bn-ico" type="button" title="History" disabled>' + bIcon('history') + '</button>';
+    }
     if (obj) {
       left += '<button class="bn-chip" type="button" data-nav="toggle-art">' + bIcon('objectives', 'bn-cico') +
         '<span>' + (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives</span></button>';
     }
 
-    const ctxChip = ddWrap('team',
-      '<button class="bn-chip" type="button" data-dd="team">' + bIcon('people', 'bn-cico') +
-        '<span>' + esc(ctxName()) + '</span><span class="bn-type">' + esc(TYPE_LABEL[ctx.type]) + '</span>' + bIcon('chev', 'bn-chev') + '</button>',
-      teamMenu());
     let center;
-    if (mode === 'page') {
-      const pg = pagesFor().find((p) => p.id === activePage) || pagesFor()[0];
-      center =
-        ddWrap('page', ddChipBtn('page', 'doc', pg ? pg.title : 'Pages'), pageMenu()) +
-        ddWrap('session', ddChipBtn('session', 'folder', state.piName), sessionMenu()) +
-        ctxChip;
+    if (v2) {
+      // v2: the tree is the navigation; the top bar just says where you are.
+      center = '<span class="bn-crumb">' + esc(state.piName) + '<i>/</i>' + esc(ctxName()) +
+        '<i>/</i><b>' + esc(activeArtifactName()) + '</b></span>';
     } else {
-      center =
-        '<button class="bn-ico" type="button" title="Layout" disabled>' + bIcon('view') + '</button>' +
-        ddWrap('board', ddChipBtn('board', boardIcon(railActive), boardName(railActive)), boardMenu()) +
-        ddWrap('session', ddChipBtn('session', 'folder', state.piName), sessionMenu()) +
-        ctxChip;
+      const ctxChip = ddWrap('team',
+        '<button class="bn-chip" type="button" data-dd="team">' + bIcon('people', 'bn-cico') +
+          '<span>' + esc(ctxName()) + '</span><span class="bn-type">' + esc(TYPE_LABEL[ctx.type]) + '</span>' + bIcon('chev', 'bn-chev') + '</button>',
+        teamMenu());
+      if (mode === 'page') {
+        const pg = pagesFor().find((p) => p.id === activePage) || pagesFor()[0];
+        center =
+          ddWrap('page', ddChipBtn('page', 'doc', pg ? pg.title : 'Pages'), pageMenu()) +
+          ddWrap('session', ddChipBtn('session', 'folder', state.piName), sessionMenu()) +
+          ctxChip;
+      } else {
+        center =
+          '<button class="bn-ico" type="button" title="Layout" disabled>' + bIcon('view') + '</button>' +
+          ddWrap('board', ddChipBtn('board', boardIcon(railActive), boardName(railActive)), boardMenu()) +
+          ddWrap('session', ddChipBtn('session', 'folder', state.piName), sessionMenu()) +
+          ctxChip;
+      }
     }
 
     bnav.innerHTML =
@@ -502,13 +523,101 @@
           (state.threads.length ? '<span class="bn-badge">' + state.threads.length + '</span>' : '') + '</button>' +
         '<button class="bn-ico" type="button" title="Snapshot" disabled>' + bIcon('snap') + '</button>' +
         '<button class="bn-ico" type="button" title="Edit" disabled>' + bIcon('edit') + '</button>' +
+        (v2 ? '' :
         '<span class="bn-plane">' +
           '<button class="bn-ico bn-toggle' + (mode === 'board' ? ' on' : '') + '" type="button" data-plane="board" title="Boards">' + bIcon('teamboard') + '</button>' +
           '<button class="bn-ico bn-toggle' + (mode === 'page' ? ' on' : '') + '" type="button" data-plane="page" title="Pages">' + bIcon('doc') + '</button>' +
-        '</span>' +
+        '</span>') +
         '<span class="bn-me">' + esc(initials(state.user.name)) + '</span>' +
       '</div>';
   }
+
+  // ---------- v2: Navigator tree — the whole workspace in one panel ----------
+  let navOpen = true;         // v2 sidebar visibility
+  let expanded = null;        // which tree nodes are open (lazy-initialised)
+  let recents = [];           // last visited artifacts (runtime only)
+  const nodeId = (type, id) => (type === 'st' ? 'st' : type + ':' + id);
+  function ensureExpanded() {
+    if (expanded) return;
+    expanded = {};
+    expanded[nodeId(ctx.type, ctx.id)] = true;
+    if (ctx.type === 'team') { expanded['art:' + artOf(ctx.id).id] = true; expanded.st = true; }
+    if (ctx.type === 'art') expanded.st = true;
+  }
+  function recordRecent() {
+    const id = mode === 'page' ? activePage : railActive;
+    if (!id) return;
+    const key = mode + ':' + ctx.type + ':' + (ctx.type === 'st' ? '' : ctx.id) + ':' + id;
+    const label = mode === 'page' ? ((state.pages.find((p) => p.id === id) || {}).title || 'Page') : boardName(id);
+    recents = recents.filter((r) => r.key !== key);
+    recents.unshift({ key, mode, id, ctxType: ctx.type, ctxId: ctx.type === 'st' ? '' : ctx.id, ctxName: ctxName(), label,
+      icon: mode === 'page' ? 'doc' : boardIcon(id) });
+    recents = recents.slice(0, 5);
+  }
+  function ntItem(attr, ico, label, on, depth, hint) {
+    return '<button class="nt-i' + (on ? ' on' : '') + '" type="button" ' + attr + ' style="--nt-depth:' + depth + '">' +
+      bIcon(ico, 'nt-ico') + '<span>' + esc(label) + '</span>' +
+      (hint ? '<span class="nt-hint">' + esc(hint) + '</span>' : '') + '</button>';
+  }
+  function ntArtifacts(type, id, depth) {
+    const here = ctx.type === type && (type === 'st' || ctx.id === id);
+    const boards = boardsFor(type).map((b) =>
+      ntItem('data-nt-board="' + type + ':' + id + ':' + b[0] + '"', b[1], b[2], here && mode === 'board' && railActive === b[0], depth)).join('');
+    const pages = state.pages.filter((p) => p.owner === type).map((p) =>
+      ntItem('data-nt-page="' + type + ':' + id + ':' + p.id + '"', 'doc', p.title, here && mode === 'page' && activePage === p.id, depth)).join('');
+    return '<div class="nt-sec" style="--nt-depth:' + depth + '">Boards</div>' + boards +
+      '<div class="nt-sec" style="--nt-depth:' + depth + '">Pages</div>' + pages;
+  }
+  function ntNode(type, id, name, icon, depth) {
+    const nid = nodeId(type, id);
+    const isCtx = ctx.type === type && (type === 'st' || ctx.id === id);
+    return '<button class="nt-node' + (isCtx ? ' ctx' : '') + '" type="button" data-nt-exp="' + nid + '" style="--nt-depth:' + depth + '">' +
+      '<span class="nt-chev' + (expanded[nid] ? ' open' : '') + '">▸</span>' + bIcon(icon, 'nt-ico') +
+      '<span>' + esc(name) + '</span><span class="nt-type">' + esc(TYPE_LABEL[type]) + '</span></button>';
+  }
+  function renderNavTree() {
+    if (state.navVersion !== 'v2' || boardScreen.hidden || !navOpen) { navEl.innerHTML = ''; return; }
+    ensureExpanded();
+    let h = '<div class="nt-head">' +
+      ddWrap('nt-session',
+        '<button class="nt-sess" type="button" data-dd="nt-session">' + bIcon('folder', 'nt-ico') +
+          '<span>' + esc(state.piName) + '</span>' + bIcon('chev', 'bn-chev') + '</button>',
+        sessionMenu()) + '</div>';
+    const prev = recents.slice(1, 5);
+    if (prev.length) {
+      h += '<div class="nt-sec nt-sec-top">Recent</div>' + prev.map((r) =>
+        ntItem('data-nt-' + (r.mode === 'page' ? 'page' : 'board') + '="' + r.ctxType + ':' + r.ctxId + ':' + r.id + '"',
+          r.icon, r.label, false, 0, r.ctxName)).join('');
+    }
+    h += '<div class="nt-sec nt-sec-top">Workspace</div>';
+    h += ntNode('st', state.st.id, state.st.name, 'solplan', 0);
+    if (expanded.st) {
+      h += ntArtifacts('st', state.st.id, 1);
+      state.arts.forEach((a) => {
+        h += ntNode('art', a.id, a.name, 'artplan', 1);
+        if (expanded['art:' + a.id]) {
+          h += ntArtifacts('art', a.id, 2);
+          state.teams.filter((t) => a.teamIds.includes(t.id)).forEach((t) => {
+            h += ntNode('team', t.id, t.name, 'teamrail', 2);
+            if (expanded['team:' + t.id]) h += ntArtifacts('team', t.id, 3);
+          });
+        }
+      });
+    }
+    navEl.innerHTML = h;
+  }
+  navEl.addEventListener('click', (e) => {
+    const dd = e.target.closest('[data-dd]');
+    if (dd) { e.stopPropagation(); menuOpen = menuOpen === dd.dataset.dd ? null : dd.dataset.dd; renderNavTree(); return; }
+    const exp = e.target.closest('[data-nt-exp]');
+    if (exp) { ensureExpanded(); expanded[exp.dataset.ntExp] = !expanded[exp.dataset.ntExp]; renderNavTree(); return; }
+    const gb = e.target.closest('[data-nt-board]');
+    if (gb) { const p = gb.dataset.ntBoard.split(':'); ctx = { type: p[0], id: p[0] === 'st' ? state.st.id : p[1] }; mode = 'board'; railActive = p[2]; menuOpen = null; renderBoardView(); updateHash(); return; }
+    const gp = e.target.closest('[data-nt-page]');
+    if (gp) { const p = gp.dataset.ntPage.split(':'); ctx = { type: p[0], id: p[0] === 'st' ? state.st.id : p[1] }; mode = 'page'; activePage = p[2]; menuOpen = null; renderBoardView(); updateHash(); return; }
+    const gs = e.target.closest('[data-go-session]');
+    if (gs) { state.piName = gs.dataset.goSession; menuOpen = null; save(); renderBoardView(); return; }
+  });
 
   // ---------- Floating side rail: the active team's boards only ----------
   function renderSideRail() {
@@ -923,6 +1032,7 @@
     if (d.nav === 'home') { exitBoard(); return; }
     if (d.nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); return; }
     if (d.nav === 'palette') { openPalette(); renderTopNav(); return; }
+    if (d.nav === 'tree') { navOpen = !navOpen; renderBoardView(); return; }
     if (d.nav === 'convo') { convoOpen = !convoOpen; renderBoardView(); return; }
     if (d.plane) {
       if (d.plane === 'page') { const ps = pagesFor(); if (!ps.some((p) => p.id === activePage)) activePage = ps[0] ? ps[0].id : null; if (!activePage) return; }
@@ -945,11 +1055,16 @@
 
   function renderBoardView() {
     const obj = mode === 'board' && railActive === 'objectives';
+    const v2 = state.navVersion === 'v2';
     boardScreen.classList.toggle('obj-mode', obj);
     boardScreen.classList.toggle('obj-open', obj && objPanelOpen);
     boardScreen.classList.toggle('page-mode', mode === 'page');
     boardScreen.classList.toggle('convo-open', convoOpen);
+    boardScreen.classList.toggle('nav-v2', v2);
+    boardScreen.classList.toggle('nav-open', v2 && navOpen);
+    recordRecent();
     renderTopNav();
+    renderNavTree();
     renderSideRail();
     renderArtSide();
     renderConvo();
@@ -1090,9 +1205,13 @@
     else if (a === 'export') { closeUserMenu(); exportPlan(); }
     else if (a === 'quit') quit();
   });
+  function closeNavMenus() {
+    menuOpen = null;
+    if (!boardScreen.hidden) { renderTopNav(); renderNavTree(); }
+  }
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.user-chip-wrap')) closeUserMenu();
-    if (menuOpen && !e.target.closest('.bn-dd')) { menuOpen = null; if (!boardScreen.hidden) renderTopNav(); }
+    if (menuOpen && !e.target.closest('.bn-dd')) closeNavMenus();
   });
 
   function navigate(page) { currentPage = page; renderSide(); renderPage(page); mainEl.scrollTop = 0; updateHash(); }
@@ -1413,6 +1532,18 @@
     });
     body.appendChild(typesCard);
 
+    // Navigation
+    const segBtn = (v, label) => el('button', {
+      type: 'button', class: state.navVersion === v ? 'on' : '', text: label,
+      onclick: () => { state.navVersion = v; save(); renderSettings(); },
+    });
+    body.appendChild(rCard('Navigation', 'Two takes on moving around the planning space.', [
+      rRow('Version', state.navVersion === 'v2'
+        ? 'v2 · navigator tree: the whole workspace in one sidebar'
+        : 'v1 · switcher chips in the top bar + floating board rail',
+        [el('div', { class: 'seg' }, [segBtn('v1', 'v1'), segBtn('v2', 'v2')])]),
+    ]));
+
     // Appearance
     const presets = ['#f59e0b', '#38bdf8', '#a78bfa', '#34d399', '#fb7185', '#f472b6'];
     const presetEls = el('div', { class: 'presets' }, presets.map((c) =>
@@ -1448,7 +1579,7 @@
     }
     if (e.key === 'Escape') {
       if (paletteOpen) { closePalette(); return; }
-      if (menuOpen) { menuOpen = null; if (!boardScreen.hidden) renderTopNav(); return; }
+      if (menuOpen) { closeNavMenus(); return; }
       closeUserMenu();
     }
   });
