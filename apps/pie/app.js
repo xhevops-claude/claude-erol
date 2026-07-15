@@ -123,6 +123,8 @@
   const zoomctl = document.getElementById('zoomctl');
   const convoEl = document.getElementById('convo');
   const navEl = document.getElementById('navtree');
+  const dockEl = document.getElementById('dock');
+  const hubEl = document.getElementById('hub');
   const paletteEl = document.getElementById('palette');
 
   // ---------- State ----------
@@ -218,7 +220,7 @@
       ];
     }
     s.st = s.st || { id: uid(), name: 'Horizon Solution Train' };
-    s.navVersion = s.navVersion === 'v2' ? 'v2' : 'v1';
+    s.navVersion = ['v2', 'v3'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
     if (!Array.isArray(s.pages) || !s.pages.length || !s.pages[0].owner) s.pages = defaultPages();
     if (!Array.isArray(s.threads) || !s.threads.length || !s.threads[0].kind) s.threads = defaultThreads();
     if (!Array.isArray(s.events)) {
@@ -467,6 +469,8 @@
     return boardName(railActive);
   }
   function renderTopNav() {
+    if (state.navVersion === 'v3') { bnav.innerHTML = ''; renderDock(); return; }
+    dockEl.innerHTML = '';
     const v2 = state.navVersion === 'v2';
     const avatars = [['AR', '#e0746a'], ['MK', '#6a9be0'], ['TS', '#6ad0a8'], ['JD', '#caa15a']]
       .map((a) => avatar(a[0], a[1])).join('');
@@ -606,6 +610,91 @@
     }
     navEl.innerHTML = h;
   }
+  // ---------- v3: floating dock + full-screen Hub ----------
+  // The canvas is full-bleed; the dock only says where you are. ALL navigation
+  // lives in the Hub — one overview that is browsed spatially or filtered by typing.
+  let hubOpen = false, hubQuery = '';
+  function renderDock() {
+    const obj = mode === 'board' && railActive === 'objectives';
+    dockEl.innerHTML =
+      '<button class="dk-btn" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
+      '<button class="dk-btn dk-hubbtn' + (hubOpen ? ' on' : '') + '" type="button" data-nav="hub" title="Hub — browse everything (⌘K)">' + bIcon('board') + '</button>' +
+      '<button class="dk-crumb" type="button" data-nav="hub" title="Open the Hub">' +
+        '<span class="dk-sess">' + esc(state.piName) + '</span><i>/</i>' +
+        '<span>' + esc(ctxName()) + '</span><i>/</i><b>' + esc(activeArtifactName()) + '</b></button>' +
+      (obj ? '<button class="dk-btn' + (objPanelOpen ? ' on' : '') + '" type="button" data-nav="toggle-art" title="' +
+        (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives">' + bIcon('objectives') + '</button>' : '') +
+      '<button class="dk-btn' + (convoOpen ? ' on' : '') + '" type="button" data-nav="convo" title="Conversation">' + bIcon('chat') +
+        (state.threads.length ? '<span class="bn-badge">' + state.threads.length + '</span>' : '') + '</button>' +
+      '<span class="bn-me dk-me">' + esc(initials(state.user.name)) + '</span>';
+  }
+  dockEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-nav]'); if (!b) return;
+    const nav = b.dataset.nav;
+    if (nav === 'home') { closeHub(); exitBoard(); }
+    else if (nav === 'hub') { if (hubOpen) closeHub(); else openHub(); }
+    else if (nav === 'convo') { convoOpen = !convoOpen; renderBoardView(); }
+    else if (nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); }
+  });
+  function hubMatch(label) { return !hubQuery || label.toLowerCase().indexOf(hubQuery) >= 0; }
+  function hubTile(attr, ico, label, on) {
+    return '<button class="hb-tile' + (on ? ' on' : '') + '" type="button" ' + attr + '>' +
+      bIcon(ico, 'hb-tico') + '<span>' + esc(label) + '</span></button>';
+  }
+  function hubCard(type, id, name, icon) {
+    const nameHit = hubMatch(name);
+    const bs = boardsFor(type).filter((b) => nameHit || hubMatch(b[2]));
+    const ps = state.pages.filter((p) => p.owner === type && (nameHit || hubMatch(p.title)));
+    if (hubQuery && !bs.length && !ps.length) return '';
+    const here = ctx.type === type && (type === 'st' || ctx.id === id);
+    return '<section class="hb-card hb-' + type + (here ? ' here' : '') + '">' +
+      '<div class="hb-h">' + bIcon(icon, 'hb-hico') + '<b>' + esc(name) + '</b><span class="nt-type">' + esc(TYPE_LABEL[type]) + '</span></div>' +
+      (bs.length ? '<div class="hb-sec">Boards</div><div class="hb-tiles">' + bs.map((b) =>
+        hubTile('data-hub-board="' + type + ':' + id + ':' + b[0] + '"', b[1], b[2], here && mode === 'board' && railActive === b[0])).join('') + '</div>' : '') +
+      (ps.length ? '<div class="hb-sec">Pages</div><div class="hb-tiles">' + ps.map((p) =>
+        hubTile('data-hub-page="' + type + ':' + id + ':' + p.id + '"', 'doc', p.title, here && mode === 'page' && activePage === p.id)).join('') + '</div>' : '') +
+    '</section>';
+  }
+  function renderHub() {
+    if (!hubOpen) { hubEl.hidden = true; hubEl.innerHTML = ''; return; }
+    hubEl.hidden = false;
+    const sess = state.sessions.map((sn) =>
+      '<button class="hb-sess' + (sn.name === state.piName ? ' on' : '') + '" type="button" data-go-session="' + esc(sn.name) + '">' + esc(sn.name) + '</button>').join('');
+    const prev = recents.slice(1, 5).filter((r) => hubMatch(r.ctxName + ' ' + r.label));
+    hubEl.innerHTML = '<div class="hb-panel">' +
+      '<div class="hb-top">' + bIcon('search', 'pal-sico') +
+        '<input id="hub-input" type="text" placeholder="Filter boards, pages, teams…" autocomplete="off" value="' + esc(hubQuery) + '" />' +
+        '<button class="cv-x" type="button" data-hub-close title="Close">✕</button></div>' +
+      '<div class="hb-sessrow">' + sess + '</div>' +
+      (prev.length ? '<div class="hb-sec hb-sec-lg">Recent</div><div class="hb-tiles">' + prev.map((r) =>
+        hubTile('data-hub-' + (r.mode === 'page' ? 'page' : 'board') + '="' + r.ctxType + ':' + r.ctxId + ':' + r.id + '"',
+          r.icon, r.ctxName + ' · ' + r.label, false)).join('') + '</div>' : '') +
+      '<div class="hb-grid">' +
+        hubCard('st', state.st.id, state.st.name, 'solplan') +
+        state.arts.map((a) => hubCard('art', a.id, a.name, 'artplan')).join('') +
+        state.teams.map((t) => hubCard('team', t.id, t.name, 'teamrail')).join('') +
+      '</div></div>';
+    const input = document.getElementById('hub-input');
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.addEventListener('input', () => { hubQuery = input.value.trim().toLowerCase(); renderHub(); });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { const t = hubEl.querySelector('.hb-tile'); if (t) t.click(); }
+    });
+  }
+  function openHub() { hubOpen = true; hubQuery = ''; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
+  function closeHub() { if (!hubOpen) return; hubOpen = false; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
+  hubEl.addEventListener('click', (e) => {
+    if (e.target === hubEl) return closeHub();
+    if (e.target.closest('[data-hub-close]')) return closeHub();
+    const gb = e.target.closest('[data-hub-board]');
+    if (gb) { const p = gb.dataset.hubBoard.split(':'); ctx = { type: p[0], id: p[0] === 'st' ? state.st.id : p[1] }; mode = 'board'; railActive = p[2]; closeHub(); renderBoardView(); updateHash(); return; }
+    const gp = e.target.closest('[data-hub-page]');
+    if (gp) { const p = gp.dataset.hubPage.split(':'); ctx = { type: p[0], id: p[0] === 'st' ? state.st.id : p[1] }; mode = 'page'; activePage = p[2]; closeHub(); renderBoardView(); updateHash(); return; }
+    const gs = e.target.closest('[data-go-session]');
+    if (gs) { state.piName = gs.dataset.goSession; save(); renderHub(); if (!boardScreen.hidden) renderBoardView(); return; }
+  });
+
   navEl.addEventListener('click', (e) => {
     const dd = e.target.closest('[data-dd]');
     if (dd) { e.stopPropagation(); menuOpen = menuOpen === dd.dataset.dd ? null : dd.dataset.dd; renderNavTree(); return; }
@@ -1062,6 +1151,7 @@
     boardScreen.classList.toggle('convo-open', convoOpen);
     boardScreen.classList.toggle('nav-v2', v2);
     boardScreen.classList.toggle('nav-open', v2 && navOpen);
+    boardScreen.classList.toggle('nav-v3', state.navVersion === 'v3');
     recordRecent();
     renderTopNav();
     renderNavTree();
@@ -1537,11 +1627,14 @@
       type: 'button', class: state.navVersion === v ? 'on' : '', text: label,
       onclick: () => { state.navVersion = v; save(); renderSettings(); },
     });
-    body.appendChild(rCard('Navigation', 'Two takes on moving around the planning space.', [
-      rRow('Version', state.navVersion === 'v2'
-        ? 'v2 · navigator tree: the whole workspace in one sidebar'
-        : 'v1 · switcher chips in the top bar + floating board rail',
-        [el('div', { class: 'seg' }, [segBtn('v1', 'v1'), segBtn('v2', 'v2')])]),
+    const NAV_DESC = {
+      v1: 'v1 · switcher chips in the top bar + floating board rail',
+      v2: 'v2 · navigator tree: the whole workspace in one sidebar',
+      v3: 'v3 · hub + dock: full-bleed canvas, one overview behind ⌘K',
+    };
+    body.appendChild(rCard('Navigation', 'Three takes on moving around the planning space.', [
+      rRow('Version', NAV_DESC[state.navVersion],
+        [el('div', { class: 'seg' }, [segBtn('v1', 'v1'), segBtn('v2', 'v2'), segBtn('v3', 'v3')])]),
     ]));
 
     // Appearance
@@ -1574,10 +1667,12 @@
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') {
       e.preventDefault();
+      if (state.navVersion === 'v3' && !boardScreen.hidden) { if (hubOpen) closeHub(); else openHub(); return; }
       if (paletteOpen) closePalette(); else openPalette();
       return;
     }
     if (e.key === 'Escape') {
+      if (hubOpen) { closeHub(); return; }
       if (paletteOpen) { closePalette(); return; }
       if (menuOpen) { closeNavMenus(); return; }
       closeUserMenu();
