@@ -613,15 +613,15 @@
   // ---------- v3: floating dock + full-screen Hub ----------
   // The canvas is full-bleed; the dock only says where you are. ALL navigation
   // lives in the Hub — one overview that is browsed spatially or filtered by typing.
-  let hubOpen = false, hubQuery = '';
+  let hubOpen = false, hubQuery = '', hubSel = 0;
   function renderDock() {
     const obj = mode === 'board' && railActive === 'objectives';
     dockEl.innerHTML =
       '<button class="dk-btn" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
-      '<button class="dk-btn dk-hubbtn' + (hubOpen ? ' on' : '') + '" type="button" data-nav="hub" title="Hub — browse everything (⌘K)">' + bIcon('board') + '</button>' +
-      '<button class="dk-crumb" type="button" data-nav="hub" title="Open the Hub">' +
+      '<button class="dk-crumb" type="button" data-nav="hub" title="Open the Hub (⌘K)">' +
         '<span class="dk-sess">' + esc(state.piName) + '</span><i>/</i>' +
-        '<span>' + esc(ctxName()) + '</span><i>/</i><b>' + esc(activeArtifactName()) + '</b></button>' +
+        '<span>' + esc(ctxName()) + '</span><i>/</i><b>' + esc(activeArtifactName()) + '</b>' +
+        '<span class="dk-k">⌘K</span></button>' +
       (obj ? '<button class="dk-btn' + (objPanelOpen ? ' on' : '') + '" type="button" data-nav="toggle-art" title="' +
         (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives">' + bIcon('objectives') + '</button>' : '') +
       '<button class="dk-btn' + (convoOpen ? ' on' : '') + '" type="button" data-nav="convo" title="Conversation">' + bIcon('chat') +
@@ -647,13 +647,21 @@
     const ps = state.pages.filter((p) => p.owner === type && (nameHit || hubMatch(p.title)));
     if (hubQuery && !bs.length && !ps.length) return '';
     const here = ctx.type === type && (type === 'st' || ctx.id === id);
-    return '<section class="hb-card hb-' + type + (here ? ' here' : '') + '">' +
-      '<div class="hb-h">' + bIcon(icon, 'hb-hico') + '<b>' + esc(name) + '</b><span class="nt-type">' + esc(TYPE_LABEL[type]) + '</span></div>' +
-      (bs.length ? '<div class="hb-sec">Boards</div><div class="hb-tiles">' + bs.map((b) =>
-        hubTile('data-hub-board="' + type + ':' + id + ':' + b[0] + '"', b[1], b[2], here && mode === 'board' && railActive === b[0])).join('') + '</div>' : '') +
-      (ps.length ? '<div class="hb-sec">Pages</div><div class="hb-tiles">' + ps.map((p) =>
-        hubTile('data-hub-page="' + type + ':' + id + ':' + p.id + '"', 'doc', p.title, here && mode === 'page' && activePage === p.id)).join('') + '</div>' : '') +
-    '</section>';
+    return '<section class="hb-card' + (here ? ' here' : '') + (type === 'team' ? '' : ' hb-wide') + '">' +
+      '<div class="hb-h">' + bIcon(icon, 'hb-hico') + '<b>' + esc(name) + '</b>' +
+        (here ? '<span class="hb-dot" title="You are here"></span>' : '') +
+        '<span class="hb-type">' + esc(TYPE_LABEL[type]) + '</span></div>' +
+      '<div class="hb-tiles">' +
+        bs.map((b) => hubTile('data-hub-board="' + type + ':' + id + ':' + b[0] + '"', b[1], b[2], here && mode === 'board' && railActive === b[0])).join('') +
+        ps.map((p) => hubTile('data-hub-page="' + type + ':' + id + ':' + p.id + '"', 'doc', p.title, here && mode === 'page' && activePage === p.id)).join('') +
+      '</div></section>';
+  }
+  function hubApplySel() {
+    const tiles = hubEl.querySelectorAll('.hb-tile');
+    if (!tiles.length) return;
+    hubSel = Math.max(0, Math.min(hubSel, tiles.length - 1));
+    tiles.forEach((t, i) => t.classList.toggle('sel', i === hubSel));
+    tiles[hubSel].scrollIntoView({ block: 'nearest' });
   }
   function renderHub() {
     if (!hubOpen) { hubEl.hidden = true; hubEl.innerHTML = ''; return; }
@@ -662,27 +670,33 @@
       '<button class="hb-sess' + (sn.name === state.piName ? ' on' : '') + '" type="button" data-go-session="' + esc(sn.name) + '">' + esc(sn.name) + '</button>').join('');
     const prev = recents.slice(1, 5).filter((r) => hubMatch(r.ctxName + ' ' + r.label));
     hubEl.innerHTML = '<div class="hb-panel">' +
-      '<div class="hb-top">' + bIcon('search', 'pal-sico') +
-        '<input id="hub-input" type="text" placeholder="Filter boards, pages, teams…" autocomplete="off" value="' + esc(hubQuery) + '" />' +
-        '<button class="cv-x" type="button" data-hub-close title="Close">✕</button></div>' +
-      '<div class="hb-sessrow">' + sess + '</div>' +
-      (prev.length ? '<div class="hb-sec hb-sec-lg">Recent</div><div class="hb-tiles">' + prev.map((r) =>
-        hubTile('data-hub-' + (r.mode === 'page' ? 'page' : 'board') + '="' + r.ctxType + ':' + r.ctxId + ':' + r.id + '"',
-          r.icon, r.ctxName + ' · ' + r.label, false)).join('') + '</div>' : '') +
-      '<div class="hb-grid">' +
-        hubCard('st', state.st.id, state.st.name, 'solplan') +
-        state.arts.map((a) => hubCard('art', a.id, a.name, 'artplan')).join('') +
-        state.teams.map((t) => hubCard('team', t.id, t.name, 'teamrail')).join('') +
-      '</div></div>';
+      '<div class="hb-top">' + bIcon('search', 'hb-sico') +
+        '<input id="hub-input" type="text" placeholder="Search boards, pages, teams…" autocomplete="off" value="' + esc(hubQuery) + '" />' +
+        '<button class="hb-close" type="button" data-hub-close title="Close">esc</button></div>' +
+      '<div class="hb-body">' +
+        '<div class="hb-sessrow">' + sess + '</div>' +
+        (prev.length ? '<div class="hb-sec">Recent</div><div class="hb-tiles hb-loose">' + prev.map((r) =>
+          hubTile('data-hub-' + (r.mode === 'page' ? 'page' : 'board') + '="' + r.ctxType + ':' + r.ctxId + ':' + r.id + '"',
+            r.icon, r.ctxName + ' · ' + r.label, false)).join('') + '</div>' : '') +
+        '<div class="hb-grid">' +
+          hubCard('st', state.st.id, state.st.name, 'solplan') +
+          state.arts.map((a) => hubCard('art', a.id, a.name, 'artplan')).join('') +
+          state.teams.map((t) => hubCard('team', t.id, t.name, 'teamrail')).join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="hb-foot"><span><b>↑↓</b> navigate</span><span><b>↵</b> open</span><span><b>esc</b> close</span></div>';
+    hubApplySel();
     const input = document.getElementById('hub-input');
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
-    input.addEventListener('input', () => { hubQuery = input.value.trim().toLowerCase(); renderHub(); });
+    input.addEventListener('input', () => { hubQuery = input.value.trim().toLowerCase(); hubSel = 0; renderHub(); });
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { const t = hubEl.querySelector('.hb-tile'); if (t) t.click(); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); hubSel += 1; hubApplySel(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); hubSel -= 1; hubApplySel(); }
+      else if (e.key === 'Enter') { const t = hubEl.querySelector('.hb-tile.sel') || hubEl.querySelector('.hb-tile'); if (t) t.click(); }
     });
   }
-  function openHub() { hubOpen = true; hubQuery = ''; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
+  function openHub() { hubOpen = true; hubQuery = ''; hubSel = 0; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
   function closeHub() { if (!hubOpen) return; hubOpen = false; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
   hubEl.addEventListener('click', (e) => {
     if (e.target === hubEl) return closeHub();
