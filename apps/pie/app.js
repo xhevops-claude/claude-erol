@@ -83,6 +83,25 @@
         { type: 'text', text: 'Our ART objectives for this increment, written as OKRs and linked live to the boards that pay into them.' },
         { type: 'okr', title: 'Objectives & key results', src: 'ART Objectives' },
       ] },
+      { id: 'pi-agenda', owner: 'art', title: 'PI Planning Agenda', purpose: 'Facilitation', updated: '4d ago', blocks: [
+        { type: 'text', text: 'Two-day agenda: business context, product vision, team breakouts, draft plan review, management review, final plan review and confidence vote.' },
+      ] },
+      { id: 'inspect-adapt', owner: 'art', title: 'Inspect & Adapt Workshop', purpose: 'Facilitation', updated: '1w ago', blocks: [
+        { type: 'text', text: 'PI system demo, quantitative measurement, and the problem-solving workshop. Bring the metrics from the dashboards below.' },
+        { type: 'risk', title: 'Biggest recurring impediment', src: 'Risk Board' },
+      ] },
+      { id: 'dependency-report', owner: 'art', title: 'Dependency Report', purpose: 'Reporting', updated: '6h ago', blocks: [
+        { type: 'deps', title: 'All cross-team dependencies', src: 'ART Planning Board' },
+        { type: 'text', text: 'Generated from the planning board — hand-offs sorted by iteration, blocked items first.' },
+      ] },
+      { id: 'capacity-report', owner: 'art', title: 'Capacity Report', purpose: 'Reporting', updated: '1d ago', blocks: [
+        { type: 'stats', title: 'Load vs. capacity across the ART', src: 'Team Boards' },
+        { type: 'burndown', title: 'Trend', src: 'Team Boards' },
+      ] },
+      { id: 'retro-notes', owner: 'team', title: 'Retro Notes', purpose: 'Facilitation', updated: '2d ago', blocks: [
+        { type: 'text', text: 'What went well, what didn’t, what we try next iteration. Linked to the conversations that raised each point.' },
+        { type: 'convo', title: 'Threads behind these notes', src: 'Conversations' },
+      ] },
       { id: 'leadership-status', owner: 'art', title: 'Leadership Status Report', purpose: 'Reporting', updated: '2d ago', blocks: [
         { type: 'text', text: 'One-page status for business leaders: where the plan stands, what changed this week, and where we need decisions.' },
         { type: 'burndown', title: 'Delivery trend', src: 'Team Boards' },
@@ -221,7 +240,7 @@
     }
     s.st = s.st || { id: uid(), name: 'Horizon Solution Train' };
     s.navVersion = ['v2', 'v3'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
-    if (!Array.isArray(s.pages) || !s.pages.length || !s.pages[0].owner) s.pages = defaultPages();
+    if (!Array.isArray(s.pages) || !s.pages.length || !s.pages[0].owner || !s.pages.some((p) => p.id === 'pi-agenda')) s.pages = defaultPages();
     if (!Array.isArray(s.threads) || !s.threads.length || !s.threads[0].kind) s.threads = defaultThreads();
     if (!Array.isArray(s.events)) {
       s.events = [
@@ -617,7 +636,6 @@
   function renderDock() {
     const obj = mode === 'board' && railActive === 'objectives';
     dockEl.innerHTML =
-      '<button class="dk-btn" type="button" data-nav="home" title="Dashboard">' + bIcon('apps') + '</button>' +
       '<button class="dk-crumb" type="button" data-nav="hub" title="Open the Hub (⌘K)">' +
         '<span class="dk-sess">' + esc(state.piName) + '</span><i>/</i>' +
         '<span>' + esc(ctxName()) + '</span><i>/</i><b>' + esc(activeArtifactName()) + '</b>' +
@@ -638,53 +656,91 @@
   });
   function hubMatch(label) { return !hubQuery || label.toLowerCase().indexOf(hubQuery) >= 0; }
   function hubTile(attr, ico, label, on) {
-    return '<button class="hb-tile' + (on ? ' on' : '') + '" type="button" ' + attr + '>' +
+    return '<button class="hb-tile hb-act' + (on ? ' on' : '') + '" type="button" ' + attr + '>' +
       bIcon(ico, 'hb-tico') + '<span>' + esc(label) + '</span></button>';
   }
-  function hubCard(type, id, name, icon) {
-    const nameHit = hubMatch(name);
-    const bs = boardsFor(type).filter((b) => nameHit || hubMatch(b[2]));
-    const ps = state.pages.filter((p) => p.owner === type && (nameHit || hubMatch(p.title)));
-    if (hubQuery && !bs.length && !ps.length) return '';
+  function hubRow(attr, ico, label, hint, on) {
+    return '<button class="hb-row hb-act' + (on ? ' on' : '') + '" type="button" ' + attr + '>' + bIcon(ico, 'hb-tico') +
+      '<span class="hb-rlab">' + esc(label) + '</span>' +
+      (hint ? '<span class="hb-rhint">' + esc(hint) + '</span>' : '') + '</button>';
+  }
+  // The hierarchy as a flat list with depths: ST → its ARTs → each ART's teams.
+  function hubNodes() {
+    const out = [{ type: 'st', id: state.st.id, name: state.st.name, icon: 'solplan', depth: 0 }];
+    state.arts.forEach((a) => {
+      out.push({ type: 'art', id: a.id, name: a.name, icon: 'artplan', depth: 1 });
+      state.teams.filter((t) => a.teamIds.includes(t.id)).forEach((t) =>
+        out.push({ type: 'team', id: t.id, name: t.name, icon: 'teamrail', depth: 2 }));
+    });
+    return out;
+  }
+  let hubNode = null; // which hierarchy node the detail pane shows
+  function hubBrowse() {
+    const nav = hubNodes().map((n) => {
+      const isSel = hubNode.type === n.type && (n.type === 'st' || hubNode.id === n.id);
+      const isCtx = ctx.type === n.type && (n.type === 'st' || ctx.id === n.id);
+      return '<button class="hb-node' + (isSel ? ' sel' : '') + '" type="button" data-hub-node="' + n.type + ':' + n.id + '" style="--hb-depth:' + n.depth + '">' +
+        bIcon(n.icon, 'hb-tico') + '<span>' + esc(n.name) + '</span>' +
+        (isCtx ? '<span class="hb-dot" title="You are here"></span>' : '') + '</button>';
+    }).join('');
+    const type = hubNode.type, id = hubNode.id;
     const here = ctx.type === type && (type === 'st' || ctx.id === id);
-    return '<section class="hb-card' + (here ? ' here' : '') + (type === 'team' ? '' : ' hb-wide') + '">' +
-      '<div class="hb-h">' + bIcon(icon, 'hb-hico') + '<b>' + esc(name) + '</b>' +
-        (here ? '<span class="hb-dot" title="You are here"></span>' : '') +
-        '<span class="hb-type">' + esc(TYPE_LABEL[type]) + '</span></div>' +
-      '<div class="hb-tiles">' +
-        bs.map((b) => hubTile('data-hub-board="' + type + ':' + id + ':' + b[0] + '"', b[1], b[2], here && mode === 'board' && railActive === b[0])).join('') +
-        ps.map((p) => hubTile('data-hub-page="' + type + ':' + id + ':' + p.id + '"', 'doc', p.title, here && mode === 'page' && activePage === p.id)).join('') +
-      '</div></section>';
+    const name = type === 'st' ? state.st.name : type === 'art' ? artById(id).name : ((team(id) || {}).name || 'Team');
+    const boards = boardsFor(type).map((b) =>
+      hubTile('data-hub-board="' + type + ':' + id + ':' + b[0] + '"', b[1], b[2], here && mode === 'board' && railActive === b[0])).join('');
+    const pages = state.pages.filter((p) => p.owner === type).map((p) =>
+      hubRow('data-hub-page="' + type + ':' + id + ':' + p.id + '"', 'doc', p.title, p.purpose + ' · ' + p.updated, here && mode === 'page' && activePage === p.id)).join('');
+    return '<div class="hb-cols"><div class="hb-nav">' + nav + '</div>' +
+      '<div class="hb-detail">' +
+        '<div class="hb-dh">' + esc(name) + '<span class="hb-type">' + esc(TYPE_LABEL[type]) + '</span></div>' +
+        '<div class="hb-sec">Boards</div><div class="hb-tiles">' + boards + '</div>' +
+        '<div class="hb-sec">Pages</div><div class="hb-rows">' + (pages || '<div class="hb-none">No pages at this level yet.</div>') + '</div>' +
+      '</div></div>';
+  }
+  // Search flattens everything into rows — scales to any number of pages.
+  function hubResults() {
+    const rows = [];
+    hubNodes().forEach((n) => {
+      const nameHit = hubMatch(n.name);
+      boardsFor(n.type).forEach((b) => {
+        if (nameHit || hubMatch(b[2])) rows.push(hubRow('data-hub-board="' + n.type + ':' + n.id + ':' + b[0] + '"', b[1], b[2], n.name, false));
+      });
+      state.pages.forEach((p) => {
+        if (p.owner === n.type && (nameHit || hubMatch(p.title))) rows.push(hubRow('data-hub-page="' + n.type + ':' + n.id + ':' + p.id + '"', 'doc', p.title, n.name, false));
+      });
+    });
+    return '<div class="hb-rows hb-results">' + (rows.slice(0, 60).join('') || '<div class="hb-none">No matches.</div>') + '</div>';
   }
   function hubApplySel() {
-    const tiles = hubEl.querySelectorAll('.hb-tile');
-    if (!tiles.length) return;
-    hubSel = Math.max(0, Math.min(hubSel, tiles.length - 1));
-    tiles.forEach((t, i) => t.classList.toggle('sel', i === hubSel));
-    tiles[hubSel].scrollIntoView({ block: 'nearest' });
+    const items = hubEl.querySelectorAll('.hb-act');
+    if (!items.length) return;
+    hubSel = Math.max(0, Math.min(hubSel, items.length - 1));
+    items.forEach((t, i) => t.classList.toggle('sel', i === hubSel));
+    items[hubSel].scrollIntoView({ block: 'nearest' });
   }
   function renderHub() {
     if (!hubOpen) { hubEl.hidden = true; hubEl.innerHTML = ''; return; }
     hubEl.hidden = false;
-    const sess = state.sessions.map((sn) =>
-      '<button class="hb-sess' + (sn.name === state.piName ? ' on' : '') + '" type="button" data-go-session="' + esc(sn.name) + '">' + esc(sn.name) + '</button>').join('');
-    const prev = recents.slice(1, 5).filter((r) => hubMatch(r.ctxName + ' ' + r.label));
+    if (!hubNode) hubNode = { type: ctx.type, id: ctx.id };
+    const sessOpts = state.sessions.map((sn) =>
+      '<option' + (sn.name === state.piName ? ' selected' : '') + '>' + esc(sn.name) + '</option>').join('');
+    const prev = recents.slice(1, 5);
     hubEl.innerHTML = '<div class="hb-panel">' +
       '<div class="hb-top">' + bIcon('search', 'hb-sico') +
         '<input id="hub-input" type="text" placeholder="Search boards, pages, teams…" autocomplete="off" value="' + esc(hubQuery) + '" />' +
+        '<select class="hb-sessel" id="hub-sess" title="PI Session">' + sessOpts + '</select>' +
         '<button class="hb-close" type="button" data-hub-close title="Close">esc</button></div>' +
       '<div class="hb-body">' +
-        '<div class="hb-sessrow">' + sess + '</div>' +
-        (prev.length ? '<div class="hb-sec">Recent</div><div class="hb-tiles hb-loose">' + prev.map((r) =>
-          hubTile('data-hub-' + (r.mode === 'page' ? 'page' : 'board') + '="' + r.ctxType + ':' + r.ctxId + ':' + r.id + '"',
-            r.icon, r.ctxName + ' · ' + r.label, false)).join('') + '</div>' : '') +
-        '<div class="hb-grid">' +
-          hubCard('st', state.st.id, state.st.name, 'solplan') +
-          state.arts.map((a) => hubCard('art', a.id, a.name, 'artplan')).join('') +
-          state.teams.map((t) => hubCard('team', t.id, t.name, 'teamrail')).join('') +
-        '</div>' +
+        (!hubQuery && prev.length ? '<div class="hb-sec hb-first">Recent</div><div class="hb-recents">' + prev.map((r) =>
+          '<button class="hb-recent hb-act" type="button" data-hub-' + (r.mode === 'page' ? 'page' : 'board') + '="' + r.ctxType + ':' + r.ctxId + ':' + r.id + '">' +
+          bIcon(r.icon, 'hb-rico') + '<span class="hb-rt">' + esc(r.label) + '</span><span class="hb-rc">' + esc(r.ctxName) + '</span></button>').join('') + '</div>' : '') +
+        (hubQuery ? hubResults() : hubBrowse()) +
       '</div>' +
-      '<div class="hb-foot"><span><b>↑↓</b> navigate</span><span><b>↵</b> open</span><span><b>esc</b> close</span></div>';
+      '<div class="hb-foot"><span><b>↑↓</b> navigate</span><span><b>↵</b> open</span><span><b>esc</b> close</span>' +
+        '<span class="hb-links">' +
+          '<button class="hb-link" type="button" data-hub-shell="home">Dashboard</button>' +
+          '<button class="hb-link" type="button" data-hub-shell="settings">PIE Recipe</button>' +
+        '</span></div>';
     hubApplySel();
     const input = document.getElementById('hub-input');
     input.focus();
@@ -693,14 +749,22 @@
     input.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown') { e.preventDefault(); hubSel += 1; hubApplySel(); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); hubSel -= 1; hubApplySel(); }
-      else if (e.key === 'Enter') { const t = hubEl.querySelector('.hb-tile.sel') || hubEl.querySelector('.hb-tile'); if (t) t.click(); }
+      else if (e.key === 'Enter') { const t = hubEl.querySelector('.hb-act.sel') || hubEl.querySelector('.hb-act'); if (t) t.click(); }
+    });
+    document.getElementById('hub-sess').addEventListener('change', (e) => {
+      state.piName = e.target.value; save();
+      if (!boardScreen.hidden) renderTopNav();
     });
   }
-  function openHub() { hubOpen = true; hubQuery = ''; hubSel = 0; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
+  function openHub() { hubOpen = true; hubQuery = ''; hubSel = 0; hubNode = { type: ctx.type, id: ctx.id }; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
   function closeHub() { if (!hubOpen) return; hubOpen = false; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
   hubEl.addEventListener('click', (e) => {
     if (e.target === hubEl) return closeHub();
     if (e.target.closest('[data-hub-close]')) return closeHub();
+    const nd = e.target.closest('[data-hub-node]');
+    if (nd) { const p = nd.dataset.hubNode.split(':'); hubNode = { type: p[0], id: p[0] === 'st' ? state.st.id : p[1] }; hubSel = 0; renderHub(); return; }
+    const sh = e.target.closest('[data-hub-shell]');
+    if (sh) { const pg = sh.dataset.hubShell; closeHub(); exitBoard(); navigate(pg); return; }
     const gb = e.target.closest('[data-hub-board]');
     if (gb) { const p = gb.dataset.hubBoard.split(':'); ctx = { type: p[0], id: p[0] === 'st' ? state.st.id : p[1] }; mode = 'board'; railActive = p[2]; closeHub(); renderBoardView(); updateHash(); return; }
     const gp = e.target.closest('[data-hub-page]');
