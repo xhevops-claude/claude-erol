@@ -909,25 +909,28 @@
     btoolsEl.innerHTML =
       (utilPanel ? '<div class="ub-panel">' + utilPanelHtml() + '</div>' : '') +
       '<div class="bt-bar">' +
-        ub('search', 'search', 'Search — stickies, this board, all boards (⌘K)') +
-        ub('history', 'history', 'Board history', utilPanel === 'history', dis) +
-        ub('metrics', 'gauge', 'Board metrics', utilPanel === 'metrics', dis) +
-        ub('config', 'gear', 'Board configuration', utilPanel === 'config', dis) +
-        ub('facil', 'present', 'Facilitation — readout, timer, vote', utilPanel === 'facil', dis) +
-        '<span class="ub-brk"></span>' +
+        '<span class="bt-side">' +
+          ub('search', 'search', 'Search — stickies, this board, all boards (⌘K)') +
+          ub('history', 'history', 'Board history', utilPanel === 'history', dis) +
+          ub('metrics', 'gauge', 'Board metrics', utilPanel === 'metrics', dis) +
+          ub('config', 'gear', 'Board configuration', utilPanel === 'config', dis) +
+          ub('facil', 'present', 'Facilitation — readout, timer, vote', utilPanel === 'facil', dis) +
+        '</span>' +
         '<button class="bt-add" type="button" data-bt="add" title="Add a sticky to this board"' + (isTeam ? '' : ' disabled') + '>' + bIcon('plus') + '</button>' +
-        bt('magnify', 'search', 'Sticky magnifier — hover a sticky to enlarge it', magnify, dis) +
-        bt('scale-down', 'minus', 'Smaller stickies', false, dis) +
-        '<span class="bt-val">' + noteScale + '%</span>' +
-        bt('scale-up', 'plus', 'Bigger stickies', false, dis) +
-        bt('trail', 'cursor', 'Pointer trail', trailOn, dis) +
-        '<span class="ub-brk"></span>' +
-        bt('zfit', 'fit', 'Fit board (100%)') +
-        bt('zout', 'minus', 'Zoom out') +
-        '<span class="bt-val" id="bt-zoom">100%</span>' +
-        bt('zin', 'plus', 'Zoom in') +
-        '<span class="ub-brk"></span>' +
-        bt('help', 'help', 'Help') +
+        '<span class="bt-side">' +
+          bt('magnify', 'search', 'Sticky magnifier — hover a sticky to enlarge it', magnify, dis) +
+          bt('scale-down', 'minus', 'Smaller stickies', false, dis) +
+          '<span class="bt-val">' + noteScale + '%</span>' +
+          bt('scale-up', 'plus', 'Bigger stickies', false, dis) +
+          bt('trail', 'cursor', 'Pointer trail', trailOn, dis) +
+          '<span class="ub-brk"></span>' +
+          bt('zfit', 'fit', 'Fit board (100%)') +
+          bt('zout', 'minus', 'Zoom out') +
+          '<span class="bt-val" id="bt-zoom">100%</span>' +
+          bt('zin', 'plus', 'Zoom in') +
+          '<span class="ub-brk"></span>' +
+          bt('help', 'help', 'Help') +
+        '</span>' +
       '</div>';
   }
   function addSticky() {
