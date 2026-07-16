@@ -1230,7 +1230,15 @@ body {
 .board-screen.nav-v3 .note { cursor: pointer; }
 .note { transform: scale(var(--ns, 1)); transform-origin: top left; transition: transform 0.15s ease; }
 .board-screen.magnify .note:hover { transform: scale(calc(var(--ns, 1) * 1.9)); z-index: 6; box-shadow: 0 14px 30px rgba(20, 30, 50, 0.28); }
-.n-cv { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+/* comment-count badge on the sticky itself — the entry point to its thread */
+.n-cv {
+  position: absolute; top: 3px; right: 3px; min-width: 15px; height: 15px; padding: 0 4px;
+  border-radius: 8px; background: #18181b; color: #fff;
+  font-size: 9px; font-weight: 700; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.n-cv::before { content: "💬"; font-size: 7px; margin-right: 2px; }
+.note.n-active { box-shadow: 0 0 0 2px var(--accent), 0 6px 16px rgba(20, 30, 50, 0.2); z-index: 5; }
 .trail-dot {
   position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
   pointer-events: none; z-index: 30; transform: translate(-50%, -50%);

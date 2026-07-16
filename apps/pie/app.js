@@ -1116,9 +1116,12 @@
     const y = 4 + row * (NOTE_H + NOTE_GY) + Math.max(-3, jy);
     const prog = 30 + (Math.abs(h) % 60);
     const done = Math.round(prog * 0.6);
-    const hasCv = state.threads && state.threads.some((t) => t.kind === 'sticky' && t.sticky === c.title);
-    return '<div class="note k-' + c.kind + '" style="left:' + x + 'px;top:' + y + 'px">' +
-      '<span class="n-tab"></span>' + (hasCv ? '<span class="n-cv" title="Has a conversation"></span>' : '') +
+    const th = state.threads && state.threads.find((t) => t.kind === 'sticky' && t.sticky === c.title);
+    const cvCount = th ? 1 + (th.replies || []).length : 0;
+    const active = stickyOpen === c.title;
+    return '<div class="note k-' + c.kind + (active ? ' n-active' : '') + '" style="left:' + x + 'px;top:' + y + 'px">' +
+      '<span class="n-tab"></span>' +
+      (cvCount ? '<span class="n-cv" title="' + cvCount + ' comment' + (cvCount > 1 ? 's' : '') + ' — click to read">' + cvCount + '</span>' : '') +
       '<div class="n-text">' + esc(c.title) + '</div>' +
       '<div class="n-bar"><i class="n-done" style="width:' + done + '%"></i><i class="n-doing" style="width:' + (prog - done) + '%"></i></div>' +
     '</div>';
@@ -1452,17 +1455,49 @@
     const pg = e.target.closest('[data-open-page]');
     if (pg) { gotoPage(pg.dataset.openPage); showBoard(); return; }
     const sk = e.target.closest('[data-open-sticky]');
-    if (sk) { stickyOpen = sk.dataset.openSticky; renderStickyPanel(); return; }
+    if (sk) { openStickyPanel(sk.dataset.openSticky, null); return; }
     const b = e.target.closest('[data-nav="convo"]'); if (!b) return;
     convoOpen = false; renderBoardView();
   });
 
-  // Sticky conversations open ON the note — their own floating panel.
+  // Sticky conversations open ON the note — a popover anchored to the sticky.
   const stickyEl = document.getElementById('stickypanel');
+  let stickyAnchor = null; // screen rect of the note the panel is anchored to
   function stickyThreadFor(title) { return state.threads.find((t) => t.kind === 'sticky' && t.sticky === title); }
+  function noteRectFor(title) {
+    const notes = canvas.querySelectorAll('.note');
+    for (let i = 0; i < notes.length; i++) {
+      const t = notes[i].querySelector('.n-text');
+      if (t && t.textContent === title) return notes[i].getBoundingClientRect();
+    }
+    return null;
+  }
+  function placeStickyPanel() {
+    if (!stickyAnchor) { stickyEl.style.left = ''; stickyEl.style.top = ''; stickyEl.style.bottom = ''; return; }
+    const vw = window.innerWidth, vh = window.innerHeight, W = 300;
+    let left = stickyAnchor.right + 12;
+    if (left + W > vw - 8) left = stickyAnchor.left - W - 12;
+    left = Math.max(8, Math.min(left, vw - W - 8));
+    const top = Math.max(58, Math.min(stickyAnchor.top - 8, vh - 360));
+    stickyEl.style.left = left + 'px';
+    stickyEl.style.top = top + 'px';
+    stickyEl.style.bottom = 'auto';
+  }
+  function closeStickyPanel() {
+    stickyOpen = null; stickyAnchor = null;
+    renderStickyPanel();
+    if (!boardScreen.hidden && mode === 'board') renderCanvas(); // drop the note highlight
+  }
+  function openStickyPanel(title, rect) {
+    stickyOpen = title;
+    stickyAnchor = rect || noteRectFor(title);
+    if (!boardScreen.hidden && mode === 'board') renderCanvas(); // highlight the note
+    renderStickyPanel();
+  }
   function renderStickyPanel() {
     if (!stickyOpen) { stickyEl.hidden = true; stickyEl.innerHTML = ''; return; }
     stickyEl.hidden = false;
+    placeStickyPanel();
     const th = stickyThreadFor(stickyOpen);
     stickyEl.innerHTML =
       '<div class="cv-head sp-head">' + bIcon('edit', 'cv-hico') + '<b>Sticky · ' + esc(stickyOpen) + '</b>' +
@@ -1485,14 +1520,15 @@
     });
   }
   stickyEl.addEventListener('click', (e) => {
-    if (e.target.closest('[data-sp-close]')) { stickyOpen = null; renderStickyPanel(); }
+    if (e.target.closest('[data-sp-close]')) closeStickyPanel();
   });
   canvas.addEventListener('click', (e) => {
     if (state.navVersion !== 'v3') return;
     const n = e.target.closest('.note'); if (!n) return;
     const txt = n.querySelector('.n-text'); if (!txt) return;
-    stickyOpen = txt.textContent;
-    renderStickyPanel();
+    const title = txt.textContent;
+    if (stickyOpen === title) { closeStickyPanel(); return; }
+    openStickyPanel(title, n.getBoundingClientRect());
   });
 
   function renderCanvasIfVisible() { if (!boardScreen.hidden) { renderCanvas(); fitView(); } }
@@ -2154,7 +2190,7 @@
       if (modalType) { closeModal(); return; }
       if (hubOpen) { closeHub(); return; }
       if (paletteOpen) { closePalette(); return; }
-      if (stickyOpen) { stickyOpen = null; renderStickyPanel(); return; }
+      if (stickyOpen) { closeStickyPanel(); return; }
       if (dockPanel) { dockPanel = null; if (!boardScreen.hidden) renderDock(); return; }
       if (utilPanel) { utilPanel = null; if (!boardScreen.hidden) renderBtools(); return; }
       if (menuOpen) { closeNavMenus(); return; }
