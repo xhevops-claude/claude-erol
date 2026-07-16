@@ -112,19 +112,27 @@
   }
 
   // Conversations belong to a team, to a single sticky note (comments), or to
-  // individual users (chat) — never a place of their own. They can fetch pages.
+  // individual users (chat). Team+chat threads live in the people panel;
+  // board threads (including that board's sticky threads) in the board panel;
+  // sticky threads also open directly on the note. `board` ties a thread to a board id.
   function defaultThreads() {
     return [
-      { id: uid(), kind: 'team', who: 'Mara Kim', ini: 'MK', color: '#6a9be0', ago: '2h', where: 'ART Planning Board',
+      { id: uid(), kind: 'team', board: 'artplan', who: 'Mara Kim', ini: 'MK', color: '#6a9be0', ago: '2h', where: 'ART Planning Board',
         text: '@Ari — the SSO handshake lands in Iteration 2. Can Falcon own the token-exchange piece?',
         replies: [{ who: 'Ari Ruiz', ini: 'AR', color: '#e0746a', ago: '1h', text: 'Yes — moving it next to the login-screen story now.' }] },
-      { id: uid(), kind: 'team', who: 'Tom Sato', ini: 'TS', color: '#6ad0a8', ago: '5h', where: 'Risk Board', pageRef: 'art-sync',
+      { id: uid(), kind: 'team', board: 'risk', who: 'Tom Sato', ini: 'TS', color: '#6ad0a8', ago: '5h', where: 'Risk Board', pageRef: 'art-sync',
         text: 'Prepped tomorrow’s ART Sync page — the dependency list is pulled in already, please review.', replies: [] },
-      { id: uid(), kind: 'sticky', who: 'Jo Deng', ini: 'JD', color: '#caa15a', ago: '1d', where: 'Sticky · Billing API',
+      { id: uid(), kind: 'team', board: 'team', who: 'Mara Kim', ini: 'MK', color: '#6a9be0', ago: '3h', where: 'Team Board',
+        text: 'Iteration 2 looks overloaded — 13 points over capacity. Can we move a story right?', replies: [] },
+      { id: uid(), kind: 'sticky', board: 'team', sticky: 'Billing API', who: 'Jo Deng', ini: 'JD', color: '#caa15a', ago: '1d', where: 'Sticky · Billing API',
         text: 'Should we split this into contract + implementation? 13 points feels heavy for one iteration.',
         replies: [{ who: 'Mara Kim', ini: 'MK', color: '#6a9be0', ago: '1d', text: 'Agreed — let’s decide in the huddle tomorrow.' }] },
+      { id: uid(), kind: 'sticky', board: 'team', sticky: 'Login screen', who: 'Ari Ruiz', ini: 'AR', color: '#e0746a', ago: '6h', where: 'Sticky · Login screen',
+        text: 'Design specs are attached in Figma — are these final?', replies: [] },
       { id: uid(), kind: 'chat', who: 'Ari Ruiz', ini: 'AR', color: '#e0746a', ago: '30m', where: 'Chat · Ari Ruiz',
         text: 'Got five minutes before standup? Want to huddle on the Otter dependency.', replies: [] },
+      { id: uid(), kind: 'chat', who: 'Tom Sato', ini: 'TS', color: '#6ad0a8', ago: '2d', where: 'Chat · Tom Sato',
+        text: 'Thanks for unblocking the migration window yesterday 🙌', replies: [] },
     ];
   }
 
@@ -143,6 +151,9 @@
   const convoEl = document.getElementById('convo');
   const navEl = document.getElementById('navtree');
   const dockEl = document.getElementById('dock');
+  const utilEl = document.getElementById('utilbar');
+  const btoolsEl = document.getElementById('btools');
+  const modalEl = document.getElementById('pmodal');
   const hubEl = document.getElementById('hub');
   const paletteEl = document.getElementById('palette');
 
@@ -240,8 +251,10 @@
     }
     s.st = s.st || { id: uid(), name: 'Horizon Solution Train' };
     s.navVersion = ['v2', 'v3'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
+    s.workMode = s.workMode === 'execution' ? 'execution' : 'planning';
+    s.boardCfg = Object.assign({ dates: true, grid: true, compact: false }, s.boardCfg);
     if (!Array.isArray(s.pages) || !s.pages.length || !s.pages[0].owner || !s.pages.some((p) => p.id === 'pi-agenda')) s.pages = defaultPages();
-    if (!Array.isArray(s.threads) || !s.threads.length || !s.threads[0].kind) s.threads = defaultThreads();
+    if (!Array.isArray(s.threads) || !s.threads.length || !s.threads[0].kind || !s.threads.some((t) => t.board)) s.threads = defaultThreads();
     if (!Array.isArray(s.events)) {
       s.events = [
         { id: uid(), text: 'Synced 38 features from platform-jira', source: 'platform-jira', ago: '2h', ok: true },
@@ -330,6 +343,11 @@
       snap: '<rect x="4" y="6" width="16" height="13" rx="2"/><path d="M9 6l1.5-2h3L15 6"/><circle cx="12" cy="12.5" r="3"/>',
       doc: '<path d="M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 16.5h6"/>',
       menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+      gauge: '<path d="M5 19a9 9 0 1114 0"/><path d="M12 13l3.5-3.5"/><circle cx="12" cy="13" r="1" fill="currentColor" stroke="none"/>',
+      gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19"/>',
+      cursor: '<path d="M5.5 3.5l14 6.5-6 1.8-2.5 5.7z"/><path d="M13 13l5 5"/>',
+      timer: '<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 2"/><path d="M9.5 3h5"/>',
+      vote: '<path d="M7 11l3-7a2 2 0 012 2v4h5.2a2 2 0 012 2.3l-1 5.4A2 2 0 0116.2 19H9a2 2 0 01-2-2z"/><path d="M7 11H4v8h3"/>',
       chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-6l-5.2 4V6z"/><path d="M8 8.5h8M8 11.5h5"/>',
       present: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v3M8.5 21h7"/>',
     };
@@ -363,8 +381,10 @@
   let railRight = false;   // user's left/right preference (forced right on ART Objectives)
   let mode = 'board';      // 'board' | 'page' — the two planes of a session
   let activePage = null;   // page id when mode === 'page'
-  let convoOpen = false;   // contextual conversation panel
-  let cvFilter = 'all';    // conversation kinds: all | team | sticky | chat
+  let convoOpen = false;   // right-side conversation panel
+  let panelMode = 'people'; // which panel: 'people' (team+chats) | 'board' (board incl. stickies)
+  let cvFilter = 'team';   // people-panel tab: team | chat
+  let stickyOpen = null;   // sticky title whose on-note thread is open
   let menuOpen = null;     // which top-nav dropdown is open
 
   // Working context: WHICH TEAM you are working as — a user-team, an ART
@@ -642,16 +662,19 @@
         '<span class="dk-k">⌘K</span></button>' +
       (obj ? '<button class="dk-btn' + (objPanelOpen ? ' on' : '') + '" type="button" data-nav="toggle-art" title="' +
         (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives">' + bIcon('objectives') + '</button>' : '') +
-      '<button class="dk-btn' + (convoOpen ? ' on' : '') + '" type="button" data-nav="convo" title="Conversation">' + bIcon('chat') +
-        (state.threads.length ? '<span class="bn-badge">' + state.threads.length + '</span>' : '') + '</button>' +
+      '<span class="dk-seg" title="Work mode">' +
+        '<button class="' + (state.workMode === 'planning' ? 'on' : '') + '" type="button" data-mode="planning">Planning</button>' +
+        '<button class="' + (state.workMode === 'execution' ? 'on' : '') + '" type="button" data-mode="execution">Execution</button>' +
+      '</span>' +
       '<span class="bn-me dk-me">' + esc(initials(state.user.name)) + '</span>';
   }
   dockEl.addEventListener('click', (e) => {
+    const md = e.target.closest('[data-mode]');
+    if (md) { state.workMode = md.dataset.mode; save(); renderBoardView(); return; }
     const b = e.target.closest('[data-nav]'); if (!b) return;
     const nav = b.dataset.nav;
     if (nav === 'home') { closeHub(); exitBoard(); }
     else if (nav === 'hub') { if (hubOpen) closeHub(); else openHub(); }
-    else if (nav === 'convo') { convoOpen = !convoOpen; renderBoardView(); }
     else if (nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); }
   });
   function hubMatch(label) { return !hubQuery || label.toLowerCase().indexOf(hubQuery) >= 0; }
@@ -708,6 +731,11 @@
       state.pages.forEach((p) => {
         if (p.owner === n.type && (nameHit || hubMatch(p.title))) rows.push(hubRow('data-hub-page="' + n.type + ':' + n.id + ':' + p.id + '"', 'doc', p.title, n.name, false));
       });
+    });
+    // Stickies too: search reaches into every board's notes.
+    state.cards.filter((c) => hubMatch(c.title)).slice(0, 12).forEach((c) => {
+      const t = team(c.teamId); if (!t) return;
+      rows.push(hubRow('data-hub-sticky="' + t.id + '"', 'edit', c.title, t.name + ' · ' + (state.sprints[c.sprintIdx] || 'Sticky'), false));
     });
     return '<div class="hb-rows hb-results">' + (rows.slice(0, 60).join('') || '<div class="hb-none">No matches.</div>') + '</div>';
   }
@@ -769,8 +797,253 @@
     if (gb) { const p = gb.dataset.hubBoard.split(':'); ctx = { type: p[0], id: p[0] === 'st' ? state.st.id : p[1] }; mode = 'board'; railActive = p[2]; closeHub(); renderBoardView(); updateHash(); return; }
     const gp = e.target.closest('[data-hub-page]');
     if (gp) { const p = gp.dataset.hubPage.split(':'); ctx = { type: p[0], id: p[0] === 'st' ? state.st.id : p[1] }; mode = 'page'; activePage = p[2]; closeHub(); renderBoardView(); updateHash(); return; }
+    const gk = e.target.closest('[data-hub-sticky]');
+    if (gk) { ctx = { type: 'team', id: gk.dataset.hubSticky }; mode = 'board'; railActive = 'team'; closeHub(); renderBoardView(); updateHash(); return; }
     const gs = e.target.closest('[data-go-session]');
     if (gs) { state.piName = gs.dataset.goSession; save(); renderHub(); if (!boardScreen.hidden) renderBoardView(); return; }
+  });
+
+  // ---------- v3 utility bar (top right): search, history, metrics, config, facilitation, conversations ----------
+  let utilPanel = null; // 'history' | 'metrics' | 'config' | 'facil'
+  function boardHistory() {
+    const t = state.teams.map((x) => x.name);
+    return [
+      { who: 'Mara Kim', what: 'moved “SSO integration” to Iteration 3', ago: '2h' },
+      { who: 'Ari Ruiz', what: 'added “Login screen” (5 pts)', ago: '4h' },
+      { who: 'Tom Sato', what: 'linked a dependency to ' + (t[1] || 'Otter'), ago: '1d' },
+      { who: 'Jo Deng', what: 'commented on “Billing API”', ago: '1d' },
+      { who: 'You', what: 'set capacity for ' + (t[0] || 'Falcon') + ' to 26', ago: '3d' },
+    ];
+  }
+  function boardMetrics() {
+    const ids = ctxTeams().map((t) => t.id);
+    const cards = state.cards.filter((c) => ids.includes(c.teamId));
+    const load = cards.reduce((a, c) => a + (Number(c.points) || 0), 0);
+    const cap = ctxTeams().reduce((a, t) => a + (Number(t.capacity) || 0), 0) * state.sprints.length;
+    return [
+      ['Stickies', cards.length], ['Load', load + ' pts'], ['Capacity', cap + ' pts'],
+      ['Utilisation', cap ? Math.round((load / cap) * 100) + '%' : '—'],
+      ['Dependencies', 3], ['Open risks', state.risks.length],
+    ];
+  }
+  function utilPanelHtml() {
+    if (utilPanel === 'history') {
+      return '<div class="ub-h">History · ' + esc(boardName(railActive)) + '</div>' +
+        boardHistory().map((h) => '<div class="ub-row"><b>' + esc(h.who) + '</b><span>' + esc(h.what) + '</span><small>' + esc(h.ago) + '</small></div>').join('');
+    }
+    if (utilPanel === 'metrics') {
+      return '<div class="ub-h">Metrics · ' + esc(boardName(railActive)) + '</div><div class="ub-stats">' +
+        boardMetrics().map((m) => '<div class="ub-stat"><span>' + esc(String(m[1])) + '</span><small>' + esc(m[0]) + '</small></div>').join('') + '</div>';
+    }
+    if (utilPanel === 'config') {
+      const row = (k, label, sub) => '<button class="ub-cfg" type="button" data-cfg="' + k + '">' +
+        '<span class="ub-cfg-l"><b>' + label + '</b><small>' + sub + '</small></span>' +
+        '<span class="ub-sw' + (state.boardCfg[k] ? ' on' : '') + '"></span></button>';
+      return '<div class="ub-h">Board configuration</div>' +
+        row('dates', 'Iteration dates', 'Show date ranges in panel headers') +
+        row('grid', 'Background grid', 'Dotted grid behind the board') +
+        row('compact', 'Compact panels', 'Tighter headers, more stickies visible');
+    }
+    if (utilPanel === 'facil') {
+      const item = (f, ico, label, sub) => '<button class="ub-fac" type="button" data-fac="' + f + '">' + bIcon(ico, 'ub-fico') +
+        '<span><b>' + label + '</b><small>' + sub + '</small></span></button>';
+      return '<div class="ub-h">Facilitation</div>' +
+        item('readout', 'present', 'Plan Readout', 'Teams present their drafts in order') +
+        item('timer', 'timer', 'Timer', 'Timebox the current activity') +
+        item('vote', 'vote', 'Confidence Vote', 'Fist of five on the plan');
+    }
+    return '';
+  }
+  function renderUtilbar() {
+    if (state.navVersion !== 'v3' || boardScreen.hidden) { utilEl.innerHTML = ''; return; }
+    const dis = mode === 'board' ? '' : ' disabled';
+    const ub = (u, ico, title, on, d) => '<button class="ub-btn' + (on ? ' on' : '') + '" type="button" data-u="' + u + '" title="' + title + '"' + (d || '') + '>' + bIcon(ico) + '</button>';
+    utilEl.innerHTML =
+      '<div class="ub-bar">' +
+        ub('search', 'search', 'Search — stickies, this board, all boards (⌘K)') +
+        ub('history', 'history', 'Board history', utilPanel === 'history', dis) +
+        ub('metrics', 'gauge', 'Board metrics', utilPanel === 'metrics', dis) +
+        ub('config', 'gear', 'Board configuration', utilPanel === 'config', dis) +
+        ub('facil', 'present', 'Facilitation — readout, timer, vote', utilPanel === 'facil', dis) +
+        '<span class="ub-brk"></span>' +
+        ub('people', 'chat', 'Conversations — team & chats', convoOpen && panelMode === 'people') +
+        ub('boardtalk', 'teamboard', 'Board conversation (incl. stickies)', convoOpen && panelMode === 'board', dis) +
+      '</div>' +
+      (utilPanel ? '<div class="ub-panel">' + utilPanelHtml() + '</div>' : '');
+  }
+  utilEl.addEventListener('click', (e) => {
+    e.stopPropagation(); // re-render detaches targets; the document outside-click check would misfire
+    const cfg = e.target.closest('[data-cfg]');
+    if (cfg) { const k = cfg.dataset.cfg; state.boardCfg[k] = !state.boardCfg[k]; save(); renderBoardView(); return; }
+    const fac = e.target.closest('[data-fac]');
+    if (fac) { utilPanel = null; renderUtilbar(); openModal(fac.dataset.fac); return; }
+    const b = e.target.closest('[data-u]'); if (!b) return;
+    const u = b.dataset.u;
+    if (u === 'search') { utilPanel = null; openHub(); renderUtilbar(); return; }
+    if (u === 'people' || u === 'boardtalk') {
+      const m = u === 'people' ? 'people' : 'board';
+      if (convoOpen && panelMode === m) convoOpen = false;
+      else { convoOpen = true; panelMode = m; }
+      renderBoardView(); return;
+    }
+    utilPanel = utilPanel === u ? null : u;
+    renderUtilbar();
+  });
+
+  // ---------- v3 board toolbar (bottom right): sticky tools + view tools ----------
+  let magnify = false, trailOn = false, noteScale = 100;
+  function renderBtools() {
+    if (state.navVersion !== 'v3' || boardScreen.hidden || mode !== 'board') { btoolsEl.innerHTML = ''; return; }
+    const isTeam = railActive === 'team';
+    const bt = (a, ico, title, on, d) => '<button class="bt-btn' + (on ? ' on' : '') + '" type="button" data-bt="' + a + '" title="' + title + '"' + (d || '') + '>' + bIcon(ico) + '</button>';
+    btoolsEl.innerHTML =
+      '<button class="bt-add" type="button" data-bt="add" title="Add a sticky to this board"' + (isTeam ? '' : ' disabled') + '>' + bIcon('plus') + '</button>' +
+      '<span class="ub-brk"></span>' +
+      bt('magnify', 'search', 'Sticky magnifier — hover a sticky to enlarge it', magnify) +
+      bt('scale-down', 'minus', 'Smaller stickies') +
+      '<span class="bt-val">' + noteScale + '%</span>' +
+      bt('scale-up', 'plus', 'Bigger stickies') +
+      bt('trail', 'cursor', 'Pointer trail', trailOn) +
+      '<span class="ub-brk"></span>' +
+      bt('zfit', 'fit', 'Fit board (100%)') +
+      bt('zout', 'minus', 'Zoom out') +
+      '<span class="bt-val" id="bt-zoom">100%</span>' +
+      bt('zin', 'plus', 'Zoom in') +
+      '<span class="ub-brk"></span>' +
+      bt('help', 'help', 'Help');
+  }
+  function addSticky() {
+    if (mode !== 'board' || railActive !== 'team') return;
+    const t = ctxTeams()[0] || state.teams[0];
+    const titles = ['Follow-up spike', 'Edge-case fix', 'API contract check', 'Docs pass', 'Perf audit'];
+    state.cards.push({ id: uid(), teamId: t.id, sprintIdx: state.cards.length % 2, title: titles[state.cards.length % titles.length], points: 3, kind: 'story' });
+    save(); renderCanvas();
+  }
+  btoolsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-bt]'); if (!b) return;
+    const a = b.dataset.bt;
+    if (a === 'add') addSticky();
+    else if (a === 'magnify') { magnify = !magnify; boardScreen.classList.toggle('magnify', magnify); renderBtools(); }
+    else if (a === 'scale-down' || a === 'scale-up') {
+      noteScale = Math.max(60, Math.min(180, noteScale + (a === 'scale-up' ? 20 : -20)));
+      canvas.style.setProperty('--ns', noteScale / 100);
+      renderBtools(); applyView();
+    }
+    else if (a === 'trail') { trailOn = !trailOn; renderBtools(); }
+    else if (a === 'zfit') fitView();
+    else if (a === 'zout') zoomBy(1 / 1.4);
+    else if (a === 'zin') zoomBy(1.4);
+    else if (a === 'help') openModal('help');
+  });
+  let trailSkip = 0;
+  canvasWrap.addEventListener('pointermove', (e) => {
+    if (!trailOn || state.navVersion !== 'v3') return;
+    if ((trailSkip = (trailSkip + 1) % 2)) return;
+    const r = canvasWrap.getBoundingClientRect();
+    const d = document.createElement('span');
+    d.className = 'trail-dot';
+    d.style.left = (e.clientX - r.left) + 'px';
+    d.style.top = (e.clientY - r.top) + 'px';
+    canvasWrap.appendChild(d);
+    setTimeout(() => { d.remove(); }, 700);
+  });
+
+  // ---------- v3 modals: timer, confidence vote, plan readout, help ----------
+  let modalType = null, timerLeft = 300, timerRun = false, timerIv = 0, readoutIdx = 0, myVote = 0;
+  function fmtT(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function openModal(t) {
+    modalType = t;
+    if (t === 'vote') myVote = 0;
+    if (t === 'readout') readoutIdx = 0;
+    renderModal();
+  }
+  function closeModal() {
+    modalType = null; timerRun = false; clearInterval(timerIv);
+    modalEl.hidden = true; modalEl.innerHTML = '';
+  }
+  function modalBox(title, body) {
+    return '<div class="pm-box"><div class="pm-h"><b>' + title + '</b>' +
+      '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' + body + '</div>';
+  }
+  function renderModal() {
+    if (!modalType) return closeModal();
+    modalEl.hidden = false;
+    if (modalType === 'timer') {
+      modalEl.innerHTML = modalBox('Timer',
+        '<div class="pm-time" id="pm-time">' + fmtT(timerLeft) + '</div>' +
+        '<div class="pm-row">' +
+          '<button class="pm-btn" type="button" data-pm="t-1">−1 min</button>' +
+          '<button class="pm-btn" type="button" data-pm="t+1">+1 min</button>' +
+          '<button class="pm-btn pm-primary" type="button" data-pm="t-toggle">' + (timerRun ? 'Pause' : 'Start') + '</button>' +
+          '<button class="pm-btn" type="button" data-pm="t-reset">Reset</button>' +
+        '</div>');
+    } else if (modalType === 'vote') {
+      let body;
+      if (!myVote) {
+        body = '<p class="pm-p">Fist of five — how confident are we in this plan?</p>' +
+          '<div class="pm-votes">' + [1, 2, 3, 4, 5].map((n) =>
+            '<button class="pm-vote" type="button" data-pm="v' + n + '">' + n + '</button>').join('') + '</div>';
+      } else {
+        const all = [3, 4, 2, 4, 5].concat(myVote);
+        const avg = (all.reduce((a, b) => a + b, 0) / all.length).toFixed(1);
+        body = '<p class="pm-p">Average confidence <b class="pm-avg">' + avg + '</b> · ' + all.length + ' votes</p>' +
+          '<div class="pm-bars">' + [1, 2, 3, 4, 5].map((n) => {
+            const c = all.filter((v) => v === n).length;
+            return '<div class="pm-bar"><i style="height:' + (c * 18 + 4) + 'px"></i><span>' + n + '</span></div>';
+          }).join('') + '</div>' +
+          '<div class="pm-row"><button class="pm-btn" type="button" data-pm="v-again">Vote again</button></div>';
+      }
+      modalEl.innerHTML = modalBox('Confidence Vote', body);
+    } else if (modalType === 'readout') {
+      const a = ctxArt();
+      const list = state.teams.filter((t) => a.teamIds.includes(t.id));
+      modalEl.innerHTML = modalBox('Plan Readout — ' + esc(a.name),
+        '<p class="pm-p">Each team presents its draft plan. Five minutes per team.</p>' +
+        '<div class="pm-list">' + list.map((t, i) =>
+          '<div class="pm-item' + (i === readoutIdx ? ' now' : i < readoutIdx ? ' done' : '') + '">' +
+            '<span class="pm-n">' + (i + 1) + '</span>' + esc(t.name) +
+            (i === readoutIdx ? '<span class="pm-now">presenting</span>' : i < readoutIdx ? '<span class="pm-tick">✓</span>' : '') +
+          '</div>').join('') + '</div>' +
+        '<div class="pm-row">' +
+          '<button class="pm-btn" type="button" data-pm="r-prev"' + (readoutIdx <= 0 ? ' disabled' : '') + '>Previous</button>' +
+          '<button class="pm-btn pm-primary" type="button" data-pm="r-next"' + (readoutIdx >= list.length - 1 ? ' disabled' : '') + '>Next team</button>' +
+        '</div>');
+    } else if (modalType === 'help') {
+      modalEl.innerHTML = modalBox('Help',
+        '<div class="pm-help">' +
+          '<div><b>⌘K</b> open the Hub — search stickies, boards and pages</div>' +
+          '<div><b>Drag</b> pans the board · <b>scroll</b> zooms</div>' +
+          '<div><b>Click a sticky</b> to open its conversation</div>' +
+          '<div><b>Dock</b> switches Planning / Execution mode</div>' +
+          '<div><b>esc</b> closes panels and overlays</div>' +
+        '</div>');
+    }
+  }
+  modalEl.addEventListener('click', (e) => {
+    if (e.target === modalEl) return closeModal();
+    const b = e.target.closest('[data-pm]'); if (!b) return;
+    const a = b.dataset.pm;
+    if (a === 'close') return closeModal();
+    if (a === 't-1') { timerLeft = Math.max(60, timerLeft - 60); renderModal(); }
+    else if (a === 't+1') { timerLeft = Math.min(3600, timerLeft + 60); renderModal(); }
+    else if (a === 't-reset') { timerRun = false; clearInterval(timerIv); timerLeft = 300; renderModal(); }
+    else if (a === 't-toggle') {
+      timerRun = !timerRun; clearInterval(timerIv);
+      if (timerRun) {
+        timerIv = setInterval(() => {
+          if (timerLeft > 0) {
+            timerLeft -= 1;
+            const tEl = document.getElementById('pm-time');
+            if (tEl) tEl.textContent = fmtT(timerLeft);
+          } else { clearInterval(timerIv); timerRun = false; renderModal(); }
+        }, 1000);
+      }
+      renderModal();
+    }
+    else if (a === 'v-again') { myVote = 0; renderModal(); }
+    else if (a[0] === 'v') { myVote = Number(a.slice(1)) || 0; renderModal(); }
+    else if (a === 'r-prev') { readoutIdx = Math.max(0, readoutIdx - 1); renderModal(); }
+    else if (a === 'r-next') { readoutIdx += 1; renderModal(); }
   });
 
   navEl.addEventListener('click', (e) => {
@@ -810,8 +1083,9 @@
     const y = 4 + row * (NOTE_H + NOTE_GY) + Math.max(-3, jy);
     const prog = 30 + (Math.abs(h) % 60);
     const done = Math.round(prog * 0.6);
+    const hasCv = state.threads && state.threads.some((t) => t.kind === 'sticky' && t.sticky === c.title);
     return '<div class="note k-' + c.kind + '" style="left:' + x + 'px;top:' + y + 'px">' +
-      '<span class="n-tab"></span>' +
+      '<span class="n-tab"></span>' + (hasCv ? '<span class="n-cv" title="Has a conversation"></span>' : '') +
       '<div class="n-text">' + esc(c.title) + '</div>' +
       '<div class="n-bar"><i class="n-done" style="width:' + done + '%"></i><i class="n-doing" style="width:' + (prog - done) + '%"></i></div>' +
     '</div>';
@@ -1069,42 +1343,123 @@
       '<div class="cv-m-b"><div class="cv-m-h"><b>' + esc(m.who) + '</b><span>' + esc(m.ago) + '</span></div>' +
       '<div class="cv-m-t">' + esc(m.text) + '</div></div></div>';
   }
-  const CV_TABS = [['all', 'All'], ['team', 'Team'], ['sticky', 'Stickies'], ['chat', 'Chats']];
-  function renderConvo() {
-    if (!convoOpen) { convoEl.innerHTML = ''; return; }
-    const threads = state.threads.filter((t) => cvFilter === 'all' || t.kind === cvFilter);
-    convoEl.innerHTML =
-      '<div class="cv-head">' + bIcon('chat', 'cv-hico') + '<b>Conversation</b>' +
-        '<button class="cv-x" type="button" data-nav="convo" title="Close">✕</button></div>' +
-      '<div class="cv-sub"><span class="cv-ctx">' + esc(ctxName()) + '</span><span class="cv-ctx cv-ctx2">' + esc(convoContext()) + '</span>' +
-        '<button class="cv-sum" type="button" title="Summarise & list decisions" disabled>✨ Summarise</button></div>' +
-      '<div class="cv-tabs">' + CV_TABS.map((t) =>
-        '<button class="cv-tab' + (cvFilter === t[0] ? ' on' : '') + '" type="button" data-cv-tab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
-      '<div class="cv-body">' + (threads.map((t) => {
-        const pageRef = t.pageRef && state.pages.find((p) => p.id === t.pageRef);
-        return '<div class="cv-thread"><div class="cv-where">' + esc(t.where) + '</div>' + msgHtml(t) +
-          (pageRef ? '<button class="cv-page" type="button" data-open-page="' + pageRef.id + '">' + bIcon('doc', 'cv-pico') + esc(pageRef.title) + ' ↗</button>' : '') +
-          (t.replies || []).map((r) => '<div class="cv-reply">' + msgHtml(r) + '</div>').join('') +
-          '</div>';
-      }).join('') || '<div class="cv-empty">Nothing here yet.</div>') + '</div>' +
-      '<form class="cv-foot" id="cv-form"><input type="text" placeholder="Comment or @mention…" aria-label="Comment" />' +
-        '<button class="cv-send" type="submit">Send</button></form>';
-    document.getElementById('cv-form').addEventListener('submit', (e) => {
+  // Conversations live in three separate surfaces:
+  // 1) People panel — Team and Chats as sibling tabs (same category, not the same tab)
+  // 2) Board panel — threads about the current board, INCLUDING its sticky threads
+  // 3) Sticky panel — a single note's thread, opened on the note itself
+  const CV_TABS = [['team', 'Team'], ['chat', 'Chats']];
+  function threadHtml(t, opts) {
+    opts = opts || {};
+    const pageRef = t.pageRef && state.pages.find((p) => p.id === t.pageRef);
+    return '<div class="cv-thread">' +
+      (opts.noWhere ? '' : '<div class="cv-where">' + esc(t.where) + '</div>') +
+      msgHtml(t) +
+      (pageRef ? '<button class="cv-page" type="button" data-open-page="' + pageRef.id + '">' + bIcon('doc', 'cv-pico') + esc(pageRef.title) + ' ↗</button>' : '') +
+      (opts.stickyLink && t.sticky ? '<button class="cv-page" type="button" data-open-sticky="' + esc(t.sticky) + '">' + bIcon('edit', 'cv-pico') + 'Open on sticky ↗</button>' : '') +
+      (t.replies || []).map((r) => '<div class="cv-reply">' + msgHtml(r) + '</div>').join('') +
+      '</div>';
+  }
+  function composerHtml(id, ph) {
+    return '<form class="cv-foot" id="' + id + '"><input type="text" placeholder="' + ph + '" aria-label="Comment" />' +
+      '<button class="cv-send" type="submit">Send</button></form>';
+  }
+  function newThread(kind, extra, text) {
+    return Object.assign({ id: uid(), kind, who: state.user.name, ini: initials(state.user.name), color: state.accent, ago: 'now', text, replies: [] }, extra);
+  }
+  function bindComposer(id, make) {
+    const form = document.getElementById(id);
+    if (!form) return;
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const input = e.target.querySelector('input');
+      const input = form.querySelector('input');
       const text = input.value.trim();
       if (!text) return;
-      state.threads.unshift({ id: uid(), kind: 'team', who: state.user.name, ini: initials(state.user.name), color: state.accent, ago: 'now', where: convoContext(), text, replies: [] });
-      save(); renderConvo(); renderTopNav();
+      make(text);
+      save(); renderConvo();
     });
+  }
+  function renderConvo() {
+    if (!convoOpen) { convoEl.innerHTML = ''; return; }
+    if (panelMode === 'board') return renderBoardConvo();
+    const threads = state.threads.filter((t) => t.kind === cvFilter);
+    convoEl.innerHTML =
+      '<div class="cv-head">' + bIcon('chat', 'cv-hico') + '<b>Conversations</b>' +
+        '<button class="cv-x" type="button" data-nav="convo" title="Close">✕</button></div>' +
+      '<div class="cv-tabs">' + CV_TABS.map((t) =>
+        '<button class="cv-tab' + (cvFilter === t[0] ? ' on' : '') + '" type="button" data-cv-tab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
+      '<div class="cv-body">' + (threads.map((t) => threadHtml(t)).join('') || '<div class="cv-empty">Nothing here yet.</div>') + '</div>' +
+      composerHtml('cv-form', cvFilter === 'chat' ? 'Message someone…' : 'Comment or @mention…');
+    bindComposer('cv-form', (text) => {
+      state.threads.unshift(newThread(cvFilter, cvFilter === 'chat'
+        ? { where: 'Chat' }
+        : { where: convoContext(), board: mode === 'board' ? railActive : undefined }, text));
+    });
+  }
+  function renderBoardConvo() {
+    const bn = boardName(railActive);
+    const about = state.threads.filter((t) => t.board === railActive && t.kind !== 'sticky' && t.kind !== 'chat');
+    const onStickies = state.threads.filter((t) => t.board === railActive && t.kind === 'sticky');
+    convoEl.innerHTML =
+      '<div class="cv-head">' + bIcon('teamboard', 'cv-hico') + '<b>Board conversation</b>' +
+        '<button class="cv-x" type="button" data-nav="convo" title="Close">✕</button></div>' +
+      '<div class="cv-sub"><span class="cv-ctx">' + esc(bn) + '</span>' +
+        '<button class="cv-sum" type="button" title="Summarise & list decisions" disabled>✨ Summarise</button></div>' +
+      '<div class="cv-body">' +
+        '<div class="cv-grp">About this board</div>' +
+        (about.map((t) => threadHtml(t, { noWhere: true })).join('') || '<div class="cv-empty">No board threads yet.</div>') +
+        '<div class="cv-grp">On sticky notes</div>' +
+        (onStickies.map((t) => threadHtml(t, { stickyLink: true })).join('') || '<div class="cv-empty">No sticky conversations here.</div>') +
+      '</div>' +
+      composerHtml('cv-form', 'Comment on ' + esc(bn) + '…');
+    bindComposer('cv-form', (text) => { state.threads.unshift(newThread('team', { where: bn, board: railActive }, text)); });
   }
   convoEl.addEventListener('click', (e) => {
     const tab = e.target.closest('[data-cv-tab]');
     if (tab) { cvFilter = tab.dataset.cvTab; renderConvo(); return; }
     const pg = e.target.closest('[data-open-page]');
     if (pg) { gotoPage(pg.dataset.openPage); showBoard(); return; }
+    const sk = e.target.closest('[data-open-sticky]');
+    if (sk) { stickyOpen = sk.dataset.openSticky; renderStickyPanel(); return; }
     const b = e.target.closest('[data-nav="convo"]'); if (!b) return;
     convoOpen = false; renderBoardView();
+  });
+
+  // Sticky conversations open ON the note — their own floating panel.
+  const stickyEl = document.getElementById('stickypanel');
+  function stickyThreadFor(title) { return state.threads.find((t) => t.kind === 'sticky' && t.sticky === title); }
+  function renderStickyPanel() {
+    if (!stickyOpen) { stickyEl.hidden = true; stickyEl.innerHTML = ''; return; }
+    stickyEl.hidden = false;
+    const th = stickyThreadFor(stickyOpen);
+    stickyEl.innerHTML =
+      '<div class="cv-head sp-head">' + bIcon('edit', 'cv-hico') + '<b>Sticky · ' + esc(stickyOpen) + '</b>' +
+        '<button class="cv-x" type="button" data-sp-close title="Close">✕</button></div>' +
+      '<div class="cv-body sp-body">' + (th ? threadHtml(th, { noWhere: true })
+        : '<div class="cv-empty">No conversation on this sticky yet — start one below.</div>') + '</div>' +
+      composerHtml('sp-form', 'Comment on this sticky…');
+    const form = document.getElementById('sp-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = form.querySelector('input');
+      const text = input.value.trim();
+      if (!text) return;
+      const existing = stickyThreadFor(stickyOpen);
+      if (existing) existing.replies.push({ who: state.user.name, ini: initials(state.user.name), color: state.accent, ago: 'now', text });
+      else state.threads.unshift(newThread('sticky', { board: railActive, sticky: stickyOpen, where: 'Sticky · ' + stickyOpen }, text));
+      save(); renderStickyPanel();
+      if (convoOpen) renderConvo();
+      renderCanvas(); // sticky gains its conversation badge
+    });
+  }
+  stickyEl.addEventListener('click', (e) => {
+    if (e.target.closest('[data-sp-close]')) { stickyOpen = null; renderStickyPanel(); }
+  });
+  canvas.addEventListener('click', (e) => {
+    if (state.navVersion !== 'v3') return;
+    const n = e.target.closest('.note'); if (!n) return;
+    const txt = n.querySelector('.n-text'); if (!txt) return;
+    stickyOpen = txt.textContent;
+    renderStickyPanel();
   });
 
   function renderCanvasIfVisible() { if (!boardScreen.hidden) { renderCanvas(); fitView(); } }
@@ -1137,8 +1492,11 @@
   }
   function applyView() {
     canvas.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.scale + ')';
+    const pct = Math.round((view.scale / (fitScale() || 1)) * 100) + '%';
     const z = zoomctl.querySelector('.z-val');
-    if (z) z.textContent = Math.round((view.scale / (fitScale() || 1)) * 100) + '%';
+    if (z) z.textContent = pct;
+    const z2 = document.getElementById('bt-zoom');
+    if (z2) z2.textContent = pct;
   }
   function fitView() { view.scale = fitScale(); view.x = PAD; view.y = PAD; clampView(); applyView(); }
   function setScale(ns, mx, my) {
@@ -1230,12 +1588,21 @@
     boardScreen.classList.toggle('nav-v2', v2);
     boardScreen.classList.toggle('nav-open', v2 && navOpen);
     boardScreen.classList.toggle('nav-v3', state.navVersion === 'v3');
+    boardScreen.classList.toggle('mode-exec', state.workMode === 'execution');
+    boardScreen.classList.toggle('magnify', magnify);
+    boardScreen.classList.toggle('cfg-nodates', !state.boardCfg.dates);
+    boardScreen.classList.toggle('cfg-nogrid', !state.boardCfg.grid);
+    boardScreen.classList.toggle('cfg-compact', state.boardCfg.compact);
+    canvas.style.setProperty('--ns', noteScale / 100);
     recordRecent();
     renderTopNav();
     renderNavTree();
     renderSideRail();
     renderArtSide();
     renderConvo();
+    renderUtilbar();
+    renderBtools();
+    renderStickyPanel();
     renderZoomCtl();
     renderCanvas();
     fitView();
@@ -1380,6 +1747,7 @@
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.user-chip-wrap')) closeUserMenu();
     if (menuOpen && !e.target.closest('.bn-dd')) closeNavMenus();
+    if (utilPanel && !e.target.closest('.utilbar')) { utilPanel = null; if (!boardScreen.hidden) renderUtilbar(); }
   });
 
   function navigate(page) { currentPage = page; renderSide(); renderPage(page); mainEl.scrollTop = 0; updateHash(); }
@@ -1750,8 +2118,11 @@
       return;
     }
     if (e.key === 'Escape') {
+      if (modalType) { closeModal(); return; }
       if (hubOpen) { closeHub(); return; }
       if (paletteOpen) { closePalette(); return; }
+      if (stickyOpen) { stickyOpen = null; renderStickyPanel(); return; }
+      if (utilPanel) { utilPanel = null; if (!boardScreen.hidden) renderUtilbar(); return; }
       if (menuOpen) { closeNavMenus(); return; }
       closeUserMenu();
     }
