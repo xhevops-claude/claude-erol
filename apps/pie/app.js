@@ -694,7 +694,16 @@
     const b = e.target.closest('[data-nav]'); if (!b) return;
     const nav = b.dataset.nav;
     if (nav === 'home') { closeHub(); exitBoard(); }
-    else if (nav === 'hub') { if (hubOpen) closeHub(); else openHub(); }
+    else if (nav === 'hub') {
+      if (hubOpen) { closeHub(); return; }
+      try { openHub(); } catch (err) {
+        // never let a corrupt hub state kill navigation — reset and retry
+        hubQuery = ''; hubSel = 0; recents = [];
+        hubNode = { type: 'team', id: (state.teams[0] || {}).id };
+        ensureCtxValid();
+        openHub();
+      }
+    }
     else if (nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); }
     else if (nav === 'people' || nav === 'boardtalk') {
       const m = nav === 'people' ? 'people' : 'board';
@@ -810,10 +819,18 @@
       if (!boardScreen.hidden) renderTopNav();
     });
   }
-  function openHub() { hubOpen = true; hubQuery = ''; hubSel = 0; hubNode = { type: ctx.type, id: ctx.id }; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
+  let hubOpenedAt = 0; // guards the backdrop against the 2nd click of a double-click
+  function openHub() {
+    hubOpen = true; hubQuery = ''; hubSel = 0; hubOpenedAt = Date.now();
+    hubNode = { type: ctx.type, id: ctx.id };
+    renderHub();
+    if (!boardScreen.hidden) renderTopNav();
+  }
   function closeHub() { if (!hubOpen) return; hubOpen = false; renderHub(); if (!boardScreen.hidden) renderTopNav(); }
   hubEl.addEventListener('click', (e) => {
-    if (e.target === hubEl) return closeHub();
+    // Backdrop closes the hub — but not right after opening, or a double-click
+    // on the breadcrumb (open + backdrop hit) would cancel itself out.
+    if (e.target === hubEl) { if (Date.now() - hubOpenedAt > 400) closeHub(); return; }
     if (e.target.closest('[data-hub-close]')) return closeHub();
     const nd = e.target.closest('[data-hub-node]');
     if (nd) { const p = nd.dataset.hubNode.split(':'); hubNode = { type: p[0], id: p[0] === 'st' ? state.st.id : p[1] }; hubSel = 0; renderHub(); return; }
