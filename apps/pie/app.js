@@ -345,6 +345,8 @@
       gauge: '<path d="M5 19a9 9 0 1114 0"/><path d="M12 13l3.5-3.5"/><circle cx="12" cy="13" r="1" fill="currentColor" stroke="none"/>',
       gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19"/>',
       cursor: '<path d="M5.5 3.5l14 6.5-6 1.8-2.5 5.7z"/><path d="M13 13l5 5"/>',
+      magnify: '<circle cx="10.5" cy="10.5" r="6"/><path d="M20 20l-5-5"/><path d="M8 10.5h5M10.5 8v5"/>',
+      scale: '<rect x="3.5" y="12.5" width="7" height="7" rx="1.2"/><rect x="12" y="4" width="8.5" height="8.5" rx="1.5"/><path d="M9 9l2.5 2.5"/>',
       timer: '<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 2"/><path d="M9.5 3h5"/>',
       vote: '<path d="M7 11l3-7a2 2 0 012 2v4h5.2a2 2 0 012 2.3l-1 5.4A2 2 0 0116.2 19H9a2 2 0 01-2-2z"/><path d="M7 11H4v8h3"/>',
       chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-6l-5.2 4V6z"/><path d="M8 8.5h8M8 11.5h5"/>',
@@ -677,8 +679,6 @@
         '<button class="' + (state.workMode === 'planning' ? 'on' : '') + '" type="button" data-mode="planning">Planning</button>' +
         '<button class="' + (state.workMode === 'execution' ? 'on' : '') + '" type="button" data-mode="execution">Execution</button>' +
       '</span>' +
-      '<button class="dk-btn' + (convoOpen && panelMode === 'board' ? ' on' : '') + '" type="button" data-nav="boardtalk" title="Board conversation (incl. stickies)"' +
-        (mode === 'board' ? '' : ' disabled') + '>' + bIcon('teamboard') + '</button>' +
       '<button class="dk-btn' + (convoOpen && panelMode === 'people' ? ' on' : '') + '" type="button" data-nav="people" title="Conversations — team & chats">' + bIcon('chat') +
         (peopleCount ? '<span class="bn-badge">' + peopleCount + '</span>' : '') + '</button>' +
       '<span class="bn-me dk-me">' + esc(initials(state.user.name)) + '</span>';
@@ -899,6 +899,8 @@
   }
   // ---------- v3 bottom bar: board utilities + board tools combined ----------
   let magnify = false, trailOn = false, noteScale = 100;
+  let btPanel = null; // which tool flyout is open: 'scale' | 'zoom'
+  function zoomPct() { return Math.round((view.scale / (fitScale() || 1)) * 100) + '%'; }
   function renderBtools() {
     if (state.navVersion !== 'v3' || boardScreen.hidden) { btoolsEl.innerHTML = ''; return; }
     const onBoard = mode === 'board';
@@ -906,6 +908,15 @@
     const isTeam = onBoard && railActive === 'team';
     const ub = (u, ico, title, on, d) => '<button class="ub-btn' + (on ? ' on' : '') + '" type="button" data-u="' + u + '" title="' + title + '"' + (d || '') + '>' + bIcon(ico) + '</button>';
     const bt = (a, ico, title, on, d) => '<button class="bt-btn' + (on ? ' on' : '') + '" type="button" data-bt="' + a + '" title="' + title + '"' + (d || '') + '>' + bIcon(ico) + '</button>';
+    const scalePop = btPanel === 'scale'
+      ? '<div class="bt-pop">' + bt('scale-down', 'minus', 'Smaller stickies') +
+        '<span class="bt-popval">' + noteScale + '%</span>' + bt('scale-up', 'plus', 'Bigger stickies') + '</div>'
+      : '';
+    const zoomPop = btPanel === 'zoom'
+      ? '<div class="bt-pop">' + bt('zout', 'minus', 'Zoom out') +
+        '<span class="bt-popval bt-zoomval">' + zoomPct() + '</span>' + bt('zin', 'plus', 'Zoom in') +
+        '<button class="bt-fit" type="button" data-bt="zfit">Fit</button></div>'
+      : '';
     btoolsEl.innerHTML =
       (utilPanel ? '<div class="ub-panel">' + utilPanelHtml() + '</div>' : '') +
       '<div class="bt-bar">' +
@@ -915,19 +926,19 @@
           ub('metrics', 'gauge', 'Board metrics', utilPanel === 'metrics', dis) +
           ub('config', 'gear', 'Board configuration', utilPanel === 'config', dis) +
           ub('facil', 'present', 'Facilitation — readout, timer, vote', utilPanel === 'facil', dis) +
+          '<span class="ub-brk"></span>' +
+          bt('boardtalk', 'teamboard', 'Board conversation (incl. stickies)', convoOpen && panelMode === 'board', dis) +
         '</span>' +
         '<button class="bt-add" type="button" data-bt="add" title="Add a sticky to this board"' + (isTeam ? '' : ' disabled') + '>' + bIcon('plus') + '</button>' +
         '<span class="bt-side">' +
-          bt('magnify', 'search', 'Sticky magnifier — hover a sticky to enlarge it', magnify, dis) +
-          bt('scale-down', 'minus', 'Smaller stickies', false, dis) +
-          '<span class="bt-val">' + noteScale + '%</span>' +
-          bt('scale-up', 'plus', 'Bigger stickies', false, dis) +
+          bt('magnify', 'magnify', 'Sticky magnifier — hover a sticky to enlarge it', magnify, dis) +
+          '<span class="bt-wrap">' + bt('scale-pop', 'scale', 'Scale stickies', btPanel === 'scale', dis) + scalePop + '</span>' +
           bt('trail', 'cursor', 'Pointer trail', trailOn, dis) +
           '<span class="ub-brk"></span>' +
-          bt('zfit', 'fit', 'Fit board (100%)') +
-          bt('zout', 'minus', 'Zoom out') +
-          '<span class="bt-val" id="bt-zoom">100%</span>' +
-          bt('zin', 'plus', 'Zoom in') +
+          '<span class="bt-wrap">' +
+            '<button class="bt-btn bt-zbtn' + (btPanel === 'zoom' ? ' on' : '') + '" type="button" data-bt="zoom-pop" title="Board zoom">' +
+              '<span class="bt-zoomval">' + zoomPct() + '</span></button>' + zoomPop +
+          '</span>' +
           '<span class="ub-brk"></span>' +
           bt('help', 'help', 'Help') +
         '</span>' +
@@ -956,7 +967,14 @@
     const b = e.target.closest('[data-bt]'); if (!b) return;
     const a = b.dataset.bt;
     if (a === 'add') addSticky();
+    else if (a === 'boardtalk') {
+      if (convoOpen && panelMode === 'board') convoOpen = false;
+      else { convoOpen = true; panelMode = 'board'; }
+      renderBoardView();
+    }
     else if (a === 'magnify') { magnify = !magnify; boardScreen.classList.toggle('magnify', magnify); renderBtools(); }
+    else if (a === 'scale-pop') { btPanel = btPanel === 'scale' ? null : 'scale'; renderBtools(); }
+    else if (a === 'zoom-pop') { btPanel = btPanel === 'zoom' ? null : 'zoom'; renderBtools(); }
     else if (a === 'scale-down' || a === 'scale-up') {
       noteScale = Math.max(60, Math.min(180, noteScale + (a === 'scale-up' ? 20 : -20)));
       canvas.style.setProperty('--ns', noteScale / 100);
@@ -1564,8 +1582,7 @@
     const pct = Math.round((view.scale / (fitScale() || 1)) * 100) + '%';
     const z = zoomctl.querySelector('.z-val');
     if (z) z.textContent = pct;
-    const z2 = document.getElementById('bt-zoom');
-    if (z2) z2.textContent = pct;
+    document.querySelectorAll('.bt-zoomval').forEach((el) => { el.textContent = pct; });
   }
   function fitView() { view.scale = fitScale(); view.x = PAD; view.y = PAD; clampView(); applyView(); }
   function setScale(ns, mx, my) {
@@ -1815,7 +1832,7 @@
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.user-chip-wrap')) closeUserMenu();
     if (menuOpen && !e.target.closest('.bn-dd')) closeNavMenus();
-    if (utilPanel && !e.target.closest('.btools')) { utilPanel = null; if (!boardScreen.hidden) renderBtools(); }
+    if ((utilPanel || btPanel) && !e.target.closest('.btools')) { utilPanel = null; btPanel = null; if (!boardScreen.hidden) renderBtools(); }
     if (dockPanel && !e.target.closest('.dock')) { dockPanel = null; if (!boardScreen.hidden) renderDock(); }
   });
 
@@ -2192,7 +2209,7 @@
       if (paletteOpen) { closePalette(); return; }
       if (stickyOpen) { closeStickyPanel(); return; }
       if (dockPanel) { dockPanel = null; if (!boardScreen.hidden) renderDock(); return; }
-      if (utilPanel) { utilPanel = null; if (!boardScreen.hidden) renderBtools(); return; }
+      if (utilPanel || btPanel) { utilPanel = null; btPanel = null; if (!boardScreen.hidden) renderBtools(); return; }
       if (menuOpen) { closeNavMenus(); return; }
       closeUserMenu();
     }
