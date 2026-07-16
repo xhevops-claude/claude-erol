@@ -975,14 +975,35 @@ body {
 .board-screen.nav-v3.convo-open .convo { top: 0; }
 
 .dock { display: none; }
+/* the dock is now a fixed top navigation bar */
 .board-screen.nav-v3 .dock {
-  display: flex; align-items: center; gap: 3px; position: absolute; bottom: 14px; left: 50%;
-  transform: translateX(-50%); z-index: 45; max-width: calc(100vw - 32px); padding: 5px;
-  background: rgba(255, 255, 255, 0.78);
+  display: flex; align-items: center; gap: 3px; position: absolute; top: 0; left: 0; right: 0;
+  z-index: 45; height: 50px; padding: 0 10px;
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(16px) saturate(1.8); -webkit-backdrop-filter: blur(16px) saturate(1.8);
-  border: 1px solid rgba(24, 24, 27, 0.08); border-radius: 999px;
-  box-shadow: 0 12px 32px rgba(24, 24, 27, 0.14), 0 1px 2px rgba(24, 24, 27, 0.06);
+  border-bottom: 1px solid rgba(24, 24, 27, 0.08);
 }
+.board-screen.nav-v3 .canvas-wrap { top: 50px; }
+.board-screen.nav-v3.obj-mode.obj-open .art-side { top: 50px; }
+.board-screen.nav-v3.convo-open .convo { top: 50px; }
+.dk-sp { flex: 1 1 auto; }
+.dk-dd { position: relative; }
+.dk-panel {
+  position: absolute; top: calc(100% + 10px); left: 0; width: 290px; z-index: 60;
+  background: #fff; border: 1px solid rgba(24, 24, 27, 0.08); border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(24, 24, 27, 0.18); padding: 8px;
+  font: 12.5px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+.dk-page {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; min-width: 0;
+  border: 0; background: transparent; border-radius: 8px; padding: 7px 8px;
+  font: inherit; font-size: 12.5px; font-weight: 500; color: #3f3f46; cursor: pointer;
+}
+.dk-page:hover { background: rgba(24, 24, 27, 0.06); color: #18181b; }
+.dk-page.on { background: rgba(24, 24, 27, 0.07); color: #18181b; font-weight: 600; }
+.dk-page span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-page small { flex: 0 0 auto; color: #a1a1aa; font-size: 10.5px; }
+.dk-pico { width: 14px; height: 14px; stroke: #a1a1aa; flex: 0 0 auto; }
 .dk-btn {
   position: relative; width: 34px; height: 34px; border-radius: 999px; border: 0;
   background: transparent; color: #52525b; cursor: pointer;
@@ -1120,20 +1141,7 @@ body {
 }
 .dk-seg button.on { background: #18181b; color: #fff; }
 
-/* ---------- v3 utility bar (top right) ---------- */
-.utilbar { display: none; }
-.board-screen.nav-v3 .utilbar {
-  display: flex; flex-direction: column; align-items: flex-end;
-  position: absolute; top: 14px; right: 14px; z-index: 45;
-}
-.board-screen.convo-open .utilbar { right: 354px; }
-.ub-bar {
-  display: flex; align-items: center; gap: 2px; padding: 4px;
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(16px) saturate(1.8); -webkit-backdrop-filter: blur(16px) saturate(1.8);
-  border: 1px solid rgba(24, 24, 27, 0.08); border-radius: 999px;
-  box-shadow: 0 12px 32px rgba(24, 24, 27, 0.14), 0 1px 2px rgba(24, 24, 27, 0.06);
-}
+/* ---------- v3 bottom bar buttons (utilities merged with board tools) ---------- */
 .ub-btn {
   position: relative; width: 32px; height: 32px; border-radius: 999px; border: 0;
   background: transparent; color: #52525b; cursor: pointer;
@@ -1144,7 +1152,7 @@ body {
 .ub-btn.on { background: #18181b; color: #fff; }
 .ub-brk { width: 1px; height: 18px; background: rgba(24, 24, 27, 0.08); margin: 0 4px; align-self: center; }
 .ub-panel {
-  margin-top: 8px; width: 320px; background: #fff; color: #18181b;
+  width: 320px; background: #fff; color: #18181b;
   border: 1px solid rgba(24, 24, 27, 0.08); border-radius: 12px;
   box-shadow: 0 18px 50px rgba(24, 24, 27, 0.18); padding: 10px;
   font: 12.5px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -1181,19 +1189,22 @@ body {
 .ub-fac small { color: #a1a1aa; font-size: 11px; }
 
 /* ---------- v3 board toolbar (bottom right) ---------- */
+/* bottom bar sits where the dock used to be */
 .btools { display: none; }
 .board-screen.nav-v3 .btools {
-  display: flex; flex-direction: column; align-items: center; gap: 2px; position: absolute;
-  right: 14px; top: 50%; transform: translateY(-50%); z-index: 42;
-  padding: 6px 5px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; position: absolute;
+  bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 42;
+  max-width: calc(100vw - 32px);
+}
+.board-screen.nav-v3.convo-open .btools { left: calc((100% - 340px) / 2); }
+.bt-bar {
+  display: flex; align-items: center; gap: 2px; padding: 5px;
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(16px) saturate(1.8); -webkit-backdrop-filter: blur(16px) saturate(1.8);
-  border: 1px solid rgba(24, 24, 27, 0.08); border-radius: 18px;
+  border: 1px solid rgba(24, 24, 27, 0.08); border-radius: 999px;
   box-shadow: 0 12px 32px rgba(24, 24, 27, 0.14), 0 1px 2px rgba(24, 24, 27, 0.06);
 }
-.board-screen.convo-open .btools { right: 354px; }
-.btools .ub-brk { width: 18px; height: 1px; margin: 4px 0; }
-.board-screen.nav-v3:not(.page-mode) .zoomctl { display: none; }
+.board-screen.nav-v3 .zoomctl { display: none; }
 .bt-btn {
   width: 30px; height: 30px; border-radius: 999px; border: 0; background: transparent; color: #52525b;
   cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
@@ -1203,10 +1214,11 @@ body {
 .bt-btn.on { background: #18181b; color: #fff; }
 .bt-val { min-width: 40px; text-align: center; font-size: 11px; font-weight: 600; color: #71717a; font-variant-numeric: tabular-nums; }
 .bt-add {
-  display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0;
-  border: 0; border-radius: 999px; background: #18181b; color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: 999px; background: #18181b; color: #fff; cursor: pointer; margin: 0 1px;
 }
-.bt-add svg { width: 16px; height: 16px; stroke: #fff; }
+.bt-add svg { width: 15px; height: 15px; stroke: #fff; }
+.bt-add:disabled { background: rgba(24, 24, 27, 0.2); }
 
 /* board feature effects */
 .board-screen.nav-v3 .note { cursor: pointer; }

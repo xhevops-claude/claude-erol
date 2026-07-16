@@ -151,7 +151,6 @@
   const convoEl = document.getElementById('convo');
   const navEl = document.getElementById('navtree');
   const dockEl = document.getElementById('dock');
-  const utilEl = document.getElementById('utilbar');
   const btoolsEl = document.getElementById('btools');
   const modalEl = document.getElementById('pmodal');
   const hubEl = document.getElementById('hub');
@@ -653,22 +652,43 @@
   // The canvas is full-bleed; the dock only says where you are. ALL navigation
   // lives in the Hub — one overview that is browsed spatially or filtered by typing.
   let hubOpen = false, hubQuery = '', hubSel = 0;
+  let dockPanel = null; // 'pages' — the team-pages shortcut dropdown
   function renderDock() {
     const obj = mode === 'board' && railActive === 'objectives';
+    const pages = pagesFor();
+    const peopleCount = state.threads.filter((t) => t.kind === 'team' || t.kind === 'chat').length;
     dockEl.innerHTML =
       '<button class="dk-crumb" type="button" data-nav="hub" title="Open the Hub (⌘K)">' +
         '<span class="dk-sess">' + esc(state.piName) + '</span><i>/</i>' +
         '<span>' + esc(ctxName()) + '</span><i>/</i><b>' + esc(activeArtifactName()) + '</b>' +
         '<span class="dk-k">⌘K</span></button>' +
+      '<span class="dk-dd">' +
+        '<button class="dk-btn' + (dockPanel === 'pages' ? ' on' : '') + '" type="button" data-dock="pages" title="Pages · ' + esc(ctxName()) + '">' + bIcon('doc') + '</button>' +
+        (dockPanel === 'pages'
+          ? '<div class="dk-panel"><div class="ub-h">' + esc(ctxName()) + ' · Pages</div>' +
+            pages.map((p) => '<button class="dk-page' + (mode === 'page' && activePage === p.id ? ' on' : '') + '" type="button" data-go-dock-page="' + p.id + '">' +
+              bIcon('doc', 'dk-pico') + '<span>' + esc(p.title) + '</span><small>' + esc(p.purpose) + '</small></button>').join('') + '</div>'
+          : '') +
+      '</span>' +
+      '<span class="dk-sp"></span>' +
       (obj ? '<button class="dk-btn' + (objPanelOpen ? ' on' : '') + '" type="button" data-nav="toggle-art" title="' +
         (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives">' + bIcon('objectives') + '</button>' : '') +
       '<span class="dk-seg" title="Work mode">' +
         '<button class="' + (state.workMode === 'planning' ? 'on' : '') + '" type="button" data-mode="planning">Planning</button>' +
         '<button class="' + (state.workMode === 'execution' ? 'on' : '') + '" type="button" data-mode="execution">Execution</button>' +
       '</span>' +
+      '<button class="dk-btn' + (convoOpen && panelMode === 'board' ? ' on' : '') + '" type="button" data-nav="boardtalk" title="Board conversation (incl. stickies)"' +
+        (mode === 'board' ? '' : ' disabled') + '>' + bIcon('teamboard') + '</button>' +
+      '<button class="dk-btn' + (convoOpen && panelMode === 'people' ? ' on' : '') + '" type="button" data-nav="people" title="Conversations — team & chats">' + bIcon('chat') +
+        (peopleCount ? '<span class="bn-badge">' + peopleCount + '</span>' : '') + '</button>' +
       '<span class="bn-me dk-me">' + esc(initials(state.user.name)) + '</span>';
   }
   dockEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const dp = e.target.closest('[data-dock]');
+    if (dp) { dockPanel = dockPanel === dp.dataset.dock ? null : dp.dataset.dock; renderDock(); return; }
+    const gp = e.target.closest('[data-go-dock-page]');
+    if (gp) { dockPanel = null; gotoPage(gp.dataset.goDockPage); renderBoardView(); updateHash(); return; }
     const md = e.target.closest('[data-mode]');
     if (md) { state.workMode = md.dataset.mode; save(); renderBoardView(); return; }
     const b = e.target.closest('[data-nav]'); if (!b) return;
@@ -676,6 +696,12 @@
     if (nav === 'home') { closeHub(); exitBoard(); }
     else if (nav === 'hub') { if (hubOpen) closeHub(); else openHub(); }
     else if (nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); }
+    else if (nav === 'people' || nav === 'boardtalk') {
+      const m = nav === 'people' ? 'people' : 'board';
+      if (convoOpen && panelMode === m) convoOpen = false;
+      else { convoOpen = true; panelMode = m; }
+      renderBoardView();
+    }
   });
   function hubMatch(label) { return !hubQuery || label.toLowerCase().indexOf(hubQuery) >= 0; }
   function hubTile(attr, ico, label, on) {
@@ -854,63 +880,38 @@
     }
     return '';
   }
-  function renderUtilbar() {
-    if (state.navVersion !== 'v3' || boardScreen.hidden) { utilEl.innerHTML = ''; return; }
-    const dis = mode === 'board' ? '' : ' disabled';
+  // ---------- v3 bottom bar: board utilities + board tools combined ----------
+  let magnify = false, trailOn = false, noteScale = 100;
+  function renderBtools() {
+    if (state.navVersion !== 'v3' || boardScreen.hidden) { btoolsEl.innerHTML = ''; return; }
+    const onBoard = mode === 'board';
+    const dis = onBoard ? '' : ' disabled';
+    const isTeam = onBoard && railActive === 'team';
     const ub = (u, ico, title, on, d) => '<button class="ub-btn' + (on ? ' on' : '') + '" type="button" data-u="' + u + '" title="' + title + '"' + (d || '') + '>' + bIcon(ico) + '</button>';
-    utilEl.innerHTML =
-      '<div class="ub-bar">' +
+    const bt = (a, ico, title, on, d) => '<button class="bt-btn' + (on ? ' on' : '') + '" type="button" data-bt="' + a + '" title="' + title + '"' + (d || '') + '>' + bIcon(ico) + '</button>';
+    btoolsEl.innerHTML =
+      (utilPanel ? '<div class="ub-panel">' + utilPanelHtml() + '</div>' : '') +
+      '<div class="bt-bar">' +
         ub('search', 'search', 'Search — stickies, this board, all boards (⌘K)') +
         ub('history', 'history', 'Board history', utilPanel === 'history', dis) +
         ub('metrics', 'gauge', 'Board metrics', utilPanel === 'metrics', dis) +
         ub('config', 'gear', 'Board configuration', utilPanel === 'config', dis) +
         ub('facil', 'present', 'Facilitation — readout, timer, vote', utilPanel === 'facil', dis) +
         '<span class="ub-brk"></span>' +
-        ub('people', 'chat', 'Conversations — team & chats', convoOpen && panelMode === 'people') +
-        ub('boardtalk', 'teamboard', 'Board conversation (incl. stickies)', convoOpen && panelMode === 'board', dis) +
-      '</div>' +
-      (utilPanel ? '<div class="ub-panel">' + utilPanelHtml() + '</div>' : '');
-  }
-  utilEl.addEventListener('click', (e) => {
-    e.stopPropagation(); // re-render detaches targets; the document outside-click check would misfire
-    const cfg = e.target.closest('[data-cfg]');
-    if (cfg) { const k = cfg.dataset.cfg; state.boardCfg[k] = !state.boardCfg[k]; save(); renderBoardView(); return; }
-    const fac = e.target.closest('[data-fac]');
-    if (fac) { utilPanel = null; renderUtilbar(); openModal(fac.dataset.fac); return; }
-    const b = e.target.closest('[data-u]'); if (!b) return;
-    const u = b.dataset.u;
-    if (u === 'search') { utilPanel = null; openHub(); renderUtilbar(); return; }
-    if (u === 'people' || u === 'boardtalk') {
-      const m = u === 'people' ? 'people' : 'board';
-      if (convoOpen && panelMode === m) convoOpen = false;
-      else { convoOpen = true; panelMode = m; }
-      renderBoardView(); return;
-    }
-    utilPanel = utilPanel === u ? null : u;
-    renderUtilbar();
-  });
-
-  // ---------- v3 board toolbar (bottom right): sticky tools + view tools ----------
-  let magnify = false, trailOn = false, noteScale = 100;
-  function renderBtools() {
-    if (state.navVersion !== 'v3' || boardScreen.hidden || mode !== 'board') { btoolsEl.innerHTML = ''; return; }
-    const isTeam = railActive === 'team';
-    const bt = (a, ico, title, on, d) => '<button class="bt-btn' + (on ? ' on' : '') + '" type="button" data-bt="' + a + '" title="' + title + '"' + (d || '') + '>' + bIcon(ico) + '</button>';
-    btoolsEl.innerHTML =
-      '<button class="bt-add" type="button" data-bt="add" title="Add a sticky to this board"' + (isTeam ? '' : ' disabled') + '>' + bIcon('plus') + '</button>' +
-      '<span class="ub-brk"></span>' +
-      bt('magnify', 'search', 'Sticky magnifier — hover a sticky to enlarge it', magnify) +
-      bt('scale-down', 'minus', 'Smaller stickies') +
-      '<span class="bt-val">' + noteScale + '%</span>' +
-      bt('scale-up', 'plus', 'Bigger stickies') +
-      bt('trail', 'cursor', 'Pointer trail', trailOn) +
-      '<span class="ub-brk"></span>' +
-      bt('zfit', 'fit', 'Fit board (100%)') +
-      bt('zout', 'minus', 'Zoom out') +
-      '<span class="bt-val" id="bt-zoom">100%</span>' +
-      bt('zin', 'plus', 'Zoom in') +
-      '<span class="ub-brk"></span>' +
-      bt('help', 'help', 'Help');
+        '<button class="bt-add" type="button" data-bt="add" title="Add a sticky to this board"' + (isTeam ? '' : ' disabled') + '>' + bIcon('plus') + '</button>' +
+        bt('magnify', 'search', 'Sticky magnifier — hover a sticky to enlarge it', magnify, dis) +
+        bt('scale-down', 'minus', 'Smaller stickies', false, dis) +
+        '<span class="bt-val">' + noteScale + '%</span>' +
+        bt('scale-up', 'plus', 'Bigger stickies', false, dis) +
+        bt('trail', 'cursor', 'Pointer trail', trailOn, dis) +
+        '<span class="ub-brk"></span>' +
+        bt('zfit', 'fit', 'Fit board (100%)') +
+        bt('zout', 'minus', 'Zoom out') +
+        '<span class="bt-val" id="bt-zoom">100%</span>' +
+        bt('zin', 'plus', 'Zoom in') +
+        '<span class="ub-brk"></span>' +
+        bt('help', 'help', 'Help') +
+      '</div>';
   }
   function addSticky() {
     if (mode !== 'board' || railActive !== 'team') return;
@@ -920,6 +921,18 @@
     save(); renderCanvas();
   }
   btoolsEl.addEventListener('click', (e) => {
+    e.stopPropagation(); // re-render detaches targets; the document outside-click check would misfire
+    const cfg = e.target.closest('[data-cfg]');
+    if (cfg) { const k = cfg.dataset.cfg; state.boardCfg[k] = !state.boardCfg[k]; save(); renderBoardView(); return; }
+    const fac = e.target.closest('[data-fac]');
+    if (fac) { utilPanel = null; renderBtools(); openModal(fac.dataset.fac); return; }
+    const u = e.target.closest('[data-u]');
+    if (u) {
+      const k = u.dataset.u;
+      if (k === 'search') { utilPanel = null; renderBtools(); openHub(); return; }
+      utilPanel = utilPanel === k ? null : k;
+      renderBtools(); return;
+    }
     const b = e.target.closest('[data-bt]'); if (!b) return;
     const a = b.dataset.bt;
     if (a === 'add') addSticky();
@@ -1600,7 +1613,6 @@
     renderSideRail();
     renderArtSide();
     renderConvo();
-    renderUtilbar();
     renderBtools();
     renderStickyPanel();
     renderZoomCtl();
@@ -1747,7 +1759,8 @@
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.user-chip-wrap')) closeUserMenu();
     if (menuOpen && !e.target.closest('.bn-dd')) closeNavMenus();
-    if (utilPanel && !e.target.closest('.utilbar')) { utilPanel = null; if (!boardScreen.hidden) renderUtilbar(); }
+    if (utilPanel && !e.target.closest('.btools')) { utilPanel = null; if (!boardScreen.hidden) renderBtools(); }
+    if (dockPanel && !e.target.closest('.dock')) { dockPanel = null; if (!boardScreen.hidden) renderDock(); }
   });
 
   function navigate(page) { currentPage = page; renderSide(); renderPage(page); mainEl.scrollTop = 0; updateHash(); }
@@ -2122,7 +2135,8 @@
       if (hubOpen) { closeHub(); return; }
       if (paletteOpen) { closePalette(); return; }
       if (stickyOpen) { stickyOpen = null; renderStickyPanel(); return; }
-      if (utilPanel) { utilPanel = null; if (!boardScreen.hidden) renderUtilbar(); return; }
+      if (dockPanel) { dockPanel = null; if (!boardScreen.hidden) renderDock(); return; }
+      if (utilPanel) { utilPanel = null; if (!boardScreen.hidden) renderBtools(); return; }
       if (menuOpen) { closeNavMenus(); return; }
       closeUserMenu();
     }
