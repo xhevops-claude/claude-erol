@@ -278,7 +278,7 @@
         if (t) t.objectives = [];
       });
     }
-    s.navVersion = ['v2', 'v3'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
+    s.navVersion = ['v2', 'v3', 'v4'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
     s.workMode = s.workMode === 'execution' ? 'execution' : 'planning';
     s.boardCfg = Object.assign({ dates: true, grid: true, compact: false }, s.boardCfg);
     if (!Array.isArray(s.pages) || !s.pages.length || !s.pages[0].owner || !s.pages.some((p) => p.id === 'pi-agenda')) s.pages = defaultPages();
@@ -417,6 +417,10 @@
   let stickyOpen = null;   // sticky title whose on-note thread is open
   let menuOpen = null;     // which top-nav dropdown is open
 
+  // v4 exists only as a design variant slot (ART Objectives); its navigation
+  // chrome is v3's. chromeV() is what version-of-chrome checks should use.
+  const chromeV = () => (state.navVersion === 'v4' ? 'v3' : state.navVersion);
+
   // Working context: WHICH TEAM you are working as — a user-team, an ART
   // (team of teams) or the Solution Train (team of ARTs). Everything else
   // (boards, pages, conversations) is scoped by it.
@@ -538,7 +542,7 @@
     return boardName(railActive);
   }
   function renderTopNav() {
-    if (state.navVersion === 'v3') { bnav.innerHTML = ''; renderDock(); return; }
+    if (chromeV() === 'v3') { bnav.innerHTML = ''; renderDock(); return; }
     dockEl.innerHTML = '';
     const v2 = state.navVersion === 'v2';
     const avatars = [['AR', '#e0746a'], ['MK', '#6a9be0'], ['TS', '#6ad0a8'], ['JD', '#caa15a']]
@@ -933,7 +937,7 @@
     verfabEl.hidden = false;
     verfabEl.innerHTML =
       '<span class="vf-grip" title="Drag to move"><i></i><i></i><i></i><i></i><i></i><i></i></span>' +
-      ['v1', 'v2', 'v3'].map((v) =>
+      ['v1', 'v2', 'v3', 'v4'].map((v) =>
         '<button class="vf-btn' + (state.navVersion === v ? ' on' : '') + '" type="button" data-ver="' + v + '">' + v + '</button>').join('');
     try {
       const pos = JSON.parse(localStorage.getItem('pie-vfpos'));
@@ -973,7 +977,7 @@
   let btPanel = null; // which tool flyout is open: 'scale' | 'zoom'
   function zoomPct() { return Math.round((view.scale / (fitScale() || 1)) * 100) + '%'; }
   function renderBtools() {
-    if (state.navVersion !== 'v3' || boardScreen.hidden) { btoolsEl.innerHTML = ''; return; }
+    if (chromeV() !== 'v3' || boardScreen.hidden) { btoolsEl.innerHTML = ''; return; }
     const onBoard = mode === 'board';
     const dis = onBoard ? '' : ' disabled';
     const isTeam = onBoard && railActive === 'team';
@@ -1059,7 +1063,7 @@
   });
   let trailSkip = 0;
   canvasWrap.addEventListener('pointermove', (e) => {
-    if (!trailOn || state.navVersion !== 'v3') return;
+    if (!trailOn || chromeV() !== 'v3') return;
     if ((trailSkip = (trailSkip + 1) % 2)) return;
     const r = canvasWrap.getBoundingClientRect();
     const d = document.createElement('span');
@@ -1289,7 +1293,8 @@
   // No cards — the sheet stays one continuous board; ONLY the header changes.
   //   v1 · name chip — the team name in a compact filled dark pill
   //   v2 · grey banner — the name sits in a soft grey band
-  //   v3 · numbered heading — oversized ghost ordinal + bold name
+  //   v3 · kicker dash — a short thick dark dash above a bold name
+  //   v4 · icon tile — small grey rounded tile with the team glyph + bold name
   function objRow(o, i) {
     return '<div class="ob-item"><div class="ob-t"><b>' + (i + 1) + '</b> ' + esc(o.text) + '</div>' +
       '<div class="ob-meta"><span class="ob-bv">' + o.bv + ' BV</span>' +
@@ -1310,10 +1315,9 @@
     const body = n ? objGroup('Commited', com) + objGroup('Uncommitted', unc) : '';
     let head;
     if (v === 'v2') head = '<div class="ob-head ob-head2"><span class="ob-av">' + esc(initials(tm.name)) + '</span>' + name + tail + '</div>';
-    else if (v === 'v3') {
-      const num = String(ctxTeams().indexOf(tm) + 1).padStart(2, '0');
-      head = '<div class="ob-head ob-head3"><span class="ob-num">' + num + '</span>' + name + tail + '</div>';
-    } else head = '<div class="ob-head ob-head1">' + name + tail + '</div>';
+    else if (v === 'v3') head = '<div class="ob-head ob-head3">' + name + tail + '</div>';
+    else if (v === 'v4') head = '<div class="ob-head ob-head4"><span class="ob-ico">' + bIcon('teamrail', 'ob-tico') + '</span>' + name + tail + '</div>';
+    else head = '<div class="ob-head ob-head1">' + name + tail + '</div>';
     return '<section class="obj-block' + (n ? '' : ' obj-empty') + '">' + head + body + '</section>';
   }
   function estBlock(tm) {
@@ -1647,7 +1651,7 @@
     if (e.target.closest('[data-sp-close]')) closeStickyPanel();
   });
   canvas.addEventListener('click', (e) => {
-    if (state.navVersion !== 'v3') return;
+    if (chromeV() !== 'v3') return;
     const n = e.target.closest('.note'); if (!n) return;
     const txt = n.querySelector('.n-text'); if (!txt) return;
     const title = txt.textContent;
@@ -1779,7 +1783,7 @@
     boardScreen.classList.toggle('convo-open', convoOpen);
     boardScreen.classList.toggle('nav-v2', v2);
     boardScreen.classList.toggle('nav-open', v2 && navOpen);
-    boardScreen.classList.toggle('nav-v3', state.navVersion === 'v3');
+    boardScreen.classList.toggle('nav-v3', chromeV() === 'v3');
     boardScreen.classList.toggle('mode-exec', state.workMode === 'execution');
     boardScreen.classList.toggle('magnify', magnify);
     boardScreen.classList.toggle('cfg-nodates', !state.boardCfg.dates);
@@ -2271,10 +2275,11 @@
       v1: 'v1 · switcher chips in the top bar + floating board rail',
       v2: 'v2 · navigator tree: the whole workspace in one sidebar',
       v3: 'v3 · hub + dock: full-bleed canvas, one overview behind ⌘K',
+      v4: 'v4 · v3 navigation with an alternate ART Objectives design',
     };
-    body.appendChild(rCard('Navigation', 'Three takes on moving around the planning space.', [
+    body.appendChild(rCard('Navigation', 'Design versions — also switchable from the floating pill on any board.', [
       rRow('Version', NAV_DESC[state.navVersion],
-        [el('div', { class: 'seg' }, [segBtn('v1', 'v1'), segBtn('v2', 'v2'), segBtn('v3', 'v3')])]),
+        [el('div', { class: 'seg' }, [segBtn('v1', 'v1'), segBtn('v2', 'v2'), segBtn('v3', 'v3'), segBtn('v4', 'v4')])]),
     ]));
 
     // Appearance
@@ -2307,7 +2312,7 @@
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') {
       e.preventDefault();
-      if (state.navVersion === 'v3' && !boardScreen.hidden) { if (hubOpen) closeHub(); else openHub(); return; }
+      if (chromeV() === 'v3' && !boardScreen.hidden) { if (hubOpen) closeHub(); else openHub(); return; }
       if (paletteOpen) closePalette(); else openPalette();
       return;
     }

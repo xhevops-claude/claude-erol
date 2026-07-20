@@ -1379,12 +1379,23 @@ body {
 }
 .obj-d-v2 .obj-block.obj-empty .ob-head2 { margin-bottom: -6px; }
 
-/* v3 · numbered heading: oversized ghost ordinal + bold name */
-.ob-head3 { display: flex; align-items: baseline; gap: 9px; margin: 0 0 8px; }
-.ob-num { flex: 0 0 auto; font-size: 23px; font-weight: 800; line-height: 1; color: #d4d4d8; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
-.ob-head3 .ob-name { font-size: 14px; font-weight: 800; }
+/* v3 · kicker dash: a short thick dark dash above a bold name */
+.ob-head3 { position: relative; display: flex; align-items: center; gap: 9px; margin: 2px 0 8px; padding-top: 10px; }
+.ob-head3::before { content: ""; position: absolute; top: 0; left: 0; width: 26px; height: 4px; border-radius: 2px; background: #3f3f46; }
+.ob-head3 .ob-name { font-size: 14.5px; font-weight: 800; }
 .obj-d-v3 .obj-block.obj-empty { padding-bottom: 12px; }
 .obj-d-v3 .obj-block.obj-empty .ob-head3 { margin-bottom: 0; }
+
+/* v4 · icon tile: small grey rounded tile with the team glyph */
+.ob-head4 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; }
+.ob-ico {
+  flex: 0 0 auto; width: 24px; height: 24px; border-radius: 7px;
+  background: rgba(24, 24, 27, 0.07); display: flex; align-items: center; justify-content: center;
+}
+.ob-tico { width: 14px; height: 14px; stroke: #3f3f46; }
+.ob-head4 .ob-name { font-size: 14px; font-weight: 800; }
+.obj-d-v4 .obj-block.obj-empty { padding-bottom: 12px; }
+.obj-d-v4 .obj-block.obj-empty .ob-head4 { margin-bottom: 0; }
 
 /* segmented control (PIE Recipe · Navigation) */
 .seg { display: flex; border: 1px solid var(--r-line); border-radius: 9px; overflow: hidden; }
