@@ -1286,9 +1286,10 @@
   // can be compared live with the floating v1/v2/v3 switcher. Teams without
   // objectives are still teams — each variant renders them in its own header
   // language with a muted "No objectives yet".
-  //   v1 · folder tabs — the name sits in a tab on top of the team's container
+  // No cards — the sheet stays one continuous board; ONLY the header changes.
+  //   v1 · inverse band — solid dark bar, white name: the loudest start marker
   //   v2 · grey banner — the name sits in a soft grey band
-  //   v3 · editorial divider — small-caps name + rule line + committed/uncommitted meta
+  //   v3 · heavy rule — thick dark rule + oversized bold name, purely typographic
   function objRow(o, i) {
     return '<div class="ob-item"><div class="ob-t"><b>' + (i + 1) + '</b> ' + esc(o.text) + '</div>' +
       '<div class="ob-meta"><span class="ob-bv">' + o.bv + ' BV</span>' +
@@ -1306,19 +1307,11 @@
     const count = n ? '<span class="ob-count">' + n + '</span>' : '';
     const tail = n ? '<span class="ob-count">' + n + '</span>' : '<span class="ob-none">No objectives yet</span>';
     const name = '<span class="ob-name">' + esc(tm.name) + '</span>';
-    let head, body;
-    if (v === 'v2') {
-      head = '<div class="ob-head ob-head2"><span class="ob-av">' + esc(initials(tm.name)) + '</span>' + name + tail + '</div>';
-      body = n ? objGroup('Commited', com) + objGroup('Uncommitted', unc) : '';
-    } else if (v === 'v3') {
-      head = '<div class="ob-head ob-head3">' + name + '<i class="ob-rule"></i>' + tail + '</div>' +
-        (n ? '<div class="ob-meta3">' + com.length + ' committed · ' + unc.length + ' uncommitted</div>' : '');
-      body = n ? objGroup('Commited', com) + objGroup('Uncommitted', unc) : '';
-    } else {
-      head = '<div class="ob-head ob-head1">' + name + count + '</div>';
-      body = n ? objGroup('Commited', com) + objGroup('Uncommitted', unc)
-        : '<div class="ob-nobody">No objectives yet</div>';
-    }
+    const body = n ? objGroup('Commited', com) + objGroup('Uncommitted', unc) : '';
+    let head;
+    if (v === 'v2') head = '<div class="ob-head ob-head2"><span class="ob-av">' + esc(initials(tm.name)) + '</span>' + name + tail + '</div>';
+    else if (v === 'v3') head = '<div class="ob-head ob-head3">' + name + tail + '</div>';
+    else head = '<div class="ob-head ob-head1">' + name + tail + '</div>';
     return '<section class="obj-block' + (n ? '' : ' obj-empty') + '">' + head + body + '</section>';
   }
   function estBlock(tm) {
