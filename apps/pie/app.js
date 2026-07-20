@@ -1300,27 +1300,30 @@
     return '<section class="obj-block">' + head +
       objGroup('Commited', com) + objGroup('Uncommitted', unc) + '</section>';
   }
-  function estBlock(tm) {
-    const objs = tm.objectives || [];
-    return 56 + 2 * 34 + objs.length * 78; // header + 2 group labels + items
-  }
   function renderObjectivesBoard() {
-    const COLS = 3;
-    const cols = [[], [], []], colH = [0, 0, 0];
-    ctxTeams().forEach((tm) => {
-      const ci = colH.indexOf(Math.min.apply(null, colH));
-      cols[ci].push(tm); colH[ci] += estBlock(tm);
-    });
+    const teams = ctxTeams();
     const availW = canvasWrap.clientWidth - 2 * PAD;
     const availH = canvasWrap.clientHeight - 2 * PAD;
     boardW = availW;
-    canvas.style.width = boardW + 'px';
-    canvas.style.height = 'auto';
-    canvas.innerHTML = '<div class="obj-sheet obj-d-' + state.navVersion + '">' + cols.map((teams, ci) =>
-      '<div class="obj-col' + (ci === COLS - 1 ? ' last-col' : '') + '">' +
-      teams.map(teamBlock).join('') + '</div>').join('') + '</div>';
-    boardH = Math.max(canvas.firstChild.scrollHeight, availH);
-    canvas.style.height = boardH + 'px';
+    boardH = availH;
+    canvas.style.width = availW + 'px';
+    canvas.style.height = availH + 'px';
+    // One column per team; then shrink the whole sheet (fonts included) until
+    // everything fits the viewport at 100% — the objectives board never scrolls.
+    canvas.innerHTML = '<div class="obj-fit"><div class="obj-sheet obj-d-' + state.navVersion + '" id="obj-sheet" style="height:auto;width:' + availW + 'px">' +
+      teams.map((tm, ci) => '<div class="obj-col' + (ci === teams.length - 1 ? ' last-col' : '') + '">' + teamBlock(tm) + '</div>').join('') +
+      '</div></div>';
+    const sheet = document.getElementById('obj-sheet');
+    let s = Math.min(1, availH / sheet.scrollHeight);
+    for (let i = 0; i < 4 && s < 1; i++) {
+      sheet.style.width = Math.round(availW / s) + 'px';
+      const ns = Math.min(1, availH / sheet.scrollHeight);
+      if (Math.abs(ns - s) < 0.01) { s = ns; break; }
+      s = ns;
+    }
+    s = Math.min(s, availH / sheet.scrollHeight);
+    sheet.style.transformOrigin = 'top left';
+    sheet.style.transform = s < 1 ? 'scale(' + s + ')' : '';
   }
 
   function renderPlaceholderBoard() {

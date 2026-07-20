@@ -232,6 +232,7 @@ body {
 .as-bv-box { min-width: 26px; height: 26px; padding: 0 6px; border: 1px solid var(--r-line); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #1b1f27; }
 .as-lk { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--r-dim); }
 
+.obj-fit { width: 100%; height: 100%; overflow: hidden; border-radius: 16px; }
 .obj-sheet { position: relative; display: flex; align-items: stretch; height: 100%; background: #fff; border: 1px solid #dfe2e9; border-radius: 16px; box-shadow: 0 12px 44px rgba(20,30,50,.12); overflow: hidden; }
 .obj-col { flex: 1 1 0; min-width: 0; border-right: 1px solid #ebedf2; }
 .obj-col.last-col { border-right: 0; }
