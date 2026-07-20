@@ -1361,6 +1361,15 @@ body {
   flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; background: #52525b;
   color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;
 }
+/* teams without objectives: slim grey header bars mixed into the columns */
+.obj-block.obj-empty { padding: 8px 10px; }
+.ob-head-empty {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(24, 24, 27, 0.05); border-radius: 9px; padding: 10px 13px;
+}
+.ob-head-empty .ob-name { font-size: 13.5px; font-weight: 700; }
+.ob-none { margin-left: auto; flex: 0 0 auto; font-size: 11.5px; color: #a1a1aa; }
+.obj-d-v1 .obj-block.obj-empty { border-left-color: #e4e4e7; }
 /* v1 · grey rail: dark edge + dot beside the name */
 .obj-d-v1 .obj-block { border-left: 4px solid #a1a1aa; }
 .ob-head1 { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }

@@ -270,6 +270,14 @@
         s.teams.forEach((t, i) => { if (pay.teamIds.includes(t.id)) t.objectives = genManyObjectives(i); });
       }
     }
+    // Mix it like a real planning wall: some teams have no objectives yet.
+    if (!s.payMix) {
+      s.payMix = true;
+      ['Badger', 'Osprey', 'Viper'].forEach((nm) => {
+        const t = s.teams.find((x) => x.name === nm);
+        if (t) t.objectives = [];
+      });
+    }
     s.navVersion = ['v2', 'v3'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
     s.workMode = s.workMode === 'execution' ? 'execution' : 'planning';
     s.boardCfg = Object.assign({ dates: true, grid: true, compact: false }, s.boardCfg);
@@ -1290,6 +1298,10 @@
   }
   function teamBlock(tm) {
     const objs = tm.objectives || [];
+    if (!objs.length) {
+      return '<section class="obj-block obj-empty"><div class="ob-head-empty">' +
+        '<span class="ob-name">' + esc(tm.name) + '</span><span class="ob-none">No objectives yet</span></div></section>';
+    }
     const com = objs.filter((o) => o.committed), unc = objs.filter((o) => !o.committed);
     const count = '<span class="ob-count">' + objs.length + '</span>';
     const av = '<span class="ob-av">' + esc(initials(tm.name)) + '</span>';
@@ -1300,6 +1312,10 @@
     return '<section class="obj-block">' + head +
       objGroup('Commited', com) + objGroup('Uncommitted', unc) + '</section>';
   }
+  function estBlock(tm) {
+    const n = (tm.objectives || []).length;
+    return n ? 60 + 2 * 30 + n * 76 : 64;
+  }
   function renderObjectivesBoard() {
     const teams = ctxTeams();
     const availW = canvasWrap.clientWidth - 2 * PAD;
@@ -1308,10 +1324,19 @@
     boardH = availH;
     canvas.style.width = availW + 'px';
     canvas.style.height = availH + 'px';
-    // One column per team; then shrink the whole sheet (fonts included) until
-    // everything fits the viewport at 100% — the objectives board never scrolls.
+    // Teams and objectives mix in a masonry: several teams stack per column
+    // (shortest column first), empty teams as slim "No objectives yet" bars.
+    // Then the whole sheet shrinks (fonts included) until it fits at 100%.
+    const loaded = teams.filter((t) => (t.objectives || []).length).length;
+    const COLS = Math.max(3, Math.min(6, loaded + (teams.length > loaded ? 1 : 0)));
+    const cols = [], colH = [];
+    for (let i = 0; i < COLS; i++) { cols.push([]); colH.push(0); }
+    teams.forEach((tm) => {
+      const ci = colH.indexOf(Math.min.apply(null, colH));
+      cols[ci].push(tm); colH[ci] += estBlock(tm);
+    });
     canvas.innerHTML = '<div class="obj-fit"><div class="obj-sheet obj-d-' + state.navVersion + '" id="obj-sheet" style="height:auto;width:' + availW + 'px">' +
-      teams.map((tm, ci) => '<div class="obj-col' + (ci === teams.length - 1 ? ' last-col' : '') + '">' + teamBlock(tm) + '</div>').join('') +
+      cols.map((group, ci) => '<div class="obj-col' + (ci === COLS - 1 ? ' last-col' : '') + '">' + group.map(teamBlock).join('') + '</div>').join('') +
       '</div></div>';
     const sheet = document.getElementById('obj-sheet');
     let s = Math.min(1, availH / sheet.scrollHeight);
