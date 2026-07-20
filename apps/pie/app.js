@@ -50,6 +50,13 @@
   function genArtObjectives() {
     return ART_OBJ.map((o, i) => ({ id: uid(), title: o.title, desc: o.desc, bv: 0, links: [7, 5, 5, 5, 3][i] || 4, committed: i < 3 }));
   }
+  // A heavy objective load (9 committed + 5 uncommitted) for crowding tests.
+  function genManyObjectives(i) {
+    const out = [];
+    for (let k = 0; k < 9; k++) out.push({ id: uid(), text: OBJ_POOL[(i + k) % OBJ_POOL.length], bv: [8, 10, 13, 5][k % 4], links: (k % 3) + 1, committed: true });
+    for (let k = 0; k < 5; k++) out.push({ id: uid(), text: OBJ_POOL[(i + k + 3) % OBJ_POOL.length], bv: [5, 8, 3][k % 3], links: k % 3, committed: false });
+    return out;
+  }
 
   // Pages: sets of purpose-specific documents assembled from boards + conversations.
   // Each page belongs to a team; the team's TYPE ('team' | 'art' | 'st') gates access,
@@ -249,19 +256,18 @@
       ];
     }
     s.st = s.st || { id: uid(), name: 'Horizon Solution Train' };
-    // Stress case: Payments ART teams carry a LOT of objectives, so the
-    // ART Objectives design options can be judged under crowding.
-    if (!s.objBoost) {
-      s.objBoost = true;
+    // Stress case: Payments ART is BIG — eight teams, each with a heavy
+    // objective load, so the ART Objectives designs can be judged under crowding.
+    if (!s.payTeams) {
+      s.payTeams = true;
       const pay = s.arts[1];
       if (pay) {
-        s.teams.forEach((t, i) => {
-          if (!pay.teamIds.includes(t.id)) return;
-          const many = [];
-          for (let k = 0; k < 9; k++) many.push({ id: uid(), text: OBJ_POOL[(i + k) % OBJ_POOL.length], bv: [8, 10, 13, 5][k % 4], links: (k % 3) + 1, committed: true });
-          for (let k = 0; k < 5; k++) many.push({ id: uid(), text: OBJ_POOL[(i + k + 3) % OBJ_POOL.length], bv: [5, 8, 3][k % 3], links: k % 3, committed: false });
-          t.objectives = many;
+        ['Lynx', 'Heron', 'Badger', 'Osprey', 'Viper'].forEach((nm) => {
+          const t = { id: uid(), name: nm, capacity: 22, objectives: [] };
+          s.teams.push(t);
+          pay.teamIds.push(t.id);
         });
+        s.teams.forEach((t, i) => { if (pay.teamIds.includes(t.id)) t.objectives = genManyObjectives(i); });
       }
     }
     s.navVersion = ['v2', 'v3'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
@@ -1268,13 +1274,11 @@
   }
 
   // ART Objectives: team blocks in a balanced masonry (shortest column first).
-  // Three team-name treatments, driven by the active nav version so they can
-  // be compared live with the floating v1/v2/v3 switcher:
-  //   v1 · color rail — colored left border + dot next to the name
-  //   v2 · tinted banner — the name sits in a band washed with the team color
-  //   v3 · team cards — separate cards, solid team-color header, avatar + count
-  const TEAM_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#14b8a6', '#f97316'];
-  const teamColor = (tm) => TEAM_COLORS[Math.max(0, state.teams.indexOf(tm)) % TEAM_COLORS.length];
+  // Three GREY team-name treatments, driven by the active nav version so they
+  // can be compared live with the floating v1/v2/v3 switcher:
+  //   v1 · grey rail — dark left border + dot next to the name
+  //   v2 · grey banner — the name sits in a soft grey band
+  //   v3 · team cards — separate cards with a solid dark-grey header
   function objRow(o, i) {
     return '<div class="ob-item"><div class="ob-t"><b>' + (i + 1) + '</b> ' + esc(o.text) + '</div>' +
       '<div class="ob-meta"><span class="ob-bv">' + o.bv + ' BV</span>' +
@@ -1287,14 +1291,13 @@
   function teamBlock(tm) {
     const objs = tm.objectives || [];
     const com = objs.filter((o) => o.committed), unc = objs.filter((o) => !o.committed);
-    const c = teamColor(tm);
     const count = '<span class="ob-count">' + objs.length + '</span>';
     const av = '<span class="ob-av">' + esc(initials(tm.name)) + '</span>';
     let head;
     if (state.navVersion === 'v2') head = '<div class="ob-head ob-head2">' + av + '<span class="ob-name">' + esc(tm.name) + '</span>' + count + '</div>';
     else if (state.navVersion === 'v3') head = '<div class="ob-head ob-head3">' + av + '<span class="ob-name">' + esc(tm.name) + '</span>' + count + '</div>';
     else head = '<div class="ob-head ob-head1"><i class="ob-dot"></i><span class="ob-name">' + esc(tm.name) + '</span>' + count + '</div>';
-    return '<section class="obj-block" style="--tc:' + c + ';--tcs:' + hexToRgba(c, 0.13) + '">' + head +
+    return '<section class="obj-block">' + head +
       objGroup('Commited', com) + objGroup('Uncommitted', unc) + '</section>';
   }
   function estBlock(tm) {

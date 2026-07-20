@@ -1350,38 +1350,38 @@ body {
 .vf-btn:hover { background: rgba(24, 24, 27, 0.06); color: #18181b; }
 .vf-btn.on { background: #18181b; color: #fff; }
 
-/* ---------- ART Objectives · three team-name treatments (v1/v2/v3) ---------- */
+/* ---------- ART Objectives · three GREY team-name treatments (v1/v2/v3) ---------- */
 .ob-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ob-count {
   margin-left: auto; flex: 0 0 auto; font-size: 11px; font-weight: 700;
   padding: 2px 8px; border-radius: 8px; background: rgba(24, 24, 27, 0.06); color: #44505f;
 }
 .ob-av {
-  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; background: var(--tc, #64748b);
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; background: #52525b;
   color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;
 }
-/* v1 · color rail: colored edge + dot beside the name */
-.obj-d-v1 .obj-block { border-left: 4px solid var(--tc, #64748b); }
+/* v1 · grey rail: dark edge + dot beside the name */
+.obj-d-v1 .obj-block { border-left: 4px solid #a1a1aa; }
 .ob-head1 { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.ob-head1 .ob-dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: var(--tc, #64748b); }
-/* v2 · tinted banner: the name sits in a band washed with the team color */
+.ob-head1 .ob-dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: #52525b; }
+/* v2 · grey banner: the name sits in a soft grey band */
 .ob-head2 {
   display: flex; align-items: center; gap: 9px; margin: -6px -8px 8px; padding: 8px 10px;
-  background: var(--tcs, rgba(100, 116, 139, 0.13)); border-radius: 9px;
+  background: rgba(24, 24, 27, 0.06); border-radius: 9px;
 }
-/* v3 · team cards: separate cards with a solid team-color header */
+/* v3 · team cards: separate cards with a solid dark-grey header */
 .obj-sheet.obj-d-v3 { background: transparent; border: 0; box-shadow: none; }
 .obj-d-v3 .obj-col { border-right: 0; padding: 0 6px; }
 .obj-d-v3 .obj-block {
   background: #fff; border: 1px solid #e3e6ec; border-radius: 12px; margin-bottom: 12px;
-  border-bottom: 1px solid #e3e6ec; box-shadow: 0 6px 18px rgba(20, 30, 50, 0.08); overflow: hidden;
+  box-shadow: 0 6px 18px rgba(20, 30, 50, 0.08); overflow: hidden;
 }
 .ob-head3 {
   display: flex; align-items: center; gap: 9px; margin: -16px -18px 8px; padding: 10px 14px;
-  background: var(--tc, #64748b); color: #fff;
+  background: #3f3f46; color: #fff;
 }
-.ob-head3 .ob-av { background: rgba(255, 255, 255, 0.25); }
-.ob-head3 .ob-count { background: rgba(255, 255, 255, 0.25); color: #fff; }
+.ob-head3 .ob-av { background: rgba(255, 255, 255, 0.22); }
+.ob-head3 .ob-count { background: rgba(255, 255, 255, 0.22); color: #fff; }
 
 /* segmented control (PIE Recipe · Navigation) */
 .seg { display: flex; border: 1px solid var(--r-line); border-radius: 9px; overflow: hidden; }
