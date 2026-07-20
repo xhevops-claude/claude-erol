@@ -1363,16 +1363,13 @@ body {
 }
 .ob-none { margin-left: auto; flex: 0 0 auto; font-size: 11.5px; color: #a1a1aa; }
 
-/* v1 · inverse band: a solid dark bar marks where the team starts */
-.ob-head1 {
-  display: flex; align-items: center; gap: 10px;
-  margin: -16px -18px 10px; padding: 10px 16px;
-  background: #3f3f46; color: #fff;
+/* v1 · name chip: the team name in a compact filled dark pill */
+.ob-head1 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; }
+.ob-head1 .ob-name {
+  flex: 0 1 auto; background: #27272a; color: #fff;
+  font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px;
 }
-.ob-head1 .ob-name { font-size: 13px; font-weight: 700; }
-.ob-head1 .ob-count { background: rgba(255, 255, 255, 0.22); color: #fff; }
-.ob-head1 .ob-none { color: rgba(255, 255, 255, 0.6); }
-.obj-d-v1 .obj-block.obj-empty { padding-bottom: 0; }
+.obj-d-v1 .obj-block.obj-empty { padding-bottom: 12px; }
 .obj-d-v1 .obj-block.obj-empty .ob-head1 { margin-bottom: 0; }
 
 /* v2 · grey banner: the name sits in a soft grey band */
@@ -1382,10 +1379,10 @@ body {
 }
 .obj-d-v2 .obj-block.obj-empty .ob-head2 { margin-bottom: -6px; }
 
-/* v3 · heavy rule: thick dark rule + oversized bold name, flat on the board */
-.obj-d-v3 .obj-block { border-top: 3px solid #52525b; }
-.ob-head3 { display: flex; align-items: center; gap: 10px; margin: -2px 0 8px; }
-.ob-head3 .ob-name { font-size: 16px; font-weight: 800; letter-spacing: -0.2px; }
+/* v3 · numbered heading: oversized ghost ordinal + bold name */
+.ob-head3 { display: flex; align-items: baseline; gap: 9px; margin: 0 0 8px; }
+.ob-num { flex: 0 0 auto; font-size: 23px; font-weight: 800; line-height: 1; color: #d4d4d8; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+.ob-head3 .ob-name { font-size: 14px; font-weight: 800; }
 .obj-d-v3 .obj-block.obj-empty { padding-bottom: 12px; }
 .obj-d-v3 .obj-block.obj-empty .ob-head3 { margin-bottom: 0; }
 
