@@ -249,6 +249,21 @@
       ];
     }
     s.st = s.st || { id: uid(), name: 'Horizon Solution Train' };
+    // Stress case: Payments ART teams carry a LOT of objectives, so the
+    // ART Objectives design options can be judged under crowding.
+    if (!s.objBoost) {
+      s.objBoost = true;
+      const pay = s.arts[1];
+      if (pay) {
+        s.teams.forEach((t, i) => {
+          if (!pay.teamIds.includes(t.id)) return;
+          const many = [];
+          for (let k = 0; k < 9; k++) many.push({ id: uid(), text: OBJ_POOL[(i + k) % OBJ_POOL.length], bv: [8, 10, 13, 5][k % 4], links: (k % 3) + 1, committed: true });
+          for (let k = 0; k < 5; k++) many.push({ id: uid(), text: OBJ_POOL[(i + k + 3) % OBJ_POOL.length], bv: [5, 8, 3][k % 3], links: k % 3, committed: false });
+          t.objectives = many;
+        });
+      }
+    }
     s.navVersion = ['v2', 'v3'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
     s.workMode = s.workMode === 'execution' ? 'execution' : 'planning';
     s.boardCfg = Object.assign({ dates: true, grid: true, compact: false }, s.boardCfg);
@@ -897,6 +912,48 @@
     }
     return '';
   }
+  // ---------- Floating version switcher: draggable, compares v1/v2/v3 live ----------
+  const verfabEl = document.getElementById('verfab');
+  function renderVerfab() {
+    if (boardScreen.hidden) { verfabEl.hidden = true; return; }
+    verfabEl.hidden = false;
+    verfabEl.innerHTML =
+      '<span class="vf-grip" title="Drag to move"><i></i><i></i><i></i><i></i><i></i><i></i></span>' +
+      ['v1', 'v2', 'v3'].map((v) =>
+        '<button class="vf-btn' + (state.navVersion === v ? ' on' : '') + '" type="button" data-ver="' + v + '">' + v + '</button>').join('');
+    try {
+      const pos = JSON.parse(localStorage.getItem('pie-vfpos'));
+      if (pos) { verfabEl.style.left = pos.x + 'px'; verfabEl.style.top = pos.y + 'px'; verfabEl.style.bottom = 'auto'; }
+    } catch (_) {}
+  }
+  let vfDrag = null;
+  verfabEl.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('.vf-grip')) return;
+    const r = verfabEl.getBoundingClientRect();
+    vfDrag = { dx: e.clientX - r.left, dy: e.clientY - r.top, id: e.pointerId };
+    try { verfabEl.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  verfabEl.addEventListener('pointermove', (e) => {
+    if (!vfDrag || e.pointerId !== vfDrag.id) return;
+    const x = Math.max(8, Math.min(e.clientX - vfDrag.dx, window.innerWidth - verfabEl.offsetWidth - 8));
+    const y = Math.max(8, Math.min(e.clientY - vfDrag.dy, window.innerHeight - verfabEl.offsetHeight - 8));
+    verfabEl.style.left = x + 'px'; verfabEl.style.top = y + 'px'; verfabEl.style.bottom = 'auto';
+  });
+  function vfEndDrag(e) {
+    if (!vfDrag || e.pointerId !== vfDrag.id) return;
+    vfDrag = null;
+    const r = verfabEl.getBoundingClientRect();
+    try { localStorage.setItem('pie-vfpos', JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) })); } catch (_) {}
+  }
+  verfabEl.addEventListener('pointerup', vfEndDrag);
+  verfabEl.addEventListener('pointercancel', vfEndDrag);
+  verfabEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ver]'); if (!b) return;
+    state.navVersion = b.dataset.ver;
+    save();
+    renderBoardView();
+  });
+
   // ---------- v3 bottom bar: board utilities + board tools combined ----------
   let magnify = false, trailOn = false, noteScale = 100;
   let btPanel = null; // which tool flyout is open: 'scale' | 'zoom'
@@ -1210,7 +1267,14 @@
       ',1fr);grid-template-rows:repeat(' + rows + ',1fr)">' + cells + '</div>';
   }
 
-  // ART Objectives: team blocks in a balanced masonry (shortest column first)
+  // ART Objectives: team blocks in a balanced masonry (shortest column first).
+  // Three team-name treatments, driven by the active nav version so they can
+  // be compared live with the floating v1/v2/v3 switcher:
+  //   v1 · color rail — colored left border + dot next to the name
+  //   v2 · tinted banner — the name sits in a band washed with the team color
+  //   v3 · team cards — separate cards, solid team-color header, avatar + count
+  const TEAM_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#14b8a6', '#f97316'];
+  const teamColor = (tm) => TEAM_COLORS[Math.max(0, state.teams.indexOf(tm)) % TEAM_COLORS.length];
   function objRow(o, i) {
     return '<div class="ob-item"><div class="ob-t"><b>' + (i + 1) + '</b> ' + esc(o.text) + '</div>' +
       '<div class="ob-meta"><span class="ob-bv">' + o.bv + ' BV</span>' +
@@ -1223,7 +1287,14 @@
   function teamBlock(tm) {
     const objs = tm.objectives || [];
     const com = objs.filter((o) => o.committed), unc = objs.filter((o) => !o.committed);
-    return '<section class="obj-block"><div class="ob-head">' + esc(tm.name) + '</div>' +
+    const c = teamColor(tm);
+    const count = '<span class="ob-count">' + objs.length + '</span>';
+    const av = '<span class="ob-av">' + esc(initials(tm.name)) + '</span>';
+    let head;
+    if (state.navVersion === 'v2') head = '<div class="ob-head ob-head2">' + av + '<span class="ob-name">' + esc(tm.name) + '</span>' + count + '</div>';
+    else if (state.navVersion === 'v3') head = '<div class="ob-head ob-head3">' + av + '<span class="ob-name">' + esc(tm.name) + '</span>' + count + '</div>';
+    else head = '<div class="ob-head ob-head1"><i class="ob-dot"></i><span class="ob-name">' + esc(tm.name) + '</span>' + count + '</div>';
+    return '<section class="obj-block" style="--tc:' + c + ';--tcs:' + hexToRgba(c, 0.13) + '">' + head +
       objGroup('Commited', com) + objGroup('Uncommitted', unc) + '</section>';
   }
   function estBlock(tm) {
@@ -1242,7 +1313,7 @@
     boardW = availW;
     canvas.style.width = boardW + 'px';
     canvas.style.height = 'auto';
-    canvas.innerHTML = '<div class="obj-sheet">' + cols.map((teams, ci) =>
+    canvas.innerHTML = '<div class="obj-sheet obj-d-' + state.navVersion + '">' + cols.map((teams, ci) =>
       '<div class="obj-col' + (ci === COLS - 1 ? ' last-col' : '') + '">' +
       teams.map(teamBlock).join('') + '</div>').join('') + '</div>';
     boardH = Math.max(canvas.firstChild.scrollHeight, availH);
@@ -1688,6 +1759,7 @@
     renderConvo();
     renderBtools();
     renderStickyPanel();
+    renderVerfab();
     renderZoomCtl();
     renderCanvas();
     fitView();
@@ -1957,6 +2029,7 @@
   }
   function exitBoard() {
     boardScreen.hidden = true; shell.hidden = false;
+    verfabEl.hidden = true;
     navigate(currentPage);
   }
 
