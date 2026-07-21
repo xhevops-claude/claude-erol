@@ -380,6 +380,21 @@
       vote: '<path d="M7 11l3-7a2 2 0 012 2v4h5.2a2 2 0 012 2.3l-1 5.4A2 2 0 0116.2 19H9a2 2 0 01-2-2z"/><path d="M7 11H4v8h3"/>',
       chat: '<path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2h-6l-5.2 4V6z"/><path d="M8 8.5h8M8 11.5h5"/>',
       present: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v3M8.5 21h7"/>',
+      // sticky action bar
+      sqtype: '<rect x="4" y="4" width="16" height="16" rx="3.5"/>',
+      alm: '<path d="M12 3l8.5 9-8.5 9-8.5-9z"/>',
+      statusdot: '<circle cx="12" cy="12" r="7.5"/>',
+      link: '<path d="M9 15l6-6"/><path d="M8.4 12.6l-1.6 1.6a3.4 3.4 0 004.8 4.8l1.6-1.6"/><path d="M15.6 11.4l1.6-1.6a3.4 3.4 0 00-4.8-4.8l-1.6 1.6"/>',
+      trash: '<path d="M4 7h16"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M6.5 7l1 12a1 1 0 001 1h7a1 1 0 001-1l1-12"/>',
+      removebox: '<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M8.5 12h7"/>',
+      unplan: '<path d="M20 5v14"/><path d="M16.5 12H4"/><path d="M9 7l-5 5 5 5"/>',
+      move: '<path d="M6 7l5 5-5 5"/><path d="M13 7l5 5-5 5"/>',
+      mirror: '<rect x="3.5" y="8" width="9" height="12" rx="1.5"/><rect x="13.5" y="4" width="7" height="9" rx="1.5" stroke-dasharray="2.6 2"/>',
+      pin: '<circle cx="12" cy="8" r="4"/><path d="M12 12v9"/>',
+      dupe: '<rect x="8" y="8" width="12" height="12" rx="2.2"/><path d="M4 16V6a2 2 0 012-2h10"/>',
+      share: '<circle cx="6" cy="12" r="2.4"/><circle cx="17" cy="6" r="2.4"/><circle cx="17" cy="18" r="2.4"/><path d="M8.2 11l6.6-3.6M8.2 13l6.6 3.6"/>',
+      breakdown: '<rect x="9" y="3" width="6" height="5" rx="1.2"/><rect x="3" y="16" width="6" height="5" rx="1.2"/><rect x="15" y="16" width="6" height="5" rx="1.2"/><path d="M6 16v-2h12v2M12 8v6"/>',
+      activity: '<path d="M3 12h4l2.5 6 4-13 2.5 7H21"/>',
     };
     return '<svg class="' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (P[name] || '') + '</svg>';
   }
@@ -415,6 +430,12 @@
   let panelMode = 'people'; // which panel: 'people' (team+chats) | 'board' (board incl. stickies)
   let cvFilter = 'team';   // people-panel tab: team | chat
   let stickyOpen = null;   // sticky title whose on-note thread is open
+  let sbCard = null;       // card whose action bar is open
+  let sbAnchor = null;     // screen rect of that note
+  let sbSub = null;        // open action-bar sub-panel key
+  let pinned = null;       // pinned card id (focus mode)
+  let linkMode = null;     // source card id while string-linking
+  let modalCard = null;    // card context for breakdown / links overlay
   let menuOpen = null;     // which top-nav dropdown is open
 
   // v4 exists only as a design variant slot (ART Objectives); its navigation
@@ -1086,7 +1107,10 @@
   function closeModal() {
     modalType = null; timerRun = false; clearInterval(timerIv);
     modalEl.hidden = true; modalEl.innerHTML = '';
+    modalEl.classList.remove('pm-wide');
   }
+  function openBreakdown(c) { closeStickyBar(); modalCard = c; modalType = 'breakdown'; modalEl.classList.add('pm-wide'); renderModal(); }
+  function openLinksOverlay(c) { modalCard = c; modalType = 'sblinks'; modalEl.classList.add('pm-wide'); renderModal(); }
   function modalBox(title, body) {
     return '<div class="pm-box"><div class="pm-h"><b>' + title + '</b>' +
       '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' + body + '</div>';
@@ -1139,14 +1163,56 @@
         '<div class="pm-help">' +
           '<div><b>⌘K</b> open the Hub — search stickies, boards and pages</div>' +
           '<div><b>Drag</b> pans the board · <b>scroll</b> zooms</div>' +
-          '<div><b>Click a sticky</b> to open its conversation</div>' +
+          '<div><b>Click a sticky</b> opens its action bar · <b>💬 badge</b> opens comments</div>' +
           '<div><b>Dock</b> switches Planning / Execution mode</div>' +
           '<div><b>esc</b> closes panels and overlays</div>' +
         '</div>');
+    } else if (modalType === 'breakdown') {
+      const c = modalCard || {};
+      modalEl.innerHTML =
+        '<div class="pm-full"><div class="pm-full-h">' +
+          '<div class="pm-full-t"><span class="pm-kicker">Breakdown</span><h2>' + esc(c.title || '') + '</h2>' +
+            '<div class="pm-full-meta"><span class="sb-swatch s-' + stypeOf(c) + '"></span>' + stypeLabel(stypeOf(c)) +
+              ' · ' + (Number(c.points) || 0) + ' pts · ' + statusLabel(statusOf(c)) + '</div></div>' +
+          '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' +
+          '<div class="pm-full-b"><div class="pm-placeholder">' + bIcon('breakdown', 'pm-ph-ico') +
+            '<h3>Break this sticky into smaller work</h3>' +
+            '<p>The full breakdown workspace opens here — split a feature into stories, an epic into features, and push the results back to the board. You’ll define what this does in the next step.</p></div></div></div>';
+    } else if (modalType === 'sblinks') {
+      const c = modalCard || {};
+      const linked = new Set(linkedIdsFor(c));
+      const section = (title, cards) => cards.length ? '<div class="ov-grp">' + esc(title) + '</div><div class="ov-tiles">' +
+        cards.map((x) => '<button class="ov-tile' + (linked.has(x.id) ? ' on' : '') + (x.id === c.id ? ' self' : '') + '" type="button" data-link-id="' + x.id + '"' + (x.id === c.id ? ' disabled' : '') + '>' +
+          '<i class="sb-swatch s-' + stypeOf(x) + '"></i><span>' + esc(x.title) + '</span>' + (linked.has(x.id) ? '<span class="ov-ck">✓</span>' : '') + '</button>').join('') + '</div>' : '';
+      let cols = '';
+      state.arts.forEach((a) => {
+        let inner = '';
+        state.teams.filter((t) => a.teamIds.includes(t.id)).forEach((t) => {
+          inner += section(t.name, state.cards.filter((x) => x.teamId === t.id));
+        });
+        if (inner) cols += '<div class="ov-art"><div class="ov-art-h">' + esc(a.name) + '</div>' + inner + '</div>';
+      });
+      modalEl.innerHTML =
+        '<div class="pm-full"><div class="pm-full-h">' +
+          '<div class="pm-full-t"><span class="pm-kicker">Link stickies</span><h2>' + esc(c.title || '') + '</h2>' +
+            '<div class="pm-full-meta">' + linked.size + ' linked · pick stickies across ' + esc(state.st.name) + '</div></div>' +
+          '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' +
+          '<div class="pm-full-b ov-body">' + (cols || '<div class="sb-empty">No stickies to link.</div>') + '</div></div>';
     }
   }
   modalEl.addEventListener('click', (e) => {
     if (e.target === modalEl) return closeModal();
+    const lk = e.target.closest('[data-link-id]');
+    if (lk && modalCard) {
+      const target = card(lk.dataset.linkId);
+      if (target && target.id !== modalCard.id) {
+        const linked = linkedIdsFor(modalCard).includes(target.id);
+        if (linked) removeLink(modalCard, target.id); else addLink(modalCard, target);
+        save(); renderModal();
+        if (!boardScreen.hidden) renderCanvas();
+      }
+      return;
+    }
     const b = e.target.closest('[data-pm]'); if (!b) return;
     const a = b.dataset.pm;
     if (a === 'close') return closeModal();
@@ -1200,6 +1266,33 @@
   }
 
   // ---------- Sticky notes ----------
+  // ---------- Sticky metadata (type / status / links / activity) ----------
+  const STYPES = [['feature', 'Feature'], ['story', 'User story'], ['dependency', 'Dependency'], ['note', 'Note']];
+  const STATUSES = [['todo', 'To Do'], ['doing', 'In Progress'], ['done', 'Done']];
+  const KIND_TO_STYPE = { feature: 'feature', enabler: 'dependency', milestone: 'note', story: 'story' };
+  const stypeOf = (c) => c.stype || KIND_TO_STYPE[c.kind] || 'story';
+  const statusOf = (c) => c.status || 'todo';
+  const stypeLabel = (k) => (STYPES.find((s) => s[0] === k) || ['', k])[1];
+  const statusLabel = (k) => (STATUSES.find((s) => s[0] === k) || ['', k])[1];
+  // Links are symmetric: A↔B if either lists the other.
+  function linkedIdsFor(c) {
+    const set = new Set(c.links || []);
+    state.cards.forEach((o) => { if (o.id !== c.id && (o.links || []).includes(c.id)) set.add(o.id); });
+    return [...set].filter((id) => card(id));
+  }
+  function activityOf(c) {
+    if (!c.activity) c.activity = [
+      { who: 'Mara Kim', what: 'created this sticky', ago: '3d' },
+      { who: 'Ari Ruiz', what: 'set points to ' + (c.points || 0), ago: '2d' },
+      { who: 'Tom Sato', what: 'moved it to ' + statusLabel(statusOf(c)), ago: '1d' },
+    ];
+    return c.activity;
+  }
+  function logActivity(c, what) {
+    activityOf(c).unshift({ who: state.user.name, what, ago: 'now' });
+    c.activity = c.activity.slice(0, 20);
+  }
+
   const NOTE_COLS = 4, NOTE_W = 96, NOTE_H = 66, NOTE_GX = 12, NOTE_GY = 14;
   function noteHtml(c, i) {
     const h = hashCode(c.id);
@@ -1211,9 +1304,18 @@
     const done = Math.round(prog * 0.6);
     const th = state.threads && state.threads.find((t) => t.kind === 'sticky' && t.sticky === c.title);
     const cvCount = th ? 1 + (th.replies || []).length : 0;
-    const active = stickyOpen === c.title;
-    return '<div class="note k-' + c.kind + (active ? ' n-active' : '') + '" style="left:' + x + 'px;top:' + y + 'px">' +
+    const st = stypeOf(c), status = statusOf(c);
+    let cls = 'note s-' + st + ' st-' + status;
+    if (stickyOpen === c.title) cls += ' n-active';
+    if (sbCard && sbCard.id === c.id) cls += ' n-open';
+    if (pinned) {
+      if (pinned === c.id) cls += ' n-pinned';
+      else if (linkedIdsFor(card(pinned) || {}).includes(c.id)) cls += ' n-linked';
+      else cls += ' n-dim';
+    }
+    return '<div class="' + cls + '" data-id="' + c.id + '" style="left:' + x + 'px;top:' + y + 'px">' +
       '<span class="n-tab"></span>' +
+      '<span class="n-pip" title="' + statusLabel(status) + '"></span>' +
       (cvCount ? '<span class="n-cv" title="' + cvCount + ' comment' + (cvCount > 1 ? 's' : '') + ' — click to read">' + cvCount + '</span>' : '') +
       '<div class="n-text">' + esc(c.title) + '</div>' +
       '<div class="n-bar"><i class="n-done" style="width:' + done + '%"></i><i class="n-doing" style="width:' + (prog - done) + '%"></i></div>' +
@@ -1653,10 +1755,203 @@
   canvas.addEventListener('click', (e) => {
     if (chromeV() !== 'v3') return;
     const n = e.target.closest('.note'); if (!n) return;
-    const txt = n.querySelector('.n-text'); if (!txt) return;
-    const title = txt.textContent;
-    if (stickyOpen === title) { closeStickyPanel(); return; }
-    openStickyPanel(title, n.getBoundingClientRect());
+    const c = card(n.dataset.id); if (!c) return;
+    // String-linking: second click picks the target.
+    if (linkMode && linkMode !== c.id) { addLink(card(linkMode), c); linkMode = null; setLinkHint(''); refreshSticky(); return; }
+    // The 💬 badge opens the conversation popover; the note body opens the action bar.
+    if (e.target.closest('.n-cv')) {
+      closeStickyBar();
+      if (stickyOpen === c.title) closeStickyPanel(); else openStickyPanel(c.title, n.getBoundingClientRect());
+      return;
+    }
+    closeStickyPanel();
+    if (sbCard && sbCard.id === c.id) { closeStickyBar(); return; }
+    openStickyBar(c, n.getBoundingClientRect());
+  });
+
+  // ---------- Sticky action bar (opens above the clicked sticky) ----------
+  const sbEl = document.getElementById('stickybar');
+  const pinbEl = document.getElementById('pinbanner');
+  const SB_ITEMS = [
+    ['type', 'sqtype', 'Change type'],
+    ['alm', 'alm', 'ALM'],
+    ['status', 'statusdot', 'Status'],
+    ['points', null, 'Points'],
+    ['project', 'folder', 'Project (soon)', true],
+    ['links', 'link', 'Links'],
+    ['delete', 'trash', 'Delete'],
+    ['remove', 'removebox', 'Remove (soon)', true],
+    ['unplan', 'unplan', 'Unplan (soon)', true],
+    ['move', 'move', 'Move (soon)', true],
+    ['mirror', 'mirror', 'Mirror (soon)', true],
+    ['pin', 'pin', 'Pin — focus & show links'],
+    ['duplicate', 'dupe', 'Duplicate'],
+    ['share', 'share', 'Share (soon)', true],
+    ['breakdown', 'breakdown', 'Breakdown'],
+    ['activity', 'activity', 'Activity'],
+  ];
+  function noteRectById(id) {
+    const n = canvas.querySelector('.note[data-id="' + id + '"]');
+    return n ? n.getBoundingClientRect() : null;
+  }
+  function placeStickyBar() {
+    if (!sbAnchor) return;
+    const vw = window.innerWidth, W = Math.min(sbEl.offsetWidth || 600, vw - 24);
+    let left = sbAnchor.left + sbAnchor.width / 2 - W / 2;
+    left = Math.max(12, Math.min(left, vw - W - 12));
+    let top = sbAnchor.top - (sbEl.offsetHeight || 48) - 10;
+    if (top < 58) top = sbAnchor.bottom + 10; // flip below if no room above
+    sbEl.style.left = left + 'px';
+    sbEl.style.top = top + 'px';
+  }
+  function openStickyBar(c, rect) {
+    sbCard = c; sbSub = null;
+    if (!boardScreen.hidden && mode === 'board') renderCanvas(); // highlight the note first
+    sbAnchor = noteRectById(c.id) || rect;
+    renderStickyBar();
+  }
+  function closeStickyBar() {
+    if (!sbCard) return;
+    sbCard = null; sbAnchor = null; sbSub = null;
+    sbEl.hidden = true; sbEl.innerHTML = '';
+    if (!boardScreen.hidden && mode === 'board') renderCanvas();
+  }
+  function refreshSticky() {
+    // re-render board + keep the bar anchored to the same note
+    if (!boardScreen.hidden && mode === 'board') renderCanvas();
+    if (sbCard) { sbAnchor = noteRectById(sbCard.id); renderStickyBar(); }
+    save();
+  }
+  function sbBtn(it) {
+    const [key, ico, title, soon] = it;
+    const on = sbSub === key || (key === 'pin' && pinned === (sbCard || {}).id);
+    const inner = key === 'points'
+      ? '<span class="sb-pts">' + (Number((sbCard || {}).points) || 0) + '</span>'
+      : bIcon(ico, 'sb-ico sb-' + key);
+    return '<button class="sb-btn' + (on ? ' on' : '') + (soon ? ' soon' : '') + '" type="button" data-sb="' + key + '"' +
+      (soon ? ' disabled' : '') + ' title="' + esc(title) + '">' + inner + '</button>';
+  }
+  function sbSubHtml() {
+    const c = sbCard; if (!c || !sbSub) return '';
+    let body = '';
+    if (sbSub === 'type') {
+      body = '<div class="sb-menu-h">Sticky type</div>' + STYPES.map(([k, label]) =>
+        '<button class="sb-mi' + (stypeOf(c) === k ? ' on' : '') + '" type="button" data-stype="' + k + '">' +
+        '<i class="sb-swatch s-' + k + '"></i>' + label + (stypeOf(c) === k ? '<span class="sb-ck">✓</span>' : '') + '</button>').join('');
+    } else if (sbSub === 'status') {
+      body = '<div class="sb-menu-h">Status</div>' + STATUSES.map(([k, label]) =>
+        '<button class="sb-mi' + (statusOf(c) === k ? ' on' : '') + '" type="button" data-status="' + k + '">' +
+        '<i class="sb-pip st-' + k + '"></i>' + label + (statusOf(c) === k ? '<span class="sb-ck">✓</span>' : '') + '</button>').join('');
+    } else if (sbSub === 'points') {
+      body = '<div class="sb-menu-h">Story points</div>' +
+        '<form class="sb-pform" id="sb-pform"><input type="number" min="0" step="1" value="' + (Number(c.points) || 0) + '" aria-label="Points" />' +
+        '<button class="sb-save" type="submit">Set</button></form>' +
+        '<div class="sb-pchips">' + [1, 2, 3, 5, 8, 13].map((p) => '<button class="sb-pchip" type="button" data-pts="' + p + '">' + p + '</button>').join('') + '</div>';
+    } else if (sbSub === 'alm') {
+      const conn = state.connections[0] || { name: 'platform-jira', type: 'Jira' };
+      body = '<div class="sb-menu-h">ALM</div>' +
+        '<div class="sb-alminfo"><div class="sb-alm-r"><span>Source</span><b>' + esc(conn.type) + '</b></div>' +
+        '<div class="sb-alm-r"><span>Board</span><b>' + esc(conn.name) + '</b></div>' +
+        '<div class="sb-alm-r"><span>External ID</span><b>' + esc(conn.type.slice(0, 3).toUpperCase()) + '-' + (100 + (Math.abs(hashCode(c.id)) % 900)) + '</b></div>' +
+        '<div class="sb-alm-r"><span>Status</span><b>' + statusLabel(statusOf(c)) + '</b></div>' +
+        '<div class="sb-alm-r"><span>Last sync</span><b>2h ago</b></div></div>';
+    } else if (sbSub === 'links') {
+      const linked = linkedIdsFor(c);
+      body = '<div class="sb-menu-h">Links · ' + linked.length + '</div>' +
+        '<button class="sb-mi" type="button" data-link-string>' + bIcon('cursor', 'sb-mico') + 'Link with string' + (linkMode === c.id ? '<span class="sb-ck">…</span>' : '') + '</button>' +
+        '<button class="sb-mi" type="button" data-link-browse>' + bIcon('solplan', 'sb-mico') + 'Browse organization…</button>' +
+        (linked.length ? '<div class="sb-links">' + linked.map((id) => {
+          const lc = card(id), t = team(lc.teamId);
+          return '<div class="sb-linkrow"><span>' + esc(lc.title) + '<small>' + esc((t || {}).name || '') + '</small></span>' +
+            '<button class="sb-unlink" type="button" data-unlink="' + id + '" title="Unlink">✕</button></div>';
+        }).join('') + '</div>' : '<div class="sb-empty">No links yet.</div>');
+    } else if (sbSub === 'activity') {
+      body = '<div class="sb-menu-h">Activity</div>' +
+        '<div class="sb-acts">' + activityOf(c).map((a) =>
+          '<div class="sb-act"><b>' + esc(a.who) + '</b> ' + esc(a.what) + '<small>' + esc(a.ago) + '</small></div>').join('') + '</div>';
+    }
+    return '<div class="sb-sub">' + body + '</div>';
+  }
+  function renderStickyBar() {
+    if (!sbCard) { sbEl.hidden = true; sbEl.innerHTML = ''; return; }
+    sbEl.hidden = false;
+    sbEl.innerHTML = '<div class="sb-bar">' + SB_ITEMS.map(sbBtn).join('') + '</div>' + sbSubHtml();
+    const pf = document.getElementById('sb-pform');
+    if (pf) pf.addEventListener('submit', (e) => {
+      e.preventDefault();
+      setPoints(sbCard, Number(pf.querySelector('input').value) || 0);
+    });
+    placeStickyBar(); // synchronous: offsetWidth is valid now that it's rendered
+  }
+  function setType(c, k) { c.stype = k; logActivity(c, 'changed type to ' + stypeLabel(k)); sbSub = null; refreshSticky(); }
+  function setStatus(c, k) { c.status = k; logActivity(c, 'moved to ' + statusLabel(k)); sbSub = null; refreshSticky(); }
+  function setPoints(c, p) { c.points = Math.max(0, p); logActivity(c, 'set points to ' + c.points); sbSub = null; refreshSticky(); if (!boardScreen.hidden) renderCanvas(); }
+  function addLink(a, b) {
+    if (!a || !b) return;
+    a.links = a.links || [];
+    if (!a.links.includes(b.id) && !(b.links || []).includes(a.id)) { a.links.push(b.id); logActivity(a, 'linked to “' + b.title + '”'); }
+  }
+  function removeLink(a, bId) {
+    if (a.links) a.links = a.links.filter((id) => id !== bId);
+    const b = card(bId); if (b && b.links) b.links = b.links.filter((id) => id !== a.id);
+    logActivity(a, 'removed a link');
+  }
+  function deleteCard(c) {
+    if (!confirm('Delete “' + c.title + '”?')) return;
+    state.cards = state.cards.filter((x) => x.id !== c.id);
+    state.cards.forEach((x) => { if (x.links) x.links = x.links.filter((id) => id !== c.id); });
+    if (pinned === c.id) togglePin(c);
+    closeStickyBar(); save(); if (!boardScreen.hidden) renderCanvas();
+  }
+  function duplicateCard(c) {
+    const copy = Object.assign({}, c, { id: uid(), title: c.title + ' (copy)', links: [], activity: null });
+    state.cards.push(copy);
+    closeStickyBar(); save(); if (!boardScreen.hidden) renderCanvas();
+  }
+  function togglePin(c) {
+    pinned = pinned === c.id ? null : c.id;
+    boardScreen.classList.toggle('pin-focus', !!pinned);
+    closeStickyBar();
+    renderPinBanner();
+    if (!boardScreen.hidden) renderCanvas();
+  }
+  function renderPinBanner() {
+    if (!pinned) { pinbEl.hidden = true; pinbEl.innerHTML = ''; return; }
+    const c = card(pinned); if (!c) { pinbEl.hidden = true; return; }
+    const n = linkedIdsFor(c).length;
+    pinbEl.hidden = false;
+    pinbEl.innerHTML = bIcon('pin', 'pb-ico') + '<b>' + esc(c.title) + '</b>' +
+      '<span>' + n + ' linked stick' + (n === 1 ? 'y' : 'ies') + '</span>' +
+      '<button class="pb-exit" type="button" data-pin-exit>Exit focus</button>';
+  }
+  pinbEl.addEventListener('click', (e) => { if (e.target.closest('[data-pin-exit]')) togglePin(card(pinned) || {}); });
+  function setLinkHint(text) {
+    if (!text) { pinbEl.hidden = !!pinned ? false : true; if (pinned) renderPinBanner(); else { pinbEl.hidden = true; pinbEl.innerHTML = ''; } return; }
+    pinbEl.hidden = false;
+    pinbEl.innerHTML = bIcon('cursor', 'pb-ico') + '<b>Linking</b><span>' + esc(text) + '</span>' +
+      '<button class="pb-exit" type="button" data-link-cancel>Cancel</button>';
+  }
+  pinbEl.addEventListener('click', (e) => { if (e.target.closest('[data-link-cancel]')) { linkMode = null; setLinkHint(''); } });
+
+  sbEl.addEventListener('click', (e) => {
+    e.stopPropagation(); // re-render detaches targets; the document outside-click check would misfire
+    const c = sbCard; if (!c) return;
+    const mi = e.target.closest('[data-stype],[data-status],[data-pts],[data-unlink],[data-link-string],[data-link-browse]');
+    if (mi) {
+      if (mi.dataset.stype != null) return setType(c, mi.dataset.stype);
+      if (mi.dataset.status != null) return setStatus(c, mi.dataset.status);
+      if (mi.dataset.pts != null) return setPoints(c, Number(mi.dataset.pts));
+      if (mi.dataset.unlink != null) { removeLink(c, mi.dataset.unlink); return refreshSticky(); }
+      if (mi.hasAttribute('data-link-string')) { linkMode = c.id; setLinkHint('Click another sticky to link it to “' + c.title + '”'); closeStickyBar(); return; }
+      if (mi.hasAttribute('data-link-browse')) { openLinksOverlay(c); return; }
+    }
+    const b = e.target.closest('[data-sb]'); if (!b) return;
+    const a = b.dataset.sb;
+    if (['type', 'alm', 'status', 'points', 'links', 'activity'].includes(a)) { sbSub = sbSub === a ? null : a; renderStickyBar(); requestAnimationFrame(placeStickyBar); return; }
+    if (a === 'delete') return deleteCard(c);
+    if (a === 'duplicate') return duplicateCard(c);
+    if (a === 'pin') return togglePin(c);
+    if (a === 'breakdown') return openBreakdown(c);
   });
 
   function renderCanvasIfVisible() { if (!boardScreen.hidden) { renderCanvas(); fitView(); } }
@@ -1720,6 +2015,12 @@
     if (!pan || e.pointerId !== pan.id) return;
     view.x = pan.vx + (e.clientX - pan.x);
     view.y = pan.vy + (e.clientY - pan.y);
+    // a real pan (not a click) detaches the sticky popovers — close them
+    if (!pan.moved && Math.abs(e.clientX - pan.x) + Math.abs(e.clientY - pan.y) > 6) {
+      pan.moved = true;
+      if (sbCard) closeStickyBar();
+      if (stickyOpen) closeStickyPanel();
+    }
     clampView(); applyView();
   });
   function endPan(e) { if (pan && e.pointerId === pan.id) { pan = null; canvasWrap.classList.remove('grabbing'); } }
@@ -1798,10 +2099,13 @@
     renderConvo();
     renderBtools();
     renderStickyPanel();
+    renderStickyBar();
+    renderPinBanner();
     renderVerfab();
     renderZoomCtl();
     renderCanvas();
     fitView();
+    if (sbCard) { sbAnchor = noteRectById(sbCard.id) || sbAnchor; placeStickyBar(); }
   }
 
   // ---------- Theming (driven by PIE Recipe) ----------
@@ -1945,6 +2249,8 @@
     if (menuOpen && !e.target.closest('.bn-dd')) closeNavMenus();
     if ((utilPanel || btPanel) && !e.target.closest('.btools')) { utilPanel = null; btPanel = null; if (!boardScreen.hidden) renderBtools(); }
     if (dockPanel && !e.target.closest('.dock')) { dockPanel = null; if (!boardScreen.hidden) renderDock(); }
+    // click away from the sticky action bar (but not onto a note — that reopens it)
+    if (sbCard && !e.target.closest('.stickybar') && !e.target.closest('.note')) closeStickyBar();
   });
 
   function navigate(page) { currentPage = page; renderSide(); renderPage(page); mainEl.scrollTop = 0; updateHash(); }
@@ -2069,6 +2375,8 @@
   function exitBoard() {
     boardScreen.hidden = true; shell.hidden = false;
     verfabEl.hidden = true;
+    closeStickyBar(); linkMode = null; setLinkHint('');
+    if (pinned) { pinned = null; boardScreen.classList.remove('pin-focus'); renderPinBanner(); }
     navigate(currentPage);
   }
 
@@ -2320,6 +2628,10 @@
       if (modalType) { closeModal(); return; }
       if (hubOpen) { closeHub(); return; }
       if (paletteOpen) { closePalette(); return; }
+      if (linkMode) { linkMode = null; setLinkHint(''); return; }
+      if (sbSub) { sbSub = null; renderStickyBar(); requestAnimationFrame(placeStickyBar); return; }
+      if (sbCard) { closeStickyBar(); return; }
+      if (pinned) { togglePin(card(pinned) || {}); return; }
       if (stickyOpen) { closeStickyPanel(); return; }
       if (dockPanel) { dockPanel = null; if (!boardScreen.hidden) renderDock(); return; }
       if (utilPanel || btPanel) { utilPanel = null; btPanel = null; if (!boardScreen.hidden) renderBtools(); return; }
