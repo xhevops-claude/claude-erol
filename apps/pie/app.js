@@ -1109,8 +1109,115 @@
     modalEl.hidden = true; modalEl.innerHTML = '';
     modalEl.classList.remove('pm-wide');
   }
-  function openBreakdown(c) { closeStickyBar(); modalCard = c; modalType = 'breakdown'; modalEl.classList.add('pm-wide'); renderModal(); }
+  function openBreakdown(c) { closeStickyBar(); modalCard = c; modalType = 'breakdown'; bdQuery = ''; bdCollapsed = {}; modalEl.classList.add('pm-wide'); renderModal(); }
   function openLinksOverlay(c) { modalCard = c; modalType = 'sblinks'; modalEl.classList.add('pm-wide'); renderModal(); }
+
+  // ---------- Breakdown model: the sticky's connections as team-lanes × iteration-columns ----------
+  let bdCollapsed = {}, bdQuery = '';
+  const bdCache = {};
+  const BD_ROLES = ['a fitness enthusiast', 'a student', 'a busy professional', 'a couple who share a bed', 'a shift worker', 'a frequent traveler', 'a new parent'];
+  const BD_GOALS = [
+    'correlate my sleep quality with my training intensity to optimize recovery.',
+    'understand my sleep cycles to better plan my study and rest times for optimal learning.',
+    'get insights into my REM and deep sleep stages to improve my sleep hygiene.',
+    'track our individual sleep cycles to find the best bedtime routine that suits both of us.',
+    'receive a smart alarm that wakes me at the optimal point in my cycle.',
+    'export my nightly data so I can share it with my doctor.',
+  ];
+  const BD_DEPS = [
+    'Data pipeline from intelligent sleep detection must be available for analysis modules.',
+    'Visualization layer and export capabilities needed for advanced analytics.',
+    'Auth service must expose per-user sleep scopes before rollout.',
+  ];
+  const BD_FEATS = ['Nightly summary report', 'Smart wake window', 'Trend dashboard', 'Partner comparison view', 'Another Feature'];
+  const BD_RISKS = [
+    'Delay in integration of sleep insight algorithms; complexity in REM/deep sleep staging.',
+    'Accuracy of sleep detection may drop for shift workers and travelers with irregular cycles.',
+    'User-story dependencies on the visualization layer could delay actionable insights.',
+    'Risk of overrun in device logic due to hardware API limitations.',
+  ];
+  function seededRng(str) { let h = (hashCode(str) >>> 0) || 1; return () => { h = (h * 1664525 + 1013904223) >>> 0; return h / 4294967296; }; }
+  const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
+  function breakdownModel(c) {
+    if (bdCache[c.id]) return bdCache[c.id];
+    const art = ctxArt();
+    const lanes = state.teams.filter((t) => art.teamIds.includes(t.id));
+    const cols = state.sprints.map((s, i) => ({ name: s, idx: i }));
+    const items = {};
+    let idn = 200;
+    lanes.forEach((lane) => {
+      cols.forEach((col, ci) => {
+        const rng = seededRng(c.id + ':' + lane.id + ':' + ci);
+        const n = rng() < 0.28 ? 0 : rng() < 0.7 ? 1 : 2;
+        const arr = [];
+        for (let k = 0; k < n; k++) {
+          const r = rng();
+          const type = r > 0.86 ? 'feature' : r > 0.72 ? 'dependency' : 'story';
+          const links = 1 + Math.floor(rng() * 3);
+          const pts = [3, 5, 8, 10, 13][Math.floor(rng() * 5)];
+          if (type === 'story') arr.push({ type, id: ++idn, text: 'As ' + pick(BD_ROLES, rng) + ', I want to ' + pick(BD_GOALS, rng), links, pts });
+          else if (type === 'feature') arr.push({ type, id: ++idn, text: pick(BD_FEATS, rng), links, pts });
+          else {
+            const other = lanes[Math.floor(rng() * lanes.length)];
+            const to = other && other.id !== lane.id ? other.name : lanes[(lanes.indexOf(lane) + 1) % lanes.length].name;
+            arr.push({ type, id: ++idn, text: pick(BD_DEPS, rng), links, from: lane.name, to });
+          }
+        }
+        items[lane.id + ':' + ci] = arr;
+      });
+      const rr = seededRng(c.id + ':risk:' + lane.id);
+      const rn = rr() < 0.45 ? 0 : rr() < 0.8 ? 1 : 2;
+      const risks = [];
+      for (let k = 0; k < rn; k++) risks.push({ type: 'risk', text: pick(BD_RISKS, rr), links: 1 + Math.floor(rr() * 3) });
+      items[lane.id + ':risk'] = risks;
+    });
+    const model = { lanes, cols, items };
+    bdCache[c.id] = model;
+    return model;
+  }
+  function bdCardHtml(it) {
+    const lk = '<span class="bd-c-lk">' + bIcon('link', 'bd-lkico') + it.links + '</span>';
+    if (it.type === 'risk') {
+      return '<div class="bd-card bd-risk"><div class="bd-c-top"><span class="bd-c-type">Risk</span></div>' +
+        '<div class="bd-c-body">' + esc(it.text) + '</div>' +
+        '<div class="bd-c-foot"><span class="bd-c-av"></span>' + lk + '</div></div>';
+    }
+    const idb = '<span class="bd-c-id">' + bIcon('alm', 'bd-idico') + 'ID-' + it.id + '</span>';
+    if (it.type === 'dependency') {
+      return '<div class="bd-card bd-dependency"><div class="bd-c-top"><span class="bd-c-type">Dependency</span></div>' +
+        '<div class="bd-c-body">' + esc(it.text) + '</div>' + lk +
+        '<div class="bd-c-dep">' + esc(it.from) + ' <span>→</span> ' + esc(it.to) + '</div></div>';
+    }
+    const label = it.type === 'feature' ? 'Feature' : 'User Story';
+    return '<div class="bd-card bd-' + it.type + '"><div class="bd-c-top"><span class="bd-c-type">' + label + '</span>' + idb + '</div>' +
+      '<div class="bd-c-body">' + esc(it.text) + '</div>' +
+      '<div class="bd-c-foot"><span class="bd-c-av"></span>' + lk + '<span class="bd-c-pts">' + it.pts + '</span></div></div>';
+  }
+  function bdMatch(it) { return !bdQuery || (it.text || '').toLowerCase().indexOf(bdQuery) >= 0; }
+  function breakdownHtml(c) {
+    const m = breakdownModel(c);
+    const ncol = m.cols.length + 1; // + Risks
+    const colCount = (ci) => m.lanes.reduce((a, l) => a + (m.items[l.id + ':' + ci] || []).filter(bdMatch).length, 0);
+    const riskCount = m.lanes.reduce((a, l) => a + (m.items[l.id + ':risk'] || []).filter(bdMatch).length, 0);
+    let head = m.cols.map((col, ci) => '<div class="bd-col-h"><span>' + esc(col.name) + '</span><b>' + colCount(ci) + '</b></div>').join('') +
+      '<div class="bd-col-h bd-risk-h">' + bIcon('risk', 'bd-risk-ico') + '<span>Risks</span><b>' + riskCount + '</b></div>';
+    let body = '';
+    m.lanes.forEach((lane) => {
+      const open = !bdCollapsed[lane.id];
+      body += '<button class="bd-lane" type="button" data-bd-lane="' + lane.id + '" style="grid-column:1/-1">' +
+        '<span class="bd-lane-cv' + (open ? ' open' : '') + '">▸</span>' + bIcon('people', 'bd-lane-ico') +
+        '<span class="bd-lane-name">' + esc(lane.name) + '</span></button>';
+      if (!open) return;
+      for (let ci = 0; ci < m.cols.length; ci++) {
+        const cards = (m.items[lane.id + ':' + ci] || []).filter(bdMatch);
+        body += '<div class="bd-cell">' + cards.map(bdCardHtml).join('') + '</div>';
+      }
+      const risks = (m.items[lane.id + ':risk'] || []).filter(bdMatch);
+      body += '<div class="bd-cell bd-cell-risk">' + risks.map(bdCardHtml).join('') + '</div>';
+    });
+    return '<div class="bd-scroll"><div class="bd-grid" style="grid-template-columns:repeat(' + ncol + ',minmax(232px,1fr))">' +
+      head + body + '</div></div>';
+  }
   function modalBox(title, body) {
     return '<div class="pm-box"><div class="pm-h"><b>' + title + '</b>' +
       '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' + body + '</div>';
@@ -1170,14 +1277,28 @@
     } else if (modalType === 'breakdown') {
       const c = modalCard || {};
       modalEl.innerHTML =
-        '<div class="pm-full"><div class="pm-full-h">' +
-          '<div class="pm-full-t"><span class="pm-kicker">Breakdown</span><h2>' + esc(c.title || '') + '</h2>' +
-            '<div class="pm-full-meta"><span class="sb-swatch s-' + stypeOf(c) + '"></span>' + stypeLabel(stypeOf(c)) +
-              ' · ' + (Number(c.points) || 0) + ' pts · ' + statusLabel(statusOf(c)) + '</div></div>' +
+        '<div class="pm-full bd-full"><div class="pm-full-h bd-head">' +
+          bIcon('breakdown', 'bd-head-ico') + '<span class="bd-head-k">Breakdown</span>' +
+          '<span class="bd-head-title"><i class="sb-swatch s-' + stypeOf(c) + '"></i>' + esc(c.title || '') + '</span>' +
+          '<span class="bd-head-tools">' +
+            '<button class="bd-vt on" type="button" disabled title="Board view">' + bIcon('teamboard') + '</button>' +
+            '<button class="bd-vt" type="button" disabled title="List view">' + bIcon('board') + '</button>' +
+          '</span>' +
           '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' +
-          '<div class="pm-full-b"><div class="pm-placeholder">' + bIcon('breakdown', 'pm-ph-ico') +
-            '<h3>Break this sticky into smaller work</h3>' +
-            '<p>The full breakdown workspace opens here — split a feature into stories, an epic into features, and push the results back to the board. You’ll define what this does in the next step.</p></div></div></div>';
+          '<div class="bd-toolbar">' +
+            '<div class="bd-search-wrap">' + bIcon('search', 'bd-search-ico') +
+              '<input id="bd-search" type="text" placeholder="Search Items" autocomplete="off" value="' + esc(bdQuery) + '" /></div>' +
+            '<button class="bd-tb-ico" type="button" disabled title="Assignee">' + bIcon('people') + '</button>' +
+            '<button class="bd-tb-ico" type="button" disabled title="Type">' + bIcon('sqtype') + '</button>' +
+            '<span class="bd-tb-label">State</span>' +
+          '</div>' +
+          '<div class="pm-full-b bd-body">' + breakdownHtml(c) + '</div></div>';
+      const bs = document.getElementById('bd-search');
+      if (bs) bs.addEventListener('input', () => {
+        bdQuery = bs.value.trim().toLowerCase();
+        const scroll = modalEl.querySelector('.bd-scroll');
+        if (scroll) scroll.outerHTML = breakdownHtml(modalCard);
+      });
     } else if (modalType === 'sblinks') {
       const c = modalCard || {};
       const linked = new Set(linkedIdsFor(c));
@@ -1202,6 +1323,14 @@
   }
   modalEl.addEventListener('click', (e) => {
     if (e.target === modalEl) return closeModal();
+    const ln = e.target.closest('[data-bd-lane]');
+    if (ln) {
+      const id = ln.dataset.bdLane;
+      bdCollapsed[id] = !bdCollapsed[id];
+      const scroll = modalEl.querySelector('.bd-scroll');
+      if (scroll && modalCard) scroll.outerHTML = breakdownHtml(modalCard);
+      return;
+    }
     const lk = e.target.closest('[data-link-id]');
     if (lk && modalCard) {
       const target = card(lk.dataset.linkId);
