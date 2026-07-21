@@ -2007,23 +2007,30 @@
   canvasWrap.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     if (e.target.closest('button, input, a, [contenteditable="true"]')) return;
-    pan = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, id: e.pointerId };
-    canvasWrap.classList.add('grabbing');
-    try { canvasWrap.setPointerCapture(e.pointerId); } catch (_) {}
+    // Don't capture yet — capturing here redirects the click event away from
+    // the sticky, breaking its action bar. We only capture once a real drag begins.
+    pan = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, id: e.pointerId, dragging: false };
   });
   canvasWrap.addEventListener('pointermove', (e) => {
     if (!pan || e.pointerId !== pan.id) return;
-    view.x = pan.vx + (e.clientX - pan.x);
-    view.y = pan.vy + (e.clientY - pan.y);
-    // a real pan (not a click) detaches the sticky popovers — close them
-    if (!pan.moved && Math.abs(e.clientX - pan.x) + Math.abs(e.clientY - pan.y) > 6) {
-      pan.moved = true;
-      if (sbCard) closeStickyBar();
+    if (!pan.dragging) {
+      if (Math.abs(e.clientX - pan.x) + Math.abs(e.clientY - pan.y) <= 4) return; // still a click
+      pan.dragging = true;
+      canvasWrap.classList.add('grabbing');
+      try { canvasWrap.setPointerCapture(e.pointerId); } catch (_) {}
+      if (sbCard) closeStickyBar();      // a real pan detaches the popovers
       if (stickyOpen) closeStickyPanel();
     }
+    view.x = pan.vx + (e.clientX - pan.x);
+    view.y = pan.vy + (e.clientY - pan.y);
     clampView(); applyView();
   });
-  function endPan(e) { if (pan && e.pointerId === pan.id) { pan = null; canvasWrap.classList.remove('grabbing'); } }
+  function endPan(e) {
+    if (pan && e.pointerId === pan.id) {
+      try { canvasWrap.releasePointerCapture(e.pointerId); } catch (_) {}
+      pan = null; canvasWrap.classList.remove('grabbing');
+    }
+  }
   canvasWrap.addEventListener('pointerup', endPan);
   canvasWrap.addEventListener('pointercancel', endPan);
   window.addEventListener('resize', () => {
