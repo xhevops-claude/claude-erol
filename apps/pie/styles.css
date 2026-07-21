@@ -1556,23 +1556,27 @@ body {
 .bd-cfg-trigger:hover, .bd-cfg-trigger.on { border-color: #a1a1aa; }
 .bd-cfg-tico { width: 16px; height: 16px; stroke: #52525b; }
 .bd-cfg-chev { width: 14px; height: 14px; stroke: #a1a1aa; }
-.bd-cfg-pop { position: absolute; top: calc(100% + 8px); right: 0; width: 380px; z-index: 20; background: #fff; border: 1px solid rgba(24, 24, 27, .1); border-radius: 14px; box-shadow: 0 20px 55px rgba(24, 24, 27, .24); padding: 12px; }
-.bd-cfg-h { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #a1a1aa; font-weight: 700; padding: 2px 4px 8px; }
-.bd-quick { display: flex; flex-direction: column; gap: 2px; }
-.bd-quick-i { display: flex; align-items: center; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 8px; padding: 9px 10px; font: inherit; font-size: 13px; font-weight: 500; color: #27272a; cursor: pointer; }
-.bd-quick-i:hover { background: #f4f4f5; }
-.bd-quick-i.on { background: rgba(24, 24, 27, .06); font-weight: 700; }
-.bd-cfg-sep { height: 1px; background: #f0f0f2; margin: 10px 4px; }
-.bd-axes { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; }
-.bd-dims { display: flex; flex-direction: column; gap: 3px; }
-.bd-dim { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 8px 9px; font: inherit; font-size: 13px; font-weight: 500; color: #3f3f46; cursor: pointer; }
-.bd-dim:hover { background: #f4f4f5; }
-.bd-dim.on { background: #18181b; color: #fff; font-weight: 600; }
-.bd-dim.on .bd-dim-ico { stroke: #fff; }
-.bd-dim:disabled { opacity: .32; cursor: default; background: transparent; }
-.bd-dim-ico { width: 15px; height: 15px; stroke: #71717a; flex: 0 0 auto; }
-.bd-swap { align-self: center; width: 30px; height: 30px; border: 1px solid #e4e4e7; background: #fff; border-radius: 8px; color: #52525b; font-size: 15px; cursor: pointer; margin-top: 22px; }
-.bd-swap:hover { border-color: #a1a1aa; color: #18181b; }
+/* Matrix picker: rows × columns as a clickable dimension grid */
+.bd-mtx-pop { position: absolute; top: calc(100% + 8px); right: 0; width: 392px; z-index: 20; background: #fff; border: 1px solid rgba(24, 24, 27, .1); border-radius: 14px; box-shadow: 0 20px 55px rgba(24, 24, 27, .24); padding: 14px; }
+.bd-mtx-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.bd-mtx-head b { font-size: 14px; font-weight: 800; }
+.bd-mtx-legend { font-size: 11px; color: #a1a1aa; }
+.bd-mtx-legend i { font-style: normal; font-weight: 700; color: #71717a; }
+.bd-mtx { display: grid; gap: 4px; align-items: stretch; }
+.bd-mtx-ch { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 2px; font-size: 11px; font-weight: 600; color: #52525b; text-align: center; border-radius: 8px; }
+.bd-mtx-ch.hi { background: rgba(24, 24, 27, .06); color: #18181b; }
+.bd-mtx-cico { width: 15px; height: 15px; stroke: #71717a; }
+.bd-mtx-ch.hi .bd-mtx-cico { stroke: #18181b; }
+.bd-mtx-rh { display: flex; align-items: center; gap: 7px; padding: 0 8px; font-size: 12.5px; font-weight: 600; color: #52525b; border-radius: 8px; }
+.bd-mtx-rh.hi { background: rgba(24, 24, 27, .06); color: #18181b; }
+.bd-mtx-rico { width: 15px; height: 15px; stroke: #71717a; flex: 0 0 auto; }
+.bd-mtx-rh.hi .bd-mtx-rico { stroke: #18181b; }
+.bd-mtx-cell { height: 46px; border: 1px solid #ececef; background: #fafafa; border-radius: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.bd-mtx-cell:hover { border-color: #18181b; background: #fff; }
+.bd-mtx-cell.on { background: #18181b; border-color: #18181b; }
+.bd-mtx-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; }
+.bd-mtx-x { color: #d4d4d8; font-size: 16px; cursor: default; background: transparent; border-color: transparent; }
+.bd-mtx-x:hover { border-color: transparent; background: transparent; }
 
 .bd-graph { display: flex; align-items: center; justify-content: center; height: 100%; }
 

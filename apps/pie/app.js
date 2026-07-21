@@ -1129,12 +1129,6 @@
     objective: { label: 'Objective', icon: 'objectives', vals: (m) => m.objs.map((o, i) => ({ key: 'o' + i, name: o.title })), of: (it) => it.objKey },
   };
   const BD_DIM_ORDER = ['team', 'iteration', 'status', 'objective'];
-  const BD_QUICK = [
-    ['Teams × Iterations', 'team', 'iteration'],
-    ['Iterations × Statuses', 'iteration', 'status'],
-    ['Teams × Statuses', 'team', 'status'],
-    ['Objectives × Teams', 'objective', 'team'],
-  ];
   const BD_ROLES = ['a fitness enthusiast', 'a student', 'a busy professional', 'a couple who share a bed', 'a shift worker', 'a frequent traveler', 'a new parent'];
   const BD_GOALS = [
     'correlate my sleep quality with my training intensity to optimize recovery.',
@@ -1240,25 +1234,28 @@
     return '<div class="bd-scroll"><div class="bd-grid" style="grid-template-columns:repeat(' + colVals.length + ',minmax(232px,1fr))">' +
       head + body + '</div></div>';
   }
+  // Matrix picker: rows down the left, columns across the top — click the
+  // intersection cell to set both axes in one move. The diagonal is disabled
+  // (a dimension can't be both rows and columns).
   function bdCfgPop() {
-    const dimChips = (axis) => {
-      const cur = axis === 'rows' ? bdRows : bdCols, other = axis === 'rows' ? bdCols : bdRows;
-      return BD_DIM_ORDER.map((d) => {
-        const on = cur === d, dis = other === d;
-        return '<button class="bd-dim' + (on ? ' on' : '') + '" type="button"' + (dis ? ' disabled' : '') +
-          ' data-bd-dim="' + axis + ':' + d + '">' + bIcon(BD_DIMS[d].icon, 'bd-dim-ico') + BD_DIMS[d].label + '</button>';
-      }).join('');
-    };
-    return '<div class="bd-cfg-pop">' +
-      '<div class="bd-cfg-h">Quick views</div>' +
-      '<div class="bd-quick">' + BD_QUICK.map((q) =>
-        '<button class="bd-quick-i' + (bdRows === q[1] && bdCols === q[2] ? ' on' : '') + '" type="button" data-bd-quick="' + q[1] + ':' + q[2] + '">' + esc(q[0]) + '</button>').join('') + '</div>' +
-      '<div class="bd-cfg-sep"></div>' +
-      '<div class="bd-axes">' +
-        '<div class="bd-axis"><div class="bd-cfg-h">Rows</div><div class="bd-dims">' + dimChips('rows') + '</div></div>' +
-        '<button class="bd-swap" type="button" data-bd-swap title="Swap rows and columns">⇄</button>' +
-        '<div class="bd-axis"><div class="bd-cfg-h">Columns</div><div class="bd-dims">' + dimChips('cols') + '</div></div>' +
-      '</div></div>';
+    const dims = BD_DIM_ORDER;
+    let html = '<div class="bd-mtx-pop"><div class="bd-mtx-head"><b>View by</b>' +
+      '<span class="bd-mtx-legend"><i>Rows</i> down · <i>Columns</i> across</span></div>';
+    html += '<div class="bd-mtx" style="grid-template-columns:104px repeat(' + dims.length + ',1fr)">';
+    html += '<div class="bd-mtx-corner"></div>';
+    dims.forEach((d) => {
+      html += '<div class="bd-mtx-ch' + (bdCols === d ? ' hi' : '') + '">' + bIcon(BD_DIMS[d].icon, 'bd-mtx-cico') + '<span>' + BD_DIMS[d].label + '</span></div>';
+    });
+    dims.forEach((rd) => {
+      html += '<div class="bd-mtx-rh' + (bdRows === rd ? ' hi' : '') + '">' + bIcon(BD_DIMS[rd].icon, 'bd-mtx-rico') + '<span>' + BD_DIMS[rd].label + '</span></div>';
+      dims.forEach((cd) => {
+        if (rd === cd) { html += '<div class="bd-mtx-cell bd-mtx-x">·</div>'; return; }
+        const on = bdRows === rd && bdCols === cd;
+        html += '<button class="bd-mtx-cell' + (on ? ' on' : '') + '" type="button" data-bd-cell="' + rd + ':' + cd + '" title="' + BD_DIMS[rd].label + ' × ' + BD_DIMS[cd].label + '">' + (on ? '<i class="bd-mtx-dot"></i>' : '') + '</button>';
+      });
+    });
+    html += '</div></div>';
+    return html;
   }
   function modalBox(title, body) {
     return '<div class="pm-box"><div class="pm-h"><b>' + title + '</b>' +
@@ -1377,17 +1374,10 @@
       if (view) { bdView = view.dataset.bdView; bdCfgOpen = false; renderModal(); return; }
       const toggle = e.target.closest('[data-bd-cfg-toggle]');
       if (toggle) { bdCfgOpen = !bdCfgOpen; renderModal(); return; }
-      const quick = e.target.closest('[data-bd-quick]');
-      if (quick) { const p = quick.dataset.bdQuick.split(':'); bdRows = p[0]; bdCols = p[1]; bdCfgOpen = false; renderModal(); return; }
-      const dim = e.target.closest('[data-bd-dim]');
-      if (dim) {
-        const [axis, d] = dim.dataset.bdDim.split(':');
-        if (axis === 'rows') { if (bdCols === d) bdCols = bdRows; bdRows = d; } else { if (bdRows === d) bdRows = bdCols; bdCols = d; }
-        renderModal(); return;
-      }
-      if (e.target.closest('[data-bd-swap]')) { const t = bdRows; bdRows = bdCols; bdCols = t; renderModal(); return; }
+      const cell = e.target.closest('[data-bd-cell]');
+      if (cell) { const p = cell.dataset.bdCell.split(':'); bdRows = p[0]; bdCols = p[1]; bdCfgOpen = false; renderModal(); return; }
       // click elsewhere closes the configurator popover
-      if (bdCfgOpen && !e.target.closest('.bd-cfg-pop')) { bdCfgOpen = false; renderModal(); return; }
+      if (bdCfgOpen && !e.target.closest('.bd-mtx-pop')) { bdCfgOpen = false; renderModal(); return; }
     }
     const ln = e.target.closest('[data-bd-lane]');
     if (ln) {
