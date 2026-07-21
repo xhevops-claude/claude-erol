@@ -1109,12 +1109,32 @@
     modalEl.hidden = true; modalEl.innerHTML = '';
     modalEl.classList.remove('pm-wide');
   }
-  function openBreakdown(c) { closeStickyBar(); modalCard = c; modalType = 'breakdown'; bdQuery = ''; bdCollapsed = {}; modalEl.classList.add('pm-wide'); renderModal(); }
+  function openBreakdown(c) {
+    closeStickyBar(); modalCard = c; modalType = 'breakdown';
+    bdQuery = ''; bdCollapsed = {}; bdRows = 'team'; bdCols = 'iteration'; bdView = 'grid'; bdCfgOpen = false;
+    modalEl.classList.add('pm-wide'); renderModal();
+  }
   function openLinksOverlay(c) { modalCard = c; modalType = 'sblinks'; modalEl.classList.add('pm-wide'); renderModal(); }
 
-  // ---------- Breakdown model: the sticky's connections as team-lanes × iteration-columns ----------
+  // ---------- Breakdown model: sticky connections grouped by configurable Rows × Columns ----------
   let bdCollapsed = {}, bdQuery = '';
+  let bdRows = 'team', bdCols = 'iteration', bdView = 'grid', bdCfgOpen = false;
   const bdCache = {};
+  // Each dimension knows its display label, icon, the values it splits into, and
+  // how to read that value off an item — so any pair can be Rows × Columns.
+  const BD_DIMS = {
+    team: { label: 'Team', icon: 'people', vals: (m) => m.teams.map((t) => ({ key: t.id, name: t.name })), of: (it) => it.teamId },
+    iteration: { label: 'Iteration', icon: 'bookmark', vals: (m) => m.iters.map((s, i) => ({ key: 'i' + i, name: s })), of: (it) => 'i' + it.iterIdx },
+    status: { label: 'Status', icon: 'statusdot', vals: () => STATUSES.map(([k, l]) => ({ key: k, name: l })), of: (it) => it.status },
+    objective: { label: 'Objective', icon: 'objectives', vals: (m) => m.objs.map((o, i) => ({ key: 'o' + i, name: o.title })), of: (it) => it.objKey },
+  };
+  const BD_DIM_ORDER = ['team', 'iteration', 'status', 'objective'];
+  const BD_QUICK = [
+    ['Teams × Iterations', 'team', 'iteration'],
+    ['Iterations × Statuses', 'iteration', 'status'],
+    ['Teams × Statuses', 'team', 'status'],
+    ['Objectives × Teams', 'objective', 'team'],
+  ];
   const BD_ROLES = ['a fitness enthusiast', 'a student', 'a busy professional', 'a couple who share a bed', 'a shift worker', 'a frequent traveler', 'a new parent'];
   const BD_GOALS = [
     'correlate my sleep quality with my training intensity to optimize recovery.',
@@ -1138,40 +1158,41 @@
   ];
   function seededRng(str) { let h = (hashCode(str) >>> 0) || 1; return () => { h = (h * 1664525 + 1013904223) >>> 0; return h / 4294967296; }; }
   const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
+  // Generate a flat list of items, each tagged with team / iteration / status /
+  // objective, so any two of those can be the grid's rows and columns.
   function breakdownModel(c) {
     if (bdCache[c.id]) return bdCache[c.id];
     const art = ctxArt();
-    const lanes = state.teams.filter((t) => art.teamIds.includes(t.id));
-    const cols = state.sprints.map((s, i) => ({ name: s, idx: i }));
-    const items = {};
+    const teams = state.teams.filter((t) => art.teamIds.includes(t.id));
+    const iters = state.sprints.slice();
+    const objs = state.artObjectives.slice(0, 4);
+    const items = [];
     let idn = 200;
-    lanes.forEach((lane) => {
-      cols.forEach((col, ci) => {
+    teams.forEach((lane) => {
+      iters.forEach((_, ci) => {
         const rng = seededRng(c.id + ':' + lane.id + ':' + ci);
         const n = rng() < 0.28 ? 0 : rng() < 0.7 ? 1 : 2;
-        const arr = [];
         for (let k = 0; k < n; k++) {
           const r = rng();
-          const type = r > 0.86 ? 'feature' : r > 0.72 ? 'dependency' : 'story';
-          const links = 1 + Math.floor(rng() * 3);
-          const pts = [3, 5, 8, 10, 13][Math.floor(rng() * 5)];
-          if (type === 'story') arr.push({ type, id: ++idn, text: 'As ' + pick(BD_ROLES, rng) + ', I want to ' + pick(BD_GOALS, rng), links, pts });
-          else if (type === 'feature') arr.push({ type, id: ++idn, text: pick(BD_FEATS, rng), links, pts });
+          const type = r > 0.9 ? 'risk' : r > 0.82 ? 'feature' : r > 0.68 ? 'dependency' : 'story';
+          const it = {
+            type, id: ++idn, links: 1 + Math.floor(rng() * 3), pts: [3, 5, 8, 10, 13][Math.floor(rng() * 5)],
+            teamId: lane.id, iterIdx: ci, status: ['todo', 'doing', 'done'][Math.floor(rng() * 3)],
+            objKey: objs.length ? 'o' + Math.floor(rng() * objs.length) : '—',
+          };
+          if (type === 'story') it.text = 'As ' + pick(BD_ROLES, rng) + ', I want to ' + pick(BD_GOALS, rng);
+          else if (type === 'feature') it.text = pick(BD_FEATS, rng);
+          else if (type === 'risk') it.text = pick(BD_RISKS, rng);
           else {
-            const other = lanes[Math.floor(rng() * lanes.length)];
-            const to = other && other.id !== lane.id ? other.name : lanes[(lanes.indexOf(lane) + 1) % lanes.length].name;
-            arr.push({ type, id: ++idn, text: pick(BD_DEPS, rng), links, from: lane.name, to });
+            const other = teams[Math.floor(rng() * teams.length)];
+            it.text = pick(BD_DEPS, rng); it.from = lane.name;
+            it.to = other && other.id !== lane.id ? other.name : teams[(teams.indexOf(lane) + 1) % teams.length].name;
           }
+          items.push(it);
         }
-        items[lane.id + ':' + ci] = arr;
       });
-      const rr = seededRng(c.id + ':risk:' + lane.id);
-      const rn = rr() < 0.45 ? 0 : rr() < 0.8 ? 1 : 2;
-      const risks = [];
-      for (let k = 0; k < rn; k++) risks.push({ type: 'risk', text: pick(BD_RISKS, rr), links: 1 + Math.floor(rr() * 3) });
-      items[lane.id + ':risk'] = risks;
     });
-    const model = { lanes, cols, items };
+    const model = { teams, iters, objs, items };
     bdCache[c.id] = model;
     return model;
   }
@@ -1196,27 +1217,48 @@
   function bdMatch(it) { return !bdQuery || (it.text || '').toLowerCase().indexOf(bdQuery) >= 0; }
   function breakdownHtml(c) {
     const m = breakdownModel(c);
-    const ncol = m.cols.length + 1; // + Risks
-    const colCount = (ci) => m.lanes.reduce((a, l) => a + (m.items[l.id + ':' + ci] || []).filter(bdMatch).length, 0);
-    const riskCount = m.lanes.reduce((a, l) => a + (m.items[l.id + ':risk'] || []).filter(bdMatch).length, 0);
-    let head = m.cols.map((col, ci) => '<div class="bd-col-h"><span>' + esc(col.name) + '</span><b>' + colCount(ci) + '</b></div>').join('') +
-      '<div class="bd-col-h bd-risk-h">' + bIcon('risk', 'bd-risk-ico') + '<span>Risks</span><b>' + riskCount + '</b></div>';
+    const rowDim = BD_DIMS[bdRows], colDim = BD_DIMS[bdCols];
+    const rowVals = rowDim.vals(m), colVals = colDim.vals(m);
+    const shown = m.items.filter(bdMatch);
+    const cellItems = (rk, ck) => shown.filter((it) => rowDim.of(it) === rk && colDim.of(it) === ck);
+    const colTotal = (ck) => shown.filter((it) => colDim.of(it) === ck).length;
+    const head = colVals.map((cv) =>
+      '<div class="bd-col-h">' + bIcon(colDim.icon, 'bd-col-ico') + '<span>' + esc(cv.name) + '</span><b>' + colTotal(cv.key) + '</b></div>').join('');
     let body = '';
-    m.lanes.forEach((lane) => {
-      const open = !bdCollapsed[lane.id];
-      body += '<button class="bd-lane" type="button" data-bd-lane="' + lane.id + '" style="grid-column:1/-1">' +
-        '<span class="bd-lane-cv' + (open ? ' open' : '') + '">▸</span>' + bIcon('people', 'bd-lane-ico') +
-        '<span class="bd-lane-name">' + esc(lane.name) + '</span></button>';
+    rowVals.forEach((rv) => {
+      const open = !bdCollapsed[rv.key];
+      const rowTotal = shown.filter((it) => rowDim.of(it) === rv.key).length;
+      body += '<button class="bd-lane" type="button" data-bd-lane="' + rv.key + '" style="grid-column:1/-1">' +
+        '<span class="bd-lane-cv' + (open ? ' open' : '') + '">▸</span>' + bIcon(rowDim.icon, 'bd-lane-ico') +
+        '<span class="bd-lane-name">' + esc(rv.name) + '</span><b class="bd-lane-n">' + rowTotal + '</b></button>';
       if (!open) return;
-      for (let ci = 0; ci < m.cols.length; ci++) {
-        const cards = (m.items[lane.id + ':' + ci] || []).filter(bdMatch);
+      colVals.forEach((cv) => {
+        const cards = cellItems(rv.key, cv.key);
         body += '<div class="bd-cell">' + cards.map(bdCardHtml).join('') + '</div>';
-      }
-      const risks = (m.items[lane.id + ':risk'] || []).filter(bdMatch);
-      body += '<div class="bd-cell bd-cell-risk">' + risks.map(bdCardHtml).join('') + '</div>';
+      });
     });
-    return '<div class="bd-scroll"><div class="bd-grid" style="grid-template-columns:repeat(' + ncol + ',minmax(232px,1fr))">' +
+    return '<div class="bd-scroll"><div class="bd-grid" style="grid-template-columns:repeat(' + colVals.length + ',minmax(232px,1fr))">' +
       head + body + '</div></div>';
+  }
+  function bdCfgPop() {
+    const dimChips = (axis) => {
+      const cur = axis === 'rows' ? bdRows : bdCols, other = axis === 'rows' ? bdCols : bdRows;
+      return BD_DIM_ORDER.map((d) => {
+        const on = cur === d, dis = other === d;
+        return '<button class="bd-dim' + (on ? ' on' : '') + '" type="button"' + (dis ? ' disabled' : '') +
+          ' data-bd-dim="' + axis + ':' + d + '">' + bIcon(BD_DIMS[d].icon, 'bd-dim-ico') + BD_DIMS[d].label + '</button>';
+      }).join('');
+    };
+    return '<div class="bd-cfg-pop">' +
+      '<div class="bd-cfg-h">Quick views</div>' +
+      '<div class="bd-quick">' + BD_QUICK.map((q) =>
+        '<button class="bd-quick-i' + (bdRows === q[1] && bdCols === q[2] ? ' on' : '') + '" type="button" data-bd-quick="' + q[1] + ':' + q[2] + '">' + esc(q[0]) + '</button>').join('') + '</div>' +
+      '<div class="bd-cfg-sep"></div>' +
+      '<div class="bd-axes">' +
+        '<div class="bd-axis"><div class="bd-cfg-h">Rows</div><div class="bd-dims">' + dimChips('rows') + '</div></div>' +
+        '<button class="bd-swap" type="button" data-bd-swap title="Swap rows and columns">⇄</button>' +
+        '<div class="bd-axis"><div class="bd-cfg-h">Columns</div><div class="bd-dims">' + dimChips('cols') + '</div></div>' +
+      '</div></div>';
   }
   function modalBox(title, body) {
     return '<div class="pm-box"><div class="pm-h"><b>' + title + '</b>' +
@@ -1276,23 +1318,29 @@
         '</div>');
     } else if (modalType === 'breakdown') {
       const c = modalCard || {};
+      const gridBody = bdView === 'grid'
+        ? '<div class="bd-toolbar">' +
+            '<div class="bd-search-wrap">' + bIcon('search', 'bd-search-ico') +
+              '<input id="bd-search" type="text" placeholder="Search items" autocomplete="off" value="' + esc(bdQuery) + '" /></div>' +
+            '<div class="bd-cfg-wrap">' +
+              '<button class="bd-cfg-trigger' + (bdCfgOpen ? ' on' : '') + '" type="button" data-bd-cfg-toggle>' +
+                bIcon('apps', 'bd-cfg-tico') + '<span>' + BD_DIMS[bdRows].label + ' × ' + BD_DIMS[bdCols].label + '</span>' + bIcon('chev', 'bd-cfg-chev') + '</button>' +
+              (bdCfgOpen ? bdCfgPop() : '') +
+            '</div>' +
+          '</div>' +
+          '<div class="pm-full-b bd-body">' + breakdownHtml(c) + '</div>'
+        : '<div class="pm-full-b bd-body"><div class="bd-graph"><div class="pm-placeholder">' + bIcon('collab', 'pm-ph-ico') +
+            '<h3>Graph view</h3><p>A relationship graph of this sticky and everything it connects to will live here — you’ll define it next.</p></div></div></div>';
       modalEl.innerHTML =
         '<div class="pm-full bd-full"><div class="pm-full-h bd-head">' +
           bIcon('breakdown', 'bd-head-ico') + '<span class="bd-head-k">Breakdown</span>' +
           '<span class="bd-head-title"><i class="sb-swatch s-' + stypeOf(c) + '"></i>' + esc(c.title || '') + '</span>' +
-          '<span class="bd-head-tools">' +
-            '<button class="bd-vt on" type="button" disabled title="Board view">' + bIcon('teamboard') + '</button>' +
-            '<button class="bd-vt" type="button" disabled title="List view">' + bIcon('board') + '</button>' +
+          '<span class="bd-seg">' +
+            '<button class="bd-seg-b' + (bdView === 'grid' ? ' on' : '') + '" type="button" data-bd-view="grid">' + bIcon('teamboard', 'bd-seg-ico') + 'Grid</button>' +
+            '<button class="bd-seg-b' + (bdView === 'graph' ? ' on' : '') + '" type="button" data-bd-view="graph">' + bIcon('collab', 'bd-seg-ico') + 'Graph</button>' +
           '</span>' +
           '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' +
-          '<div class="bd-toolbar">' +
-            '<div class="bd-search-wrap">' + bIcon('search', 'bd-search-ico') +
-              '<input id="bd-search" type="text" placeholder="Search Items" autocomplete="off" value="' + esc(bdQuery) + '" /></div>' +
-            '<button class="bd-tb-ico" type="button" disabled title="Assignee">' + bIcon('people') + '</button>' +
-            '<button class="bd-tb-ico" type="button" disabled title="Type">' + bIcon('sqtype') + '</button>' +
-            '<span class="bd-tb-label">State</span>' +
-          '</div>' +
-          '<div class="pm-full-b bd-body">' + breakdownHtml(c) + '</div></div>';
+          gridBody + '</div>';
       const bs = document.getElementById('bd-search');
       if (bs) bs.addEventListener('input', () => {
         bdQuery = bs.value.trim().toLowerCase();
@@ -1323,6 +1371,24 @@
   }
   modalEl.addEventListener('click', (e) => {
     if (e.target === modalEl) return closeModal();
+    // Breakdown Rows/Columns configurator + Grid/Graph switch
+    if (modalType === 'breakdown') {
+      const view = e.target.closest('[data-bd-view]');
+      if (view) { bdView = view.dataset.bdView; bdCfgOpen = false; renderModal(); return; }
+      const toggle = e.target.closest('[data-bd-cfg-toggle]');
+      if (toggle) { bdCfgOpen = !bdCfgOpen; renderModal(); return; }
+      const quick = e.target.closest('[data-bd-quick]');
+      if (quick) { const p = quick.dataset.bdQuick.split(':'); bdRows = p[0]; bdCols = p[1]; bdCfgOpen = false; renderModal(); return; }
+      const dim = e.target.closest('[data-bd-dim]');
+      if (dim) {
+        const [axis, d] = dim.dataset.bdDim.split(':');
+        if (axis === 'rows') { if (bdCols === d) bdCols = bdRows; bdRows = d; } else { if (bdRows === d) bdRows = bdCols; bdCols = d; }
+        renderModal(); return;
+      }
+      if (e.target.closest('[data-bd-swap]')) { const t = bdRows; bdRows = bdCols; bdCols = t; renderModal(); return; }
+      // click elsewhere closes the configurator popover
+      if (bdCfgOpen && !e.target.closest('.bd-cfg-pop')) { bdCfgOpen = false; renderModal(); return; }
+    }
     const ln = e.target.closest('[data-bd-lane]');
     if (ln) {
       const id = ln.dataset.bdLane;
