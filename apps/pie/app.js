@@ -279,6 +279,19 @@
       });
     }
     s.navVersion = ['v2', 'v3', 'v4'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
+    // Seed a couple of real links on every card so the Breakdown graph shows
+    // genuine connections for any sticky (also powers the Links overlay & Pin).
+    if (!s.linksSeeded && Array.isArray(s.cards) && s.cards.length > 4) {
+      s.linksSeeded = true;
+      const N = s.cards.length;
+      s.cards.forEach((c, i) => {
+        c.links = c.links || [];
+        [3, 7].forEach((off) => {
+          const t = s.cards[(i + off) % N];
+          if (t && t.id !== c.id && !c.links.includes(t.id) && !(t.links || []).includes(c.id)) c.links.push(t.id);
+        });
+      });
+    }
     // The viewer's own team — highlighted on the ART Objectives board so it's
     // easy to spot among many. Marlin sits in the crowded Payments ART.
     if (!s.myTeamId || !s.teams.some((t) => t.id === s.myTeamId)) {
@@ -1323,62 +1336,66 @@
       '<div class="bd-dd-row"><label>Then columns by</label>' + menu('cols') + '</div></div>';
   }
 
-  // ---------- Breakdown Graph view: a draggable node graph of the sticky's links ----------
+  // ---------- Breakdown Graph view: the sticky's REAL links as a draggable node graph ----------
   const GNW = 214, GNH = 66;
-  const bdGraphCache = {}, bdGraphPos = {};
+  const bdGraphPos = {};
+  // Build from real cards: root sticky + its links + their links (2 levels).
   function bdGraphModel(c) {
-    if (bdGraphCache[c.id]) return bdGraphCache[c.id];
-    const rng = seededRng('g' + c.id);
-    const tName = (team(c.teamId) || ctxTeams()[0] || { name: 'Team' }).name;
-    const iterAt = (i) => state.sprints[Math.min(i, state.sprints.length - 1)] || ('Iter ' + (i + 1));
-    const nodes = [], edges = [];
-    nodes.push({ id: 'root', root: true, type: stypeOf(c), label: stypeLabel(stypeOf(c)), title: c.title, team: tName, status: statusOf(c), iter: iterAt(c.sprintIdx || 0), bv: Number(c.points) || 0 });
-    nodes.push({ id: 'feat', type: 'feature', label: 'Feature', title: 'Feat 1', team: tName, status: 'todo', iter: iterAt(0) });
-    edges.push({ from: 'root', to: 'feat', dashed: true });
-    const nStory = 4 + Math.floor(rng() * 3), gap = 108, startY = 40;
-    for (let i = 0; i < nStory; i++) {
-      nodes.push({ id: 's' + i, type: 'story', label: 'User Story', title: 'Story' + (i ? ' ' + (i + 1) : ''), team: tName, status: 'todo', iter: iterAt(i < 2 ? 1 : 0) });
-      edges.push({ from: 'feat', to: 's' + i, dashed: true });
+    const nodes = [], seen = new Set([c.id]);
+    let q = [[c.id, 0]];
+    while (q.length) {
+      const [id, lvl] = q.shift();
+      const cd = card(id); if (!cd) continue;
+      nodes.push({
+        id, root: id === c.id, lvl, type: stypeOf(cd), label: stypeLabel(stypeOf(cd)),
+        title: cd.title, team: (team(cd.teamId) || {}).name || '', status: statusOf(cd),
+        iter: state.sprints[cd.sprintIdx] || '', bv: Number(cd.points) || 0,
+      });
+      if (lvl < 2) linkedIdsFor(cd).forEach((nid) => { if (!seen.has(nid)) { seen.add(nid); q.push([nid, lvl + 1]); } });
     }
-    const depY = startY + nStory * gap + 24;
-    nodes.push({ id: 'dep', type: 'dependency', label: 'Dependency', title: 'Dep', team: tName, iter: iterAt(3) });
-    edges.push({ from: 'feat', to: 'dep', dashed: false });
-    nodes.push({ id: 'depT', type: 'story', label: 'User Story', title: 'With Dep', team: tName, status: 'todo', iter: iterAt(3) });
-    edges.push({ from: 'dep', to: 'depT', dashed: true });
-    // default layout: root left, feature mid, stories + dep column, dep target far right
-    const midY = (startY + depY) / 2;
-    const layout = { root: { x: 40, y: midY }, feat: { x: 480, y: midY }, dep: { x: 940, y: depY }, depT: { x: 1300, y: depY } };
-    for (let i = 0; i < nStory; i++) layout['s' + i] = { x: 940, y: startY + i * gap };
-    nodes.forEach((n) => { n.dx = layout[n.id].x; n.dy = layout[n.id].y; });
-    const m = { nodes, edges };
-    bdGraphCache[c.id] = m;
-    return m;
+    const inSet = new Set(nodes.map((n) => n.id)), ekey = new Set(), edges = [];
+    nodes.forEach((n) => linkedIdsFor(card(n.id)).forEach((nid) => {
+      if (!inSet.has(nid)) return;
+      const k = [n.id, nid].sort().join('|');
+      if (!ekey.has(k)) { ekey.add(k); edges.push({ a: n.id, b: nid }); }
+    }));
+    // layered layout by level (centred columns); only used for nodes with no saved position
+    const byLvl = {};
+    nodes.forEach((n) => { (byLvl[n.lvl] = byLvl[n.lvl] || []).push(n); });
+    const maxCount = Math.max(1, ...Object.values(byLvl).map((a) => a.length));
+    const midY = 40 + (maxCount * 108) / 2;
+    Object.keys(byLvl).forEach((lvl) => {
+      const arr = byLvl[lvl], top = midY - (arr.length * 108) / 2;
+      arr.forEach((n, i) => { n.dx = 40 + Number(lvl) * 430; n.dy = top + i * 108; });
+    });
+    return { nodes, edges };
   }
   function ensureGraphPos(c, m) {
-    if (bdGraphPos[c.id]) return;
-    const p = {};
-    m.nodes.forEach((n) => { p[n.id] = { x: n.dx, y: n.dy }; });
-    bdGraphPos[c.id] = p;
+    const p = bdGraphPos[c.id] = bdGraphPos[c.id] || {};
+    m.nodes.forEach((n) => { if (!p[n.id]) p[n.id] = { x: n.dx, y: n.dy }; });
+  }
+  function graphEdgePath(x1, y1, x2, y2) {
+    const dx = Math.max(50, Math.abs(x2 - x1) / 2);
+    return 'M' + x1 + ',' + y1 + ' C' + (x1 + dx) + ',' + y1 + ' ' + (x2 - dx) + ',' + y2 + ' ' + x2 + ',' + y2;
   }
   function graphEdgesSvg(m, pos) {
     let paths = '';
     m.edges.forEach((e) => {
-      const a = pos[e.from], b = pos[e.to]; if (!a || !b) return;
-      const x1 = a.x + GNW, y1 = a.y + GNH / 2, x2 = b.x, y2 = b.y + GNH / 2;
-      const dx = Math.max(50, Math.abs(x2 - x1) / 2);
-      paths += '<path class="ge' + (e.dashed ? ' ge-dash' : '') + '" d="M' + x1 + ',' + y1 + ' C' + (x1 + dx) + ',' + y1 + ' ' + (x2 - dx) + ',' + y2 + ' ' + x2 + ',' + y2 + '" marker-end="url(#gearrow)"/>';
+      let a = pos[e.a], b = pos[e.b]; if (!a || !b) return;
+      if (a.x > b.x) { const t = a; a = b; b = t; } // draw left → right
+      paths += '<path class="ge ge-dash" d="' + graphEdgePath(a.x + GNW, a.y + GNH / 2, b.x, b.y + GNH / 2) + '" marker-end="url(#gearrow)"/>';
     });
-    return '<defs><marker id="gearrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9aa1ad"/></marker></defs>' + paths;
+    return '<defs><marker id="gearrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9aa1ad"/></marker></defs>' +
+      paths + '<path class="ge ge-temp" id="ge-temp" d=""/>';
   }
   function graphNodeHtml(n, p) {
     const top = n.root
       ? '<span class="gn-type">' + n.label.toUpperCase() + '</span><span class="gn-team">BV: ' + n.bv + '</span>'
       : '<span class="gn-type">' + n.label.toUpperCase() + '</span><span class="gn-team">' + esc(n.team) + '</span>';
-    const meta = n.status
-      ? '<div class="gn-meta"><i class="gn-dot st-' + n.status + '"></i>' + statusLabel(n.status) + ' · ' + esc(n.iter) + '</div>'
-      : '<div class="gn-meta">' + esc(n.iter) + '</div>';
+    const meta = '<div class="gn-meta"><i class="gn-dot st-' + n.status + '"></i>' + statusLabel(n.status) + (n.iter ? ' · ' + esc(n.iter) : '') + '</div>';
     return '<div class="gn gn-' + n.type + (n.root ? ' gn-root' : '') + '" data-gnode="' + n.id + '" style="left:' + p.x + 'px;top:' + p.y + 'px">' +
-      '<div class="gn-top">' + top + '</div><div class="gn-title">' + esc(n.title) + '</div>' + meta + '</div>';
+      '<div class="gn-top">' + top + '</div><div class="gn-title">' + esc(n.title) + '</div>' + meta +
+      '<span class="gn-port" data-gport title="Drag to link"></span></div>';
   }
   function graphHtml(c) {
     const m = bdGraphModel(c);
@@ -1386,33 +1403,55 @@
     const pos = bdGraphPos[c.id];
     let maxX = 0, maxY = 0;
     m.nodes.forEach((n) => { maxX = Math.max(maxX, pos[n.id].x); maxY = Math.max(maxY, pos[n.id].y); });
-    const W = maxX + GNW + 120, H = maxY + GNH + 120;
-    return '<div class="bd-graph-wrap" id="bd-graph-wrap"><div class="bd-graph-canvas" id="bd-graph-canvas" style="width:' + W + 'px;height:' + H + 'px">' +
+    const W = Math.max(maxX + GNW + 120, 1000), H = Math.max(maxY + GNH + 120, 560);
+    const hint = m.nodes.length <= 1 ? '<div class="bd-graph-hint">No links yet — use the sticky’s <b>Links</b> action, then they’ll appear here.</div>' : '';
+    return '<div class="bd-graph-wrap" id="bd-graph-wrap"><div class="bd-graph-toolbar">Drag nodes to arrange · drag from a node’s <span class="gn-port-demo"></span> handle to link two stickies</div>' +
+      '<div class="bd-graph-canvas" id="bd-graph-canvas" style="width:' + W + 'px;height:' + H + 'px">' +
       '<svg class="bd-graph-svg" id="bd-graph-svg" width="' + W + '" height="' + H + '">' + graphEdgesSvg(m, pos) + '</svg>' +
-      m.nodes.map((n) => graphNodeHtml(n, pos[n.id])).join('') + '</div></div>';
+      m.nodes.map((n) => graphNodeHtml(n, pos[n.id])).join('') + hint + '</div></div>';
   }
   function wireGraph(c) {
     const canvas = document.getElementById('bd-graph-canvas'); if (!canvas) return;
     const svg = document.getElementById('bd-graph-svg');
-    const m = bdGraphModel(c), pos = bdGraphPos[c.id];
-    let drag = null;
+    let m = bdGraphModel(c), pos = bdGraphPos[c.id];
+    let drag = null, link = null;
+    const canvasPt = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
     canvas.addEventListener('pointerdown', (e) => {
       const nd = e.target.closest('[data-gnode]'); if (!nd) return;
       e.preventDefault();
       const id = nd.dataset.gnode;
-      drag = { id, el: nd, sx: e.clientX, sy: e.clientY, px: pos[id].x, py: pos[id].y };
-      nd.classList.add('gn-drag');
+      if (e.target.closest('[data-gport]')) {
+        link = { from: id }; // start drawing a link
+      } else {
+        drag = { id, el: nd, sx: e.clientX, sy: e.clientY, px: pos[id].x, py: pos[id].y };
+        nd.classList.add('gn-drag');
+      }
       try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     });
     canvas.addEventListener('pointermove', (e) => {
-      if (!drag) return;
-      pos[drag.id].x = Math.max(0, drag.px + (e.clientX - drag.sx));
-      pos[drag.id].y = Math.max(0, drag.py + (e.clientY - drag.sy));
-      drag.el.style.left = pos[drag.id].x + 'px';
-      drag.el.style.top = pos[drag.id].y + 'px';
-      svg.innerHTML = graphEdgesSvg(m, pos);
+      if (drag) {
+        pos[drag.id].x = Math.max(0, drag.px + (e.clientX - drag.sx));
+        pos[drag.id].y = Math.max(0, drag.py + (e.clientY - drag.sy));
+        drag.el.style.left = pos[drag.id].x + 'px';
+        drag.el.style.top = pos[drag.id].y + 'px';
+        svg.innerHTML = graphEdgesSvg(m, pos);
+      } else if (link) {
+        const a = pos[link.from], pt = canvasPt(e);
+        const tmp = document.getElementById('ge-temp');
+        if (tmp) tmp.setAttribute('d', graphEdgePath(a.x + GNW, a.y + GNH / 2, pt.x, pt.y));
+      }
     });
-    const end = (e) => { if (drag) { drag.el.classList.remove('gn-drag'); drag = null; try { canvas.releasePointerCapture(e.pointerId); } catch (_) {} } };
+    const end = (e) => {
+      if (drag) { drag.el.classList.remove('gn-drag'); drag = null; }
+      else if (link) {
+        const tgt = document.elementFromPoint(e.clientX, e.clientY);
+        const nd = tgt && tgt.closest('[data-gnode]');
+        if (nd && nd.dataset.gnode !== link.from) { addLink(card(link.from), card(nd.dataset.gnode)); save(); renderModal(); }
+        else { const tmp = document.getElementById('ge-temp'); if (tmp) tmp.setAttribute('d', ''); }
+        link = null;
+      }
+      try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
     canvas.addEventListener('pointerup', end);
     canvas.addEventListener('pointercancel', end);
   }
