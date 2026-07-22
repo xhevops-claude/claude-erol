@@ -1127,12 +1127,12 @@
   function closeModal() {
     modalType = null; timerRun = false; clearInterval(timerIv);
     modalEl.hidden = true; modalEl.innerHTML = '';
-    modalEl.classList.remove('pm-wide');
+    modalEl.classList.remove('pm-wide', 'pm-page');
   }
   function openBreakdown(c) {
     closeStickyBar(); modalCard = c; modalType = 'breakdown';
     bdQuery = ''; bdCollapsed = {}; bdRows = 'team'; bdCols = 'iteration'; bdView = 'grid'; bdCfgOpen = false; bdDd = null;
-    modalEl.classList.add('pm-wide'); renderModal();
+    modalEl.classList.add('pm-page'); renderModal();
   }
   function openLinksOverlay(c) { modalCard = c; modalType = 'sblinks'; modalEl.classList.add('pm-wide'); renderModal(); }
 

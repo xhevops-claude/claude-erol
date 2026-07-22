@@ -1493,6 +1493,9 @@ body {
 
 /* ---------- Full-page modal (breakdown / links overlay) ---------- */
 .pmodal.pm-wide { align-items: stretch; padding: 4vh 4vw; }
+/* breakdown is a full page, not a modal: opaque, edge-to-edge, no backdrop */
+.pmodal.pm-page { padding: 0; background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; align-items: stretch; justify-content: stretch; }
+.pmodal.pm-page .pm-full { width: 100vw; max-width: none; height: 100vh; max-height: none; border-radius: 0; box-shadow: none; border: 0; }
 .pm-full {
   display: flex; flex-direction: column; width: 100%; max-width: 1100px; margin: 0 auto;
   max-height: 92vh; background: #fff; color: #18181b; border-radius: 16px; overflow: hidden;
