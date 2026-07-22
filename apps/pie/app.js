@@ -991,6 +991,7 @@
     state.navVersion = b.dataset.ver;
     save();
     renderBoardView();
+    if (modalType === 'breakdown') { bdDd = null; renderModal(); } // reflect the new configurator design live
   });
 
   // ---------- v3 bottom bar: board utilities + board tools combined ----------
@@ -1111,14 +1112,14 @@
   }
   function openBreakdown(c) {
     closeStickyBar(); modalCard = c; modalType = 'breakdown';
-    bdQuery = ''; bdCollapsed = {}; bdRows = 'team'; bdCols = 'iteration'; bdView = 'grid'; bdCfgOpen = false;
+    bdQuery = ''; bdCollapsed = {}; bdRows = 'team'; bdCols = 'iteration'; bdView = 'grid'; bdCfgOpen = false; bdDd = null;
     modalEl.classList.add('pm-wide'); renderModal();
   }
   function openLinksOverlay(c) { modalCard = c; modalType = 'sblinks'; modalEl.classList.add('pm-wide'); renderModal(); }
 
   // ---------- Breakdown model: sticky connections grouped by configurable Rows × Columns ----------
   let bdCollapsed = {}, bdQuery = '';
-  let bdRows = 'team', bdCols = 'iteration', bdView = 'grid', bdCfgOpen = false;
+  let bdRows = 'team', bdCols = 'iteration', bdView = 'grid', bdCfgOpen = false, bdDd = null;
   const bdCache = {};
   // Each dimension knows its display label, icon, the values it splits into, and
   // how to read that value off an item — so any pair can be Rows × Columns.
@@ -1234,15 +1235,21 @@
     return '<div class="bd-scroll"><div class="bd-grid" style="grid-template-columns:repeat(' + colVals.length + ',minmax(232px,1fr))">' +
       head + body + '</div></div>';
   }
-  // Matrix picker: rows down the left, columns across the top — click the
-  // intersection cell to set both axes in one move. The diagonal is disabled
-  // (a dimension can't be both rows and columns).
+  // Four configurator designs, chosen by the version pill (v1–v4).
   function bdCfgPop() {
+    const v = state.navVersion;
+    if (v === 'v1') return bdCfgChips();
+    if (v === 'v3') return bdCfgPresets();
+    if (v === 'v4') return bdCfgDropdowns();
+    return bdCfgMatrix();
+  }
+  // v2 · Matrix: rows down the left, columns across the top — click the
+  // intersection cell to set both axes at once (diagonal disabled).
+  function bdCfgMatrix() {
     const dims = BD_DIM_ORDER;
-    let html = '<div class="bd-mtx-pop"><div class="bd-mtx-head"><b>View by</b>' +
+    let html = '<div class="bd-cfg-pop bd-mtx-pop"><div class="bd-mtx-head"><b>View by</b>' +
       '<span class="bd-mtx-legend"><i>Rows</i> down · <i>Columns</i> across</span></div>';
-    html += '<div class="bd-mtx" style="grid-template-columns:104px repeat(' + dims.length + ',1fr)">';
-    html += '<div class="bd-mtx-corner"></div>';
+    html += '<div class="bd-mtx" style="grid-template-columns:104px repeat(' + dims.length + ',1fr)"><span></span>';
     dims.forEach((d) => {
       html += '<div class="bd-mtx-ch' + (bdCols === d ? ' hi' : '') + '">' + bIcon(BD_DIMS[d].icon, 'bd-mtx-cico') + '<span>' + BD_DIMS[d].label + '</span></div>';
     });
@@ -1256,6 +1263,58 @@
     });
     html += '</div></div>';
     return html;
+  }
+  // v1 · Chip lists: two vertical dimension lists with a swap between them.
+  function bdCfgChips() {
+    const dimChips = (axis) => {
+      const cur = axis === 'rows' ? bdRows : bdCols, other = axis === 'rows' ? bdCols : bdRows;
+      return BD_DIM_ORDER.map((d) => {
+        const on = cur === d, dis = other === d;
+        return '<button class="bd-dim' + (on ? ' on' : '') + '" type="button"' + (dis ? ' disabled' : '') +
+          ' data-bd-dim="' + axis + ':' + d + '">' + bIcon(BD_DIMS[d].icon, 'bd-dim-ico') + BD_DIMS[d].label + '</button>';
+      }).join('');
+    };
+    return '<div class="bd-cfg-pop bd-chip-pop">' +
+      '<div class="bd-axes">' +
+        '<div class="bd-axis"><div class="bd-cfg-h">Rows</div><div class="bd-dims">' + dimChips('rows') + '</div></div>' +
+        '<button class="bd-swap" type="button" data-bd-swap title="Swap rows and columns">⇄</button>' +
+        '<div class="bd-axis"><div class="bd-cfg-h">Columns</div><div class="bd-dims">' + dimChips('cols') + '</div></div>' +
+      '</div></div>';
+  }
+  // v3 · Preset gallery: visual thumbnails of common layouts.
+  const BD_PRESETS = [
+    ['team', 'iteration'], ['team', 'status'], ['iteration', 'status'],
+    ['objective', 'team'], ['status', 'team'], ['iteration', 'team'],
+  ];
+  function bdCfgPresets() {
+    const thumb = (r, c) => {
+      const rn = Math.min(3, BD_DIMS[r].vals(breakdownModel(modalCard)).length || 3);
+      const cn = Math.min(4, BD_DIMS[c].vals(breakdownModel(modalCard)).length || 4);
+      let g = '';
+      for (let i = 0; i < rn * cn; i++) g += '<i></i>';
+      return '<div class="bd-thumb-grid" style="grid-template-columns:repeat(' + cn + ',1fr);grid-template-rows:repeat(' + rn + ',1fr)">' + g + '</div>';
+    };
+    return '<div class="bd-cfg-pop bd-preset-pop"><div class="bd-cfg-h">Layouts</div>' +
+      '<div class="bd-presets">' + BD_PRESETS.map(([r, c]) => {
+        const on = bdRows === r && bdCols === c;
+        return '<button class="bd-preset' + (on ? ' on' : '') + '" type="button" data-bd-cell="' + r + ':' + c + '">' +
+          thumb(r, c) + '<span class="bd-preset-lab">' + BD_DIMS[r].label + ' × ' + BD_DIMS[c].label + '</span></button>';
+      }).join('') + '</div></div>';
+  }
+  // v4 · Dropdowns: two compact "group by" menus.
+  function bdCfgDropdowns() {
+    const menu = (axis) => {
+      const cur = axis === 'rows' ? bdRows : bdCols, other = axis === 'rows' ? bdCols : bdRows, open = bdDd === axis;
+      return '<div class="bd-dd' + (open ? ' open' : '') + '">' +
+        '<button class="bd-dd-btn" type="button" data-bd-dd="' + axis + '">' + bIcon(BD_DIMS[cur].icon, 'bd-dd-ico') + '<span>' + BD_DIMS[cur].label + '</span>' + bIcon('chev', 'bd-dd-chev') + '</button>' +
+        (open ? '<div class="bd-dd-menu">' + BD_DIM_ORDER.map((d) =>
+          '<button class="bd-dd-i' + (cur === d ? ' on' : '') + '" type="button"' + (other === d ? ' disabled' : '') + ' data-bd-ddpick="' + axis + ':' + d + '">' +
+          bIcon(BD_DIMS[d].icon, 'bd-dd-ico') + BD_DIMS[d].label + (cur === d ? '<span class="bd-dd-ck">✓</span>' : '') + '</button>').join('') + '</div>' : '') +
+        '</div>';
+    };
+    return '<div class="bd-cfg-pop bd-dd-pop">' +
+      '<div class="bd-dd-row"><label>Group rows by</label>' + menu('rows') + '</div>' +
+      '<div class="bd-dd-row"><label>Then columns by</label>' + menu('cols') + '</div></div>';
   }
   function modalBox(title, body) {
     return '<div class="pm-box"><div class="pm-h"><b>' + title + '</b>' +
@@ -1373,11 +1432,22 @@
       const view = e.target.closest('[data-bd-view]');
       if (view) { bdView = view.dataset.bdView; bdCfgOpen = false; renderModal(); return; }
       const toggle = e.target.closest('[data-bd-cfg-toggle]');
-      if (toggle) { bdCfgOpen = !bdCfgOpen; renderModal(); return; }
-      const cell = e.target.closest('[data-bd-cell]');
+      if (toggle) { bdCfgOpen = !bdCfgOpen; bdDd = null; renderModal(); return; }
+      const cell = e.target.closest('[data-bd-cell]');           // matrix / preset
       if (cell) { const p = cell.dataset.bdCell.split(':'); bdRows = p[0]; bdCols = p[1]; bdCfgOpen = false; renderModal(); return; }
+      const dim = e.target.closest('[data-bd-dim]');             // chip lists
+      if (dim) {
+        const [axis, d] = dim.dataset.bdDim.split(':');
+        if (axis === 'rows') { if (bdCols === d) bdCols = bdRows; bdRows = d; } else { if (bdRows === d) bdRows = bdCols; bdCols = d; }
+        renderModal(); return;
+      }
+      if (e.target.closest('[data-bd-swap]')) { const t = bdRows; bdRows = bdCols; bdCols = t; renderModal(); return; }
+      const dd = e.target.closest('[data-bd-dd]');               // dropdowns
+      if (dd) { bdDd = bdDd === dd.dataset.bdDd ? null : dd.dataset.bdDd; renderModal(); return; }
+      const ddp = e.target.closest('[data-bd-ddpick]');
+      if (ddp) { const [axis, d] = ddp.dataset.bdDdpick.split(':'); if (axis === 'rows') bdRows = d; else bdCols = d; bdDd = null; renderModal(); return; }
       // click elsewhere closes the configurator popover
-      if (bdCfgOpen && !e.target.closest('.bd-mtx-pop')) { bdCfgOpen = false; renderModal(); return; }
+      if (bdCfgOpen && !e.target.closest('.bd-cfg-pop')) { bdCfgOpen = false; bdDd = null; renderModal(); return; }
     }
     const ln = e.target.closest('[data-bd-lane]');
     if (ln) {

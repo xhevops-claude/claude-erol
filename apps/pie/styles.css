@@ -1330,7 +1330,7 @@ body {
 
 /* ---------- Floating version switcher (draggable) ---------- */
 .verfab {
-  position: fixed; left: 18px; bottom: 88px; z-index: 8000;
+  position: fixed; left: 18px; bottom: 88px; z-index: 8650;
   display: flex; align-items: center; gap: 3px; padding: 5px 7px 5px 4px;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(16px) saturate(1.8); -webkit-backdrop-filter: blur(16px) saturate(1.8);
@@ -1577,6 +1577,54 @@ body {
 .bd-mtx-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; }
 .bd-mtx-x { color: #d4d4d8; font-size: 16px; cursor: default; background: transparent; border-color: transparent; }
 .bd-mtx-x:hover { border-color: transparent; background: transparent; }
+
+/* shared popover shell */
+.bd-cfg-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; background: #fff; border: 1px solid rgba(24, 24, 27, .1); border-radius: 14px; box-shadow: 0 20px 55px rgba(24, 24, 27, .24); padding: 14px; }
+.bd-cfg-h { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #a1a1aa; font-weight: 700; padding: 2px 4px 8px; }
+
+/* v1 · chip lists + swap */
+.bd-chip-pop { width: 360px; }
+.bd-axes { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; }
+.bd-dims { display: flex; flex-direction: column; gap: 3px; }
+.bd-dim { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 8px 9px; font: inherit; font-size: 13px; font-weight: 500; color: #3f3f46; cursor: pointer; }
+.bd-dim:hover { background: #f4f4f5; }
+.bd-dim.on { background: #18181b; color: #fff; font-weight: 600; }
+.bd-dim.on .bd-dim-ico { stroke: #fff; }
+.bd-dim:disabled { opacity: .32; cursor: default; background: transparent; }
+.bd-dim-ico { width: 15px; height: 15px; stroke: #71717a; flex: 0 0 auto; }
+.bd-swap { align-self: center; width: 30px; height: 30px; border: 1px solid #e4e4e7; background: #fff; border-radius: 8px; color: #52525b; font-size: 15px; cursor: pointer; margin-top: 22px; }
+.bd-swap:hover { border-color: #a1a1aa; color: #18181b; }
+
+/* v3 · preset gallery */
+.bd-preset-pop { width: 360px; }
+.bd-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bd-preset { display: flex; flex-direction: column; gap: 7px; border: 1px solid #e4e4e7; background: #fff; border-radius: 10px; padding: 9px; cursor: pointer; font: inherit; }
+.bd-preset:hover { border-color: #a1a1aa; }
+.bd-preset.on { border-color: #18181b; box-shadow: 0 0 0 1px #18181b; }
+.bd-thumb-grid { display: grid; gap: 2px; height: 40px; }
+.bd-thumb-grid i { background: #eceef2; border-radius: 2px; }
+.bd-preset.on .bd-thumb-grid i { background: #cdd0d6; }
+.bd-preset-lab { font-size: 11px; font-weight: 600; color: #3f3f46; text-align: left; line-height: 1.3; }
+.bd-preset.on .bd-preset-lab { color: #18181b; }
+
+/* v4 · dropdowns */
+.bd-dd-pop { width: 300px; }
+.bd-dd-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.bd-dd-row:last-child { margin-bottom: 0; }
+.bd-dd-row > label { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #a1a1aa; font-weight: 700; padding-left: 2px; }
+.bd-dd { position: relative; }
+.bd-dd-btn { display: flex; align-items: center; gap: 8px; width: 100%; border: 1px solid #e4e4e7; background: #fff; border-radius: 9px; padding: 9px 11px; font: inherit; font-size: 13px; font-weight: 600; color: #18181b; cursor: pointer; }
+.bd-dd-btn:hover { border-color: #a1a1aa; }
+.bd-dd.open .bd-dd-btn { border-color: #18181b; }
+.bd-dd-btn span { flex: 1 1 auto; text-align: left; }
+.bd-dd-ico { width: 15px; height: 15px; stroke: #52525b; flex: 0 0 auto; }
+.bd-dd-chev { width: 14px; height: 14px; stroke: #a1a1aa; }
+.bd-dd-menu { position: absolute; top: calc(100% + 5px); left: 0; right: 0; z-index: 5; background: #fff; border: 1px solid rgba(24, 24, 27, .1); border-radius: 10px; box-shadow: 0 14px 36px rgba(24, 24, 27, .2); padding: 5px; }
+.bd-dd-i { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 7px; padding: 8px 9px; font: inherit; font-size: 13px; font-weight: 500; color: #27272a; cursor: pointer; }
+.bd-dd-i:hover { background: #f4f4f5; }
+.bd-dd-i.on { font-weight: 700; }
+.bd-dd-i:disabled { opacity: .32; cursor: default; background: transparent; }
+.bd-dd-ck { margin-left: auto; color: var(--accent); font-weight: 800; }
 
 .bd-graph { display: flex; align-items: center; justify-content: center; height: 100%; }
 
