@@ -1619,7 +1619,35 @@ body {
 .bd-dd-i:disabled { opacity: .32; cursor: default; background: transparent; }
 .bd-dd-ck { margin-left: auto; color: var(--accent); font-weight: 800; }
 
-.bd-graph { display: flex; align-items: center; justify-content: center; height: 100%; }
+/* Graph view: draggable node graph */
+.bd-graph-body { padding: 0; overflow: hidden; }
+.bd-graph-wrap {
+  width: 100%; height: 100%; overflow: auto;
+  background: radial-gradient(circle, rgba(20, 30, 60, .08) 1px, transparent 1px) 0 0 / 22px 22px, #fafafb;
+}
+.bd-graph-canvas { position: relative; min-width: 100%; min-height: 100%; }
+.bd-graph-svg { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+.ge { fill: none; stroke: #9aa1ad; stroke-width: 1.6; }
+.ge-dash { stroke-dasharray: 5 5; }
+.gn {
+  position: absolute; width: 214px; box-sizing: border-box; border-radius: 10px; padding: 9px 12px 10px;
+  background: #fff; border: 1px solid transparent; cursor: grab; user-select: none; touch-action: none;
+  box-shadow: 0 1px 2px rgba(24, 24, 27, .1), 0 4px 10px rgba(24, 24, 27, .05);
+}
+.gn:hover { box-shadow: 0 2px 4px rgba(24, 24, 27, .14), 0 8px 20px rgba(24, 24, 27, .1); }
+.gn.gn-drag { cursor: grabbing; z-index: 5; box-shadow: 0 10px 26px rgba(24, 24, 27, .22); }
+.gn-story { background: #e7f6ea; }
+.gn-feature { background: #dbe8fb; }
+.gn-dependency { background: #efe9fb; }
+.gn-note { background: #fff; }
+.gn-root { background: #fff; border-color: #46b16a; box-shadow: 0 0 0 1px #46b16a, 0 4px 10px rgba(24, 24, 27, .06); }
+.gn-top { display: flex; justify-content: space-between; gap: 8px; font-size: 9px; letter-spacing: .05em; text-transform: uppercase; color: #6b7280; font-weight: 700; }
+.gn-team { color: #8b93a3; font-weight: 700; white-space: nowrap; }
+.gn-title { font-size: 14px; font-weight: 600; color: #18181b; margin: 5px 0 5px; }
+.gn-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #6b7280; }
+.gn-dot { width: 8px; height: 8px; border-radius: 50%; background: #b3b3ba; flex: 0 0 auto; }
+.gn-dot.st-doing { background: #f59e0b; }
+.gn-dot.st-done { background: #46b16a; }
 
 .bd-body { padding: 0; overflow: hidden; }
 .bd-scroll { width: 100%; height: 100%; overflow: auto; }

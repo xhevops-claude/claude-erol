@@ -1322,6 +1322,101 @@
       '<div class="bd-dd-row"><label>Group rows by</label>' + menu('rows') + '</div>' +
       '<div class="bd-dd-row"><label>Then columns by</label>' + menu('cols') + '</div></div>';
   }
+
+  // ---------- Breakdown Graph view: a draggable node graph of the sticky's links ----------
+  const GNW = 214, GNH = 66;
+  const bdGraphCache = {}, bdGraphPos = {};
+  function bdGraphModel(c) {
+    if (bdGraphCache[c.id]) return bdGraphCache[c.id];
+    const rng = seededRng('g' + c.id);
+    const tName = (team(c.teamId) || ctxTeams()[0] || { name: 'Team' }).name;
+    const iterAt = (i) => state.sprints[Math.min(i, state.sprints.length - 1)] || ('Iter ' + (i + 1));
+    const nodes = [], edges = [];
+    nodes.push({ id: 'root', root: true, type: stypeOf(c), label: stypeLabel(stypeOf(c)), title: c.title, team: tName, status: statusOf(c), iter: iterAt(c.sprintIdx || 0), bv: Number(c.points) || 0 });
+    nodes.push({ id: 'feat', type: 'feature', label: 'Feature', title: 'Feat 1', team: tName, status: 'todo', iter: iterAt(0) });
+    edges.push({ from: 'root', to: 'feat', dashed: true });
+    const nStory = 4 + Math.floor(rng() * 3), gap = 108, startY = 40;
+    for (let i = 0; i < nStory; i++) {
+      nodes.push({ id: 's' + i, type: 'story', label: 'User Story', title: 'Story' + (i ? ' ' + (i + 1) : ''), team: tName, status: 'todo', iter: iterAt(i < 2 ? 1 : 0) });
+      edges.push({ from: 'feat', to: 's' + i, dashed: true });
+    }
+    const depY = startY + nStory * gap + 24;
+    nodes.push({ id: 'dep', type: 'dependency', label: 'Dependency', title: 'Dep', team: tName, iter: iterAt(3) });
+    edges.push({ from: 'feat', to: 'dep', dashed: false });
+    nodes.push({ id: 'depT', type: 'story', label: 'User Story', title: 'With Dep', team: tName, status: 'todo', iter: iterAt(3) });
+    edges.push({ from: 'dep', to: 'depT', dashed: true });
+    // default layout: root left, feature mid, stories + dep column, dep target far right
+    const midY = (startY + depY) / 2;
+    const layout = { root: { x: 40, y: midY }, feat: { x: 480, y: midY }, dep: { x: 940, y: depY }, depT: { x: 1300, y: depY } };
+    for (let i = 0; i < nStory; i++) layout['s' + i] = { x: 940, y: startY + i * gap };
+    nodes.forEach((n) => { n.dx = layout[n.id].x; n.dy = layout[n.id].y; });
+    const m = { nodes, edges };
+    bdGraphCache[c.id] = m;
+    return m;
+  }
+  function ensureGraphPos(c, m) {
+    if (bdGraphPos[c.id]) return;
+    const p = {};
+    m.nodes.forEach((n) => { p[n.id] = { x: n.dx, y: n.dy }; });
+    bdGraphPos[c.id] = p;
+  }
+  function graphEdgesSvg(m, pos) {
+    let paths = '';
+    m.edges.forEach((e) => {
+      const a = pos[e.from], b = pos[e.to]; if (!a || !b) return;
+      const x1 = a.x + GNW, y1 = a.y + GNH / 2, x2 = b.x, y2 = b.y + GNH / 2;
+      const dx = Math.max(50, Math.abs(x2 - x1) / 2);
+      paths += '<path class="ge' + (e.dashed ? ' ge-dash' : '') + '" d="M' + x1 + ',' + y1 + ' C' + (x1 + dx) + ',' + y1 + ' ' + (x2 - dx) + ',' + y2 + ' ' + x2 + ',' + y2 + '" marker-end="url(#gearrow)"/>';
+    });
+    return '<defs><marker id="gearrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9aa1ad"/></marker></defs>' + paths;
+  }
+  function graphNodeHtml(n, p) {
+    const top = n.root
+      ? '<span class="gn-type">' + n.label.toUpperCase() + '</span><span class="gn-team">BV: ' + n.bv + '</span>'
+      : '<span class="gn-type">' + n.label.toUpperCase() + '</span><span class="gn-team">' + esc(n.team) + '</span>';
+    const meta = n.status
+      ? '<div class="gn-meta"><i class="gn-dot st-' + n.status + '"></i>' + statusLabel(n.status) + ' · ' + esc(n.iter) + '</div>'
+      : '<div class="gn-meta">' + esc(n.iter) + '</div>';
+    return '<div class="gn gn-' + n.type + (n.root ? ' gn-root' : '') + '" data-gnode="' + n.id + '" style="left:' + p.x + 'px;top:' + p.y + 'px">' +
+      '<div class="gn-top">' + top + '</div><div class="gn-title">' + esc(n.title) + '</div>' + meta + '</div>';
+  }
+  function graphHtml(c) {
+    const m = bdGraphModel(c);
+    ensureGraphPos(c, m);
+    const pos = bdGraphPos[c.id];
+    let maxX = 0, maxY = 0;
+    m.nodes.forEach((n) => { maxX = Math.max(maxX, pos[n.id].x); maxY = Math.max(maxY, pos[n.id].y); });
+    const W = maxX + GNW + 120, H = maxY + GNH + 120;
+    return '<div class="bd-graph-wrap" id="bd-graph-wrap"><div class="bd-graph-canvas" id="bd-graph-canvas" style="width:' + W + 'px;height:' + H + 'px">' +
+      '<svg class="bd-graph-svg" id="bd-graph-svg" width="' + W + '" height="' + H + '">' + graphEdgesSvg(m, pos) + '</svg>' +
+      m.nodes.map((n) => graphNodeHtml(n, pos[n.id])).join('') + '</div></div>';
+  }
+  function wireGraph(c) {
+    const canvas = document.getElementById('bd-graph-canvas'); if (!canvas) return;
+    const svg = document.getElementById('bd-graph-svg');
+    const m = bdGraphModel(c), pos = bdGraphPos[c.id];
+    let drag = null;
+    canvas.addEventListener('pointerdown', (e) => {
+      const nd = e.target.closest('[data-gnode]'); if (!nd) return;
+      e.preventDefault();
+      const id = nd.dataset.gnode;
+      drag = { id, el: nd, sx: e.clientX, sy: e.clientY, px: pos[id].x, py: pos[id].y };
+      nd.classList.add('gn-drag');
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      pos[drag.id].x = Math.max(0, drag.px + (e.clientX - drag.sx));
+      pos[drag.id].y = Math.max(0, drag.py + (e.clientY - drag.sy));
+      drag.el.style.left = pos[drag.id].x + 'px';
+      drag.el.style.top = pos[drag.id].y + 'px';
+      svg.innerHTML = graphEdgesSvg(m, pos);
+    });
+    const end = (e) => { if (drag) { drag.el.classList.remove('gn-drag'); drag = null; try { canvas.releasePointerCapture(e.pointerId); } catch (_) {} } };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+  }
+
   function modalBox(title, body) {
     return '<div class="pm-box"><div class="pm-h"><b>' + title + '</b>' +
       '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' + body + '</div>';
@@ -1391,8 +1486,7 @@
             '</div>' +
           '</div>' +
           '<div class="pm-full-b bd-body">' + breakdownHtml(c) + '</div>'
-        : '<div class="pm-full-b bd-body"><div class="bd-graph"><div class="pm-placeholder">' + bIcon('collab', 'pm-ph-ico') +
-            '<h3>Graph view</h3><p>A relationship graph of this sticky and everything it connects to will live here — you’ll define it next.</p></div></div></div>';
+        : '<div class="pm-full-b bd-body bd-graph-body">' + graphHtml(c) + '</div>';
       modalEl.innerHTML =
         '<div class="pm-full bd-full"><div class="pm-full-h bd-head">' +
           bIcon('breakdown', 'bd-head-ico') + '<span class="bd-head-k">Breakdown</span>' +
@@ -1409,6 +1503,7 @@
         const scroll = modalEl.querySelector('.bd-scroll');
         if (scroll) scroll.outerHTML = breakdownHtml(modalCard);
       });
+      if (bdView === 'graph') wireGraph(c);
     } else if (modalType === 'sblinks') {
       const c = modalCard || {};
       const linked = new Set(linkedIdsFor(c));
