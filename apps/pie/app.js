@@ -1379,14 +1379,27 @@
     return 'M' + x1 + ',' + y1 + ' C' + (x1 + dx) + ',' + y1 + ' ' + (x2 - dx) + ',' + y2 + ' ' + x2 + ',' + y2;
   }
   function graphEdgesSvg(m, pos) {
-    let paths = '';
+    let paths = '', labels = '';
     m.edges.forEach((e) => {
-      let a = pos[e.a], b = pos[e.b]; if (!a || !b) return;
-      if (a.x > b.x) { const t = a; a = b; b = t; } // draw left → right
-      paths += '<path class="ge ge-dash" d="' + graphEdgePath(a.x + GNW, a.y + GNH / 2, b.x, b.y + GNH / 2) + '" marker-end="url(#gearrow)"/>';
+      let ida = e.a, idb = e.b, a = pos[ida], b = pos[idb]; if (!a || !b) return;
+      if (a.x > b.x) { const t = a; a = b; b = t; const ti = ida; ida = idb; idb = ti; } // draw left → right
+      const x1 = a.x + GNW, y1 = a.y + GNH / 2, x2 = b.x, y2 = b.y + GNH / 2;
+      const ta = (card(ida) || {}).teamId, tb = (card(idb) || {}).teamId;
+      const cross = ta && tb && ta !== tb; // a link across teams is a dependency
+      paths += '<path class="ge ' + (cross ? 'ge-cross' : 'ge-same') + '" d="' + graphEdgePath(x1, y1, x2, y2) +
+        '" marker-end="url(#' + (cross ? 'gearrowX' : 'gearrow') + ')"/>';
+      if (cross) {
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        const lab = ((team(ta) || {}).name || '') + '  →  ' + ((team(tb) || {}).name || '');
+        const w = lab.length * 5.6 + 20;
+        labels += '<rect class="ge-lab-bg" x="' + (mx - w / 2) + '" y="' + (my - 10) + '" width="' + w + '" height="20" rx="10"/>' +
+          '<text class="ge-lab" x="' + mx + '" y="' + (my + 3.5) + '" text-anchor="middle">' + esc(lab) + '</text>';
+      }
     });
-    return '<defs><marker id="gearrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9aa1ad"/></marker></defs>' +
-      paths + '<path class="ge ge-temp" id="ge-temp" d=""/>';
+    return '<defs>' +
+      '<marker id="gearrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9aa1ad"/></marker>' +
+      '<marker id="gearrowX" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#f59e0b"/></marker>' +
+      '</defs>' + paths + labels + '<path class="ge ge-temp" id="ge-temp" d=""/>';
   }
   function graphNodeHtml(n, p) {
     const top = n.root
@@ -1405,7 +1418,9 @@
     m.nodes.forEach((n) => { maxX = Math.max(maxX, pos[n.id].x); maxY = Math.max(maxY, pos[n.id].y); });
     const W = Math.max(maxX + GNW + 120, 1000), H = Math.max(maxY + GNH + 120, 560);
     const hint = m.nodes.length <= 1 ? '<div class="bd-graph-hint">No links yet — use the sticky’s <b>Links</b> action, then they’ll appear here.</div>' : '';
-    return '<div class="bd-graph-wrap" id="bd-graph-wrap"><div class="bd-graph-toolbar">Drag nodes to arrange · drag from a node’s <span class="gn-port-demo"></span> handle to link two stickies</div>' +
+    return '<div class="bd-graph-wrap" id="bd-graph-wrap"><div class="bd-graph-toolbar">' +
+      '<span>Drag nodes to arrange · drag from a node’s <span class="gn-port-demo"></span> handle to link two stickies</span>' +
+      '<span class="ge-legend"><i class="lg-line lg-same"></i>same team<i class="lg-line lg-cross"></i>cross-team dependency</span></div>' +
       '<div class="bd-graph-canvas" id="bd-graph-canvas" style="width:' + W + 'px;height:' + H + 'px">' +
       '<svg class="bd-graph-svg" id="bd-graph-svg" width="' + W + '" height="' + H + '">' + graphEdgesSvg(m, pos) + '</svg>' +
       m.nodes.map((n) => graphNodeHtml(n, pos[n.id])).join('') + hint + '</div></div>';

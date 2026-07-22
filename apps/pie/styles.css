@@ -1626,15 +1626,23 @@ body {
   background: radial-gradient(circle, rgba(20, 30, 60, .08) 1px, transparent 1px) 0 0 / 22px 22px, #fafafb;
 }
 .bd-graph-toolbar {
-  position: sticky; top: 0; left: 0; z-index: 4; padding: 8px 16px; font-size: 12px; color: #71717a;
+  position: sticky; top: 0; left: 0; z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 8px 16px; font-size: 12px; color: #71717a;
   background: rgba(255, 255, 255, .82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   border-bottom: 1px solid rgba(24, 24, 27, .06);
 }
 .gn-port-demo { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); vertical-align: middle; margin: 0 1px; }
+.ge-legend { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto; }
+.lg-line { display: inline-block; width: 20px; height: 0; margin-left: 8px; }
+.lg-same { border-top: 2px dashed #c4c8d0; }
+.lg-cross { border-top: 2.5px solid var(--accent); }
 .bd-graph-canvas { position: relative; min-width: 100%; min-height: 100%; }
 .bd-graph-svg { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
-.ge { fill: none; stroke: #9aa1ad; stroke-width: 1.6; }
-.ge-dash { stroke-dasharray: 5 5; }
+.ge { fill: none; }
+.ge-same { stroke: #c4c8d0; stroke-width: 1.5; stroke-dasharray: 5 5; }
+.ge-cross { stroke: var(--accent); stroke-width: 2.4; }
+.ge-lab-bg { fill: #fff; stroke: var(--accent); stroke-width: 1; opacity: .96; }
+.ge-lab { fill: #8a5a06; font-size: 10px; font-weight: 700; }
 .ge-temp { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; }
 .bd-graph-hint { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); color: #a1a1aa; font-size: 13px; }
 .gn {
