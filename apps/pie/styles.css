@@ -1653,9 +1653,11 @@ body {
 .lg-line { display: inline-block; width: 20px; height: 0; margin-left: 8px; vertical-align: middle; }
 .lg-same { border-top: 2px solid #c4c8d0; }
 .lg-cross { border-top: 2.5px solid var(--accent); }
-.lg-dash { border-top: 2.5px dashed var(--accent); }
-.lg-red { border-top: 2.5px solid #dc2626; }
-.lg-diamond { display: inline-block; width: 9px; height: 9px; margin-left: 8px; background: #fff; border: 2px solid #dc2626; transform: rotate(45deg); vertical-align: middle; }
+.lg-flow { width: 20px; height: 2px; margin-left: 8px; background-image: linear-gradient(90deg, var(--accent) 60%, transparent 0); background-size: 7px 2px; }
+.lg-elbow { display: inline-block; width: 18px; height: 8px; margin-left: 8px; border: 2px solid #4f46e5; border-left: 0; border-top: 0; border-bottom-left-radius: 4px; vertical-align: middle; }
+.lg-teamkey { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
+.lg-teamdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+.lg-two { margin-left: 10px; padding-left: 10px; border-left: 1px solid #e4e4e7; color: #a1a1aa; }
 .bd-graph-ver { display: flex; gap: 2px; background: #f4f4f5; border-radius: 8px; padding: 2px; }
 .bd-graph-ver button { border: 0; background: transparent; color: #71717a; border-radius: 6px; padding: 4px 9px; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; }
 .bd-graph-ver button.on { background: #18181b; color: #fff; }
@@ -1663,10 +1665,12 @@ body {
 .ge { fill: none; }
 .ge-same { stroke: #c4c8d0; stroke-width: 1.6; }
 .ge-cross { stroke: var(--accent); stroke-width: 2.4; }
-.ge-crossdash { stroke-dasharray: 8 5; }
-.ge-crossred { stroke: #dc2626; stroke-width: 2.6; }
-.ge-diamond { fill: #fff; stroke: #dc2626; stroke-width: 2; }
-.ge-dim { opacity: .12; }
+.ge-flow { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 8 5; stroke-linecap: round; animation: ge-march 1s linear infinite; }
+@keyframes ge-march { to { stroke-dashoffset: -26; } }
+.ge-elbow { stroke: #4f46e5; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.ge-team { stroke-width: 2; }
+.ge-team-cross { stroke-width: 3.4; }
+.ge-dim { opacity: .12; animation: none; }
 .ge-lab-bg { fill: #fff; stroke: var(--accent); stroke-width: 1; opacity: .96; }
 .ge-lab { fill: #8a5a06; font-size: 10px; font-weight: 700; }
 .ge-temp { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; }
@@ -1680,6 +1684,7 @@ body {
 .gn.gn-drag { cursor: grabbing; z-index: 5; box-shadow: 0 10px 26px rgba(24, 24, 27, .22); }
 .gn.gn-dim { opacity: .18; }
 .gn.gn-focus { box-shadow: 0 0 0 2px var(--accent), 0 8px 22px rgba(24, 24, 27, .16); z-index: 4; }
+.gn.gn-related { box-shadow: 0 0 0 1.5px #6366f1, 0 6px 16px rgba(24, 24, 27, .12); z-index: 3; }
 .bd-graph-world.focusing .gn { transition: opacity .12s; }
 .gn-story { background: #e7f6ea; }
 .gn-feature { background: #dbe8fb; }

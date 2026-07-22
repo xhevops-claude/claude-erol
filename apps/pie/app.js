@@ -1378,20 +1378,43 @@
     const dx = Math.max(50, Math.abs(x2 - x1) / 2);
     return 'M' + x1 + ',' + y1 + ' C' + (x1 + dx) + ',' + y1 + ' ' + (x2 - dx) + ',' + y2 + ' ' + x2 + ',' + y2;
   }
+  // orthogonal "dependency" routing (v3): right-angle elbow with rounded corners
+  function graphElbowPath(x1, y1, x2, y2) {
+    const mid = (x1 + x2) / 2, r = Math.min(10, Math.abs(y2 - y1) / 2, Math.abs(mid - x1));
+    if (Math.abs(y2 - y1) < 2 || r < 2) return 'M' + x1 + ',' + y1 + ' H' + x2;
+    const s = y2 > y1 ? 1 : -1;
+    return 'M' + x1 + ',' + y1 + ' H' + (mid - r) + ' Q' + mid + ',' + y1 + ' ' + mid + ',' + (y1 + s * r) +
+      ' V' + (y2 - s * r) + ' Q' + mid + ',' + y2 + ' ' + (mid + r) + ',' + y2 + ' H' + x2;
+  }
+  // per-team colours used to tint edges in v4
+  const GTEAM_COLORS = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#14b8a6', '#f97316'];
+  const gTeamColor = (id) => GTEAM_COLORS[Math.max(0, state.teams.findIndex((t) => t.id === id)) % GTEAM_COLORS.length];
+  // selecting a node lights its whole lineage: all ancestors (parents) and descendants (children)
+  function lineageSet(focusId, m) {
+    const lvl = {}, adj = {};
+    m.nodes.forEach((n) => { lvl[n.id] = n.lvl; adj[n.id] = []; });
+    m.edges.forEach((e) => { if (adj[e.a] && adj[e.b]) { adj[e.a].push(e.b); adj[e.b].push(e.a); } });
+    const keep = new Set([focusId]);
+    const walk = (dir) => { const st = [focusId]; while (st.length) { const id = st.pop(); (adj[id] || []).forEach((nb) => { if (dir * (lvl[nb] - lvl[id]) > 0 && !keep.has(nb)) { keep.add(nb); st.push(nb); } }); } };
+    walk(-1); // ancestors (lower level)
+    walk(1);  // descendants (higher level)
+    return keep;
+  }
+  function focusKeep(c, m) { const f = bdGraphFocus[c.id]; return f ? lineageSet(f, m) : null; }
   // Four ways (v1–v4) to distinguish a cross-team dependency from a same-team link.
-  function graphEdgesSvg(m, pos, focus) {
+  function graphEdgesSvg(m, pos, keep) {
     const v = state.navVersion;
-    let paths = '', labels = '';
-    m.edges.forEach((e) => {
+    let paths = '', labels = '', grads = '';
+    m.edges.forEach((e, idx) => {
       let ida = e.a, idb = e.b, a = pos[ida], b = pos[idb]; if (!a || !b) return;
       if (a.x > b.x) { const t = a; a = b; b = t; const ti = ida; ida = idb; idb = ti; } // draw left → right
       const x1 = a.x + GNW, y1 = a.y + GNH / 2, x2 = b.x, y2 = b.y + GNH / 2;
       const ta = (card(ida) || {}).teamId, tb = (card(idb) || {}).teamId;
       const cross = ta && tb && ta !== tb; // a link across teams is a dependency
-      const dim = focus && ida !== focus && idb !== focus;
+      const dim = keep && (!keep.has(ida) || !keep.has(idb));
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-      let cls = 'ge ', marker = 'gearrow';
-      if (!cross) {
+      let cls = 'ge ', marker = 'gearrow', d = graphEdgePath(x1, y1, x2, y2), style = '';
+      if (!cross && v !== 'v4') {
         cls += 'ge-same';
       } else if (v === 'v1') {                 // v1 · color + weight + team-name pill
         cls += 'ge-cross'; marker = 'gearrowX';
@@ -1401,28 +1424,37 @@
           labels += '<rect class="ge-lab-bg" x="' + (mx - w / 2) + '" y="' + (my - 10) + '" width="' + w + '" height="20" rx="10"/>' +
             '<text class="ge-lab" x="' + mx + '" y="' + (my + 3.5) + '" text-anchor="middle">' + esc(lab) + '</text>';
         }
-      } else if (v === 'v2') {                 // v2 · dashed line = crossing a boundary
-        cls += 'ge-cross ge-crossdash'; marker = 'gearrowX';
-      } else if (v === 'v3') {                 // v3 · neutral lines, a dependency diamond at the midpoint
-        cls += 'ge-same';
-        if (!dim) labels += '<rect class="ge-diamond" x="' + (mx - 7) + '" y="' + (my - 7) + '" width="14" height="14" rx="2" transform="rotate(45 ' + mx + ' ' + my + ')"/>';
-      } else {                                 // v4 · red risk line + diamond arrowhead
-        cls += 'ge-crossred'; marker = 'gearrowD';
+      } else if (v === 'v2') {                 // v2 · animated flowing dashes = a live cross-boundary flow
+        cls += cross ? 'ge-cross ge-flow' : 'ge-same'; marker = cross ? 'gearrowX' : 'gearrow';
+      } else if (v === 'v3') {                 // v3 · orthogonal "dependency" routing (shape-coded)
+        if (cross) { cls += 'ge-elbow'; marker = 'gearrowI'; d = graphElbowPath(x1, y1, x2, y2); }
+        else cls += 'ge-same';
+      } else {                                 // v4 · edge tinted by team — two-tone means it crosses teams
+        const gid = 'gg' + idx;
+        grads += '<linearGradient id="' + gid + '" gradientUnits="userSpaceOnUse" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '">' +
+          '<stop offset="0.15" stop-color="' + gTeamColor(ta) + '"/><stop offset="0.85" stop-color="' + gTeamColor(tb) + '"/></linearGradient>';
+        cls += 'ge-team' + (cross ? ' ge-team-cross' : ''); style = 'stroke:url(#' + gid + ')';
       }
       if (dim) cls += ' ge-dim';
-      paths += '<path class="' + cls + '" d="' + graphEdgePath(x1, y1, x2, y2) + '" marker-end="url(#' + marker + ')"/>';
+      paths += '<path class="' + cls + '" d="' + d + '" marker-end="url(#' + marker + ')"' + (style ? ' style="' + style + '"' : '') + '/>';
     });
     return '<defs>' +
       '<marker id="gearrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9aa1ad"/></marker>' +
       '<marker id="gearrowX" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#f59e0b"/></marker>' +
-      '<marker id="gearrowD" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M0,6 L6,0 L12,6 L6,12 z" fill="#dc2626"/></marker>' +
-      '</defs>' + paths + labels + '<path class="ge ge-temp" id="ge-temp" d=""/>';
+      '<marker id="gearrowI" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#4f46e5"/></marker>' +
+      grads + '</defs>' + paths + labels + '<path class="ge ge-temp" id="ge-temp" d=""/>';
   }
-  function graphLegend() {
+  function graphLegend(m) {
     const v = state.navVersion;
-    if (v === 'v2') return '<i class="lg-line lg-same"></i>same team<i class="lg-line lg-dash"></i>cross-team dependency';
-    if (v === 'v3') return '<i class="lg-line lg-same"></i>link<i class="lg-diamond"></i>cross-team dependency';
-    if (v === 'v4') return '<i class="lg-line lg-same"></i>same team<i class="lg-line lg-red"></i>cross-team dependency';
+    if (v === 'v2') return '<i class="lg-line lg-same"></i>same team<i class="lg-line lg-flow"></i>cross-team dependency';
+    if (v === 'v3') return '<i class="lg-line lg-same"></i>same team<i class="lg-elbow"></i>cross-team dependency';
+    if (v === 'v4') {
+      const seen = [];
+      m.nodes.forEach((n) => { const cd = card(n.id); if (cd && cd.teamId && !seen.includes(cd.teamId)) seen.push(cd.teamId); });
+      return '<span class="lg-teamkey">' + seen.slice(0, 6).map((id) =>
+        '<i class="lg-teamdot" style="background:' + gTeamColor(id) + '"></i>' + esc((team(id) || {}).name || '')).join('') +
+        '</span><span class="lg-two">two-tone = crosses teams</span>';
+    }
     return '<i class="lg-line lg-same"></i>same team<i class="lg-line lg-cross"></i>cross-team dependency';
   }
   function graphVerSeg() {
@@ -1442,17 +1474,17 @@
     const m = bdGraphModel(c);
     ensureGraphPos(c, m);
     const pos = bdGraphPos[c.id];
-    const focus = bdGraphFocus[c.id] || null;
+    const keep = focusKeep(c, m);
     let maxX = 0, maxY = 0;
     m.nodes.forEach((n) => { maxX = Math.max(maxX, pos[n.id].x); maxY = Math.max(maxY, pos[n.id].y); });
     const W = Math.max(maxX + GNW + 200, 1400), H = Math.max(maxY + GNH + 200, 900);
     const hint = m.nodes.length <= 1 ? '<div class="bd-graph-hint">No links yet — use the sticky’s <b>Links</b> action, then they’ll appear here.</div>' : '';
     return '<div class="bd-graph-wrap" id="bd-graph-wrap"><div class="bd-graph-toolbar">' +
       '<span class="bd-graph-hintline">Scroll to zoom · drag to pan · click a sticky to focus its links</span>' +
-      '<span class="bd-graph-tbr"><span class="ge-legend">' + graphLegend() + '</span>' + graphVerSeg() + '</span></div>' +
+      '<span class="bd-graph-tbr"><span class="ge-legend">' + graphLegend(m) + '</span>' + graphVerSeg() + '</span></div>' +
       '<div class="bd-graph-viewport" id="bd-graph-viewport">' +
         '<div class="bd-graph-world" id="bd-graph-world" style="width:' + W + 'px;height:' + H + 'px">' +
-          '<svg class="bd-graph-svg" id="bd-graph-svg" width="' + W + '" height="' + H + '">' + graphEdgesSvg(m, pos, focus) + '</svg>' +
+          '<svg class="bd-graph-svg" id="bd-graph-svg" width="' + W + '" height="' + H + '">' + graphEdgesSvg(m, pos, keep) + '</svg>' +
           m.nodes.map((n) => graphNodeHtml(n, pos[n.id])).join('') + hint +
         '</div>' +
       '</div>' +
@@ -1475,14 +1507,16 @@
     };
     applyView();
     const worldPt = (e) => { const r = vp.getBoundingClientRect(); return { x: (e.clientX - r.left - view.x) / view.zoom, y: (e.clientY - r.top - view.y) / view.zoom }; };
-    const redrawEdges = () => { svg.innerHTML = graphEdgesSvg(m, pos, bdGraphFocus[c.id] || null); };
+    const redrawEdges = () => { svg.innerHTML = graphEdgesSvg(m, pos, focusKeep(c, m)); };
     function applyFocus() {
       const f = bdGraphFocus[c.id] || null;
       world.classList.toggle('focusing', !!f);
-      const nbr = f ? new Set([f, ...linkedIdsFor(card(f) || {})]) : null;
+      const keep = f ? lineageSet(f, m) : null;
       world.querySelectorAll('.gn').forEach((el) => {
-        el.classList.toggle('gn-dim', !!f && !nbr.has(el.dataset.gnode));
-        el.classList.toggle('gn-focus', el.dataset.gnode === f);
+        const id = el.dataset.gnode, kept = !f || keep.has(id);
+        el.classList.toggle('gn-dim', !!f && !kept);
+        el.classList.toggle('gn-focus', id === f);
+        el.classList.toggle('gn-related', !!f && kept && id !== f);
       });
       redrawEdges();
     }
