@@ -1622,12 +1622,24 @@ body {
 .bd-dd-i:disabled { opacity: .32; cursor: default; background: transparent; }
 .bd-dd-ck { margin-left: auto; color: var(--accent); font-weight: 800; }
 
-/* Graph view: draggable node graph */
+/* Graph view: whiteboard — zoom, pan, drag nodes, click-to-focus */
 .bd-graph-body { padding: 0; overflow: hidden; }
-.bd-graph-wrap {
-  width: 100%; height: 100%; overflow: auto;
+.bd-graph-wrap { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.bd-graph-viewport {
+  position: relative; flex: 1 1 auto; overflow: hidden; cursor: grab; touch-action: none;
   background: radial-gradient(circle, rgba(20, 30, 60, .08) 1px, transparent 1px) 0 0 / 22px 22px, #fafafb;
 }
+.bd-graph-viewport.panning { cursor: grabbing; }
+.bd-graph-world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.bd-graph-zoom {
+  position: absolute; bottom: 16px; right: 16px; z-index: 6; display: flex; align-items: center; gap: 2px;
+  background: #fff; border: 1px solid rgba(24, 24, 27, .1); border-radius: 999px; padding: 3px;
+  box-shadow: 0 8px 24px rgba(24, 24, 27, .14);
+}
+.bd-graph-zoom button { width: 30px; height: 30px; border: 0; background: transparent; border-radius: 999px; color: #52525b; font-size: 17px; cursor: pointer; }
+.bd-graph-zoom button[data-gz="fit"] { width: auto; padding: 0 12px; font-size: 12.5px; font-weight: 600; }
+.bd-graph-zoom button:hover { background: #f4f4f5; color: #18181b; }
+.bd-graph-zoom #gz-val { min-width: 42px; text-align: center; font-size: 12px; font-weight: 700; color: #52525b; font-variant-numeric: tabular-nums; }
 .bd-graph-toolbar {
   position: sticky; top: 0; left: 0; z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 8px 16px; font-size: 12px; color: #71717a;
@@ -1637,13 +1649,13 @@ body {
 .gn-port-demo { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); vertical-align: middle; margin: 0 1px; }
 .ge-legend { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto; }
 .lg-line { display: inline-block; width: 20px; height: 0; margin-left: 8px; }
-.lg-same { border-top: 2px dashed #c4c8d0; }
+.lg-same { border-top: 2px solid #c4c8d0; }
 .lg-cross { border-top: 2.5px solid var(--accent); }
-.bd-graph-canvas { position: relative; min-width: 100%; min-height: 100%; }
 .bd-graph-svg { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
 .ge { fill: none; }
-.ge-same { stroke: #c4c8d0; stroke-width: 1.5; stroke-dasharray: 5 5; }
+.ge-same { stroke: #c4c8d0; stroke-width: 1.6; }
 .ge-cross { stroke: var(--accent); stroke-width: 2.4; }
+.ge-dim { opacity: .12; }
 .ge-lab-bg { fill: #fff; stroke: var(--accent); stroke-width: 1; opacity: .96; }
 .ge-lab { fill: #8a5a06; font-size: 10px; font-weight: 700; }
 .ge-temp { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; }
@@ -1655,6 +1667,9 @@ body {
 }
 .gn:hover { box-shadow: 0 2px 4px rgba(24, 24, 27, .14), 0 8px 20px rgba(24, 24, 27, .1); }
 .gn.gn-drag { cursor: grabbing; z-index: 5; box-shadow: 0 10px 26px rgba(24, 24, 27, .22); }
+.gn.gn-dim { opacity: .18; }
+.gn.gn-focus { box-shadow: 0 0 0 2px var(--accent), 0 8px 22px rgba(24, 24, 27, .16); z-index: 4; }
+.bd-graph-world.focusing .gn { transition: opacity .12s; }
 .gn-story { background: #e7f6ea; }
 .gn-feature { background: #dbe8fb; }
 .gn-dependency { background: #efe9fb; }

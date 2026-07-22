@@ -1338,7 +1338,7 @@
 
   // ---------- Breakdown Graph view: the sticky's REAL links as a draggable node graph ----------
   const GNW = 214, GNH = 66;
-  const bdGraphPos = {};
+  const bdGraphPos = {}, bdGraphView = {}, bdGraphFocus = {};
   // Build from real cards: root sticky + its links + their links (2 levels).
   function bdGraphModel(c) {
     const nodes = [], seen = new Set([c.id]);
@@ -1378,7 +1378,7 @@
     const dx = Math.max(50, Math.abs(x2 - x1) / 2);
     return 'M' + x1 + ',' + y1 + ' C' + (x1 + dx) + ',' + y1 + ' ' + (x2 - dx) + ',' + y2 + ' ' + x2 + ',' + y2;
   }
-  function graphEdgesSvg(m, pos) {
+  function graphEdgesSvg(m, pos, focus) {
     let paths = '', labels = '';
     m.edges.forEach((e) => {
       let ida = e.a, idb = e.b, a = pos[ida], b = pos[idb]; if (!a || !b) return;
@@ -1386,9 +1386,10 @@
       const x1 = a.x + GNW, y1 = a.y + GNH / 2, x2 = b.x, y2 = b.y + GNH / 2;
       const ta = (card(ida) || {}).teamId, tb = (card(idb) || {}).teamId;
       const cross = ta && tb && ta !== tb; // a link across teams is a dependency
-      paths += '<path class="ge ' + (cross ? 'ge-cross' : 'ge-same') + '" d="' + graphEdgePath(x1, y1, x2, y2) +
+      const dim = focus && ida !== focus && idb !== focus;
+      paths += '<path class="ge ' + (cross ? 'ge-cross' : 'ge-same') + (dim ? ' ge-dim' : '') + '" d="' + graphEdgePath(x1, y1, x2, y2) +
         '" marker-end="url(#' + (cross ? 'gearrowX' : 'gearrow') + ')"/>';
-      if (cross) {
+      if (cross && !dim) {
         const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
         const lab = ((team(ta) || {}).name || '') + '  →  ' + ((team(tb) || {}).name || '');
         const w = lab.length * 5.6 + 20;
@@ -1414,61 +1415,119 @@
     const m = bdGraphModel(c);
     ensureGraphPos(c, m);
     const pos = bdGraphPos[c.id];
+    const focus = bdGraphFocus[c.id] || null;
     let maxX = 0, maxY = 0;
     m.nodes.forEach((n) => { maxX = Math.max(maxX, pos[n.id].x); maxY = Math.max(maxY, pos[n.id].y); });
-    const W = Math.max(maxX + GNW + 120, 1000), H = Math.max(maxY + GNH + 120, 560);
+    const W = Math.max(maxX + GNW + 200, 1400), H = Math.max(maxY + GNH + 200, 900);
     const hint = m.nodes.length <= 1 ? '<div class="bd-graph-hint">No links yet — use the sticky’s <b>Links</b> action, then they’ll appear here.</div>' : '';
     return '<div class="bd-graph-wrap" id="bd-graph-wrap"><div class="bd-graph-toolbar">' +
-      '<span>Drag nodes to arrange · drag from a node’s <span class="gn-port-demo"></span> handle to link two stickies</span>' +
+      '<span>Scroll to zoom · drag empty space to pan · click a sticky to focus its links · drag a node’s <span class="gn-port-demo"></span> to link</span>' +
       '<span class="ge-legend"><i class="lg-line lg-same"></i>same team<i class="lg-line lg-cross"></i>cross-team dependency</span></div>' +
-      '<div class="bd-graph-canvas" id="bd-graph-canvas" style="width:' + W + 'px;height:' + H + 'px">' +
-      '<svg class="bd-graph-svg" id="bd-graph-svg" width="' + W + '" height="' + H + '">' + graphEdgesSvg(m, pos) + '</svg>' +
-      m.nodes.map((n) => graphNodeHtml(n, pos[n.id])).join('') + hint + '</div></div>';
+      '<div class="bd-graph-viewport" id="bd-graph-viewport">' +
+        '<div class="bd-graph-world" id="bd-graph-world" style="width:' + W + 'px;height:' + H + 'px">' +
+          '<svg class="bd-graph-svg" id="bd-graph-svg" width="' + W + '" height="' + H + '">' + graphEdgesSvg(m, pos, focus) + '</svg>' +
+          m.nodes.map((n) => graphNodeHtml(n, pos[n.id])).join('') + hint +
+        '</div>' +
+      '</div>' +
+      '<div class="bd-graph-zoom" id="bd-graph-zoom">' +
+        '<button type="button" data-gz="out" title="Zoom out">−</button>' +
+        '<span id="gz-val">100%</span>' +
+        '<button type="button" data-gz="in" title="Zoom in">+</button>' +
+        '<button type="button" data-gz="fit" title="Fit">Fit</button></div>' +
+      '</div>';
   }
   function wireGraph(c) {
-    const canvas = document.getElementById('bd-graph-canvas'); if (!canvas) return;
-    const svg = document.getElementById('bd-graph-svg');
-    let m = bdGraphModel(c), pos = bdGraphPos[c.id];
-    let drag = null, link = null;
-    const canvasPt = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
-    canvas.addEventListener('pointerdown', (e) => {
-      const nd = e.target.closest('[data-gnode]'); if (!nd) return;
+    const vp = document.getElementById('bd-graph-viewport'); if (!vp) return;
+    const world = document.getElementById('bd-graph-world');
+    let svg = document.getElementById('bd-graph-svg');
+    const m = bdGraphModel(c), pos = bdGraphPos[c.id];
+    const view = bdGraphView[c.id] = bdGraphView[c.id] || { zoom: 1, x: 24, y: 24 };
+    const applyView = () => {
+      world.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.zoom + ')';
+      const gv = document.getElementById('gz-val'); if (gv) gv.textContent = Math.round(view.zoom * 100) + '%';
+    };
+    applyView();
+    const worldPt = (e) => { const r = vp.getBoundingClientRect(); return { x: (e.clientX - r.left - view.x) / view.zoom, y: (e.clientY - r.top - view.y) / view.zoom }; };
+    const redrawEdges = () => { svg.innerHTML = graphEdgesSvg(m, pos, bdGraphFocus[c.id] || null); };
+    function applyFocus() {
+      const f = bdGraphFocus[c.id] || null;
+      world.classList.toggle('focusing', !!f);
+      const nbr = f ? new Set([f, ...linkedIdsFor(card(f) || {})]) : null;
+      world.querySelectorAll('.gn').forEach((el) => {
+        el.classList.toggle('gn-dim', !!f && !nbr.has(el.dataset.gnode));
+        el.classList.toggle('gn-focus', el.dataset.gnode === f);
+      });
+      redrawEdges();
+    }
+    applyFocus();
+
+    // zoom
+    vp.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const id = nd.dataset.gnode;
-      if (e.target.closest('[data-gport]')) {
-        link = { from: id }; // start drawing a link
-      } else {
-        drag = { id, el: nd, sx: e.clientX, sy: e.clientY, px: pos[id].x, py: pos[id].y };
-        nd.classList.add('gn-drag');
-      }
-      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      const r = vp.getBoundingClientRect(), cx = e.clientX - r.left, cy = e.clientY - r.top;
+      const wx = (cx - view.x) / view.zoom, wy = (cy - view.y) / view.zoom;
+      view.zoom = Math.max(0.3, Math.min(2.5, view.zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+      view.x = cx - wx * view.zoom; view.y = cy - wy * view.zoom;
+      applyView();
+    }, { passive: false });
+    const zoomAround = (factor) => {
+      const r = vp.getBoundingClientRect(), cx = r.width / 2, cy = r.height / 2;
+      const wx = (cx - view.x) / view.zoom, wy = (cy - view.y) / view.zoom;
+      view.zoom = Math.max(0.3, Math.min(2.5, view.zoom * factor));
+      view.x = cx - wx * view.zoom; view.y = cy - wy * view.zoom; applyView();
+    };
+    const zoomCtl = document.getElementById('bd-graph-zoom');
+    if (zoomCtl) zoomCtl.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-gz]'); if (!b) return;
+      if (b.dataset.gz === 'in') zoomAround(1.2);
+      else if (b.dataset.gz === 'out') zoomAround(1 / 1.2);
+      else { view.zoom = 1; view.x = 24; view.y = 24; applyView(); }
     });
-    canvas.addEventListener('pointermove', (e) => {
+
+    // drag nodes / pan / link / focus
+    let drag = null, link = null, pan = null;
+    vp.addEventListener('pointerdown', (e) => {
+      const port = e.target.closest('[data-gport]');
+      const nd = e.target.closest('[data-gnode]');
+      if (port && nd) { link = { from: nd.dataset.gnode }; }
+      else if (nd) { drag = { id: nd.dataset.gnode, el: nd, sx: e.clientX, sy: e.clientY, px: pos[nd.dataset.gnode].x, py: pos[nd.dataset.gnode].y, moved: false }; nd.classList.add('gn-drag'); }
+      else { pan = { sx: e.clientX, sy: e.clientY, px: view.x, py: view.y, moved: false }; vp.classList.add('panning'); }
+      try { vp.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    vp.addEventListener('pointermove', (e) => {
       if (drag) {
-        pos[drag.id].x = Math.max(0, drag.px + (e.clientX - drag.sx));
-        pos[drag.id].y = Math.max(0, drag.py + (e.clientY - drag.sy));
-        drag.el.style.left = pos[drag.id].x + 'px';
-        drag.el.style.top = pos[drag.id].y + 'px';
-        svg.innerHTML = graphEdgesSvg(m, pos);
+        if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 4) drag.moved = true;
+        pos[drag.id].x = Math.max(0, drag.px + (e.clientX - drag.sx) / view.zoom);
+        pos[drag.id].y = Math.max(0, drag.py + (e.clientY - drag.sy) / view.zoom);
+        drag.el.style.left = pos[drag.id].x + 'px'; drag.el.style.top = pos[drag.id].y + 'px';
+        redrawEdges();
       } else if (link) {
-        const a = pos[link.from], pt = canvasPt(e);
-        const tmp = document.getElementById('ge-temp');
-        if (tmp) tmp.setAttribute('d', graphEdgePath(a.x + GNW, a.y + GNH / 2, pt.x, pt.y));
+        const a = pos[link.from], pt = worldPt(e);
+        const tmp = document.getElementById('ge-temp'); if (tmp) tmp.setAttribute('d', graphEdgePath(a.x + GNW, a.y + GNH / 2, pt.x, pt.y));
+      } else if (pan) {
+        if (Math.abs(e.clientX - pan.sx) + Math.abs(e.clientY - pan.sy) > 4) pan.moved = true;
+        view.x = pan.px + (e.clientX - pan.sx); view.y = pan.py + (e.clientY - pan.sy); applyView();
       }
     });
     const end = (e) => {
-      if (drag) { drag.el.classList.remove('gn-drag'); drag = null; }
-      else if (link) {
+      if (drag) {
+        drag.el.classList.remove('gn-drag');
+        if (!drag.moved) { bdGraphFocus[c.id] = bdGraphFocus[c.id] === drag.id ? null : drag.id; applyFocus(); } // click = focus its links
+        drag = null;
+      } else if (link) {
         const tgt = document.elementFromPoint(e.clientX, e.clientY);
         const nd = tgt && tgt.closest('[data-gnode]');
         if (nd && nd.dataset.gnode !== link.from) { addLink(card(link.from), card(nd.dataset.gnode)); save(); renderModal(); }
-        else { const tmp = document.getElementById('ge-temp'); if (tmp) tmp.setAttribute('d', ''); }
+        else redrawEdges();
         link = null;
+      } else if (pan) {
+        if (!pan.moved && bdGraphFocus[c.id]) { bdGraphFocus[c.id] = null; applyFocus(); } // click empty = clear focus
+        pan = null; vp.classList.remove('panning');
       }
-      try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+      try { vp.releasePointerCapture(e.pointerId); } catch (_) {}
     };
-    canvas.addEventListener('pointerup', end);
-    canvas.addEventListener('pointercancel', end);
+    vp.addEventListener('pointerup', end);
+    vp.addEventListener('pointercancel', end);
   }
 
   function modalBox(title, body) {
