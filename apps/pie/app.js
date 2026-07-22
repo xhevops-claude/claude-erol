@@ -279,6 +279,12 @@
       });
     }
     s.navVersion = ['v2', 'v3', 'v4'].indexOf(s.navVersion) >= 0 ? s.navVersion : 'v1';
+    // The viewer's own team — highlighted on the ART Objectives board so it's
+    // easy to spot among many. Marlin sits in the crowded Payments ART.
+    if (!s.myTeamId || !s.teams.some((t) => t.id === s.myTeamId)) {
+      const mine = s.teams.find((t) => t.name === 'Marlin') || s.teams[0];
+      s.myTeamId = mine ? mine.id : null;
+    }
     s.workMode = s.workMode === 'execution' ? 'execution' : 'planning';
     s.boardCfg = Object.assign({ dates: true, grid: true, compact: false }, s.boardCfg);
     if (!Array.isArray(s.pages) || !s.pages.length || !s.pages[0].owner || !s.pages.some((p) => p.id === 'pi-agenda')) s.pages = defaultPages();
@@ -1643,15 +1649,12 @@
   }
 
   // ART Objectives: team blocks in a balanced masonry (shortest column first).
-  // Three GREY team-name treatments, driven by the active nav version so they
-  // can be compared live with the floating v1/v2/v3 switcher. Teams without
-  // objectives are still teams — each variant renders them in its own header
-  // language with a muted "No objectives yet".
-  // No cards — the sheet stays one continuous board; ONLY the header changes.
-  //   v1 · name chip — the team name in a compact filled dark pill
-  //   v2 · grey banner — the name sits in a soft grey band
-  //   v3 · kicker dash — a short thick dark dash above a bold name
-  //   v4 · icon tile — small grey rounded tile with the team glyph + bold name
+  // The header is consistent; the version pill switches how the VIEWER'S OWN
+  // team (state.myTeamId) is highlighted so it's easy to spot among many:
+  //   v1 · "You" badge — accent pill + accent name on my team's header
+  //   v2 · tinted block — my team's whole block gets a soft accent wash + rail
+  //   v3 · outline ring — an accent ring drawn around my team's block
+  //   v4 · corner flag — a "My team" ribbon on my team's block
   function objRow(o, i) {
     return '<div class="ob-item"><div class="ob-t"><b>' + (i + 1) + '</b> ' + esc(o.text) + '</div>' +
       '<div class="ob-meta"><span class="ob-bv">' + o.bv + ' BV</span>' +
@@ -1666,16 +1669,15 @@
     const com = objs.filter((o) => o.committed), unc = objs.filter((o) => !o.committed);
     const v = state.navVersion;
     const n = objs.length;
-    const count = n ? '<span class="ob-count">' + n + '</span>' : '';
+    const mine = tm.id === state.myTeamId;
     const tail = n ? '<span class="ob-count">' + n + '</span>' : '<span class="ob-none">No objectives yet</span>';
-    const name = '<span class="ob-name">' + esc(tm.name) + '</span>';
+    const star = mine && v === 'v4' ? '<span class="ob-star">' + bIcon('objectives', 'ob-star-ico') + '</span>' : '';
+    const you = mine && v === 'v1' ? '<span class="ob-you">You</span>' : '';
+    const head = '<div class="ob-head ob-head-base">' + star + '<span class="ob-name">' + esc(tm.name) + '</span>' + you + tail + '</div>';
     const body = n ? objGroup('Commited', com) + objGroup('Uncommitted', unc) : '';
-    let head;
-    if (v === 'v2') head = '<div class="ob-head ob-head2"><span class="ob-av">' + esc(initials(tm.name)) + '</span>' + name + tail + '</div>';
-    else if (v === 'v3') head = '<div class="ob-head ob-head3">' + name + tail + '</div>';
-    else if (v === 'v4') head = '<div class="ob-head ob-head4"><span class="ob-ico">' + bIcon('teamrail', 'ob-tico') + '</span>' + name + tail + '</div>';
-    else head = '<div class="ob-head ob-head1">' + name + tail + '</div>';
-    return '<section class="obj-block' + (n ? '' : ' obj-empty') + '">' + head + body + '</section>';
+    const ribbon = mine && v === 'v4' ? '<span class="ob-ribbon">My team</span>' : '';
+    const cls = 'obj-block' + (n ? '' : ' obj-empty') + (mine ? ' obj-mine' : '');
+    return '<section class="' + cls + '">' + ribbon + head + body + '</section>';
   }
   function estBlock(tm) {
     const n = (tm.objectives || []).length;
@@ -2008,7 +2010,6 @@
     if (e.target.closest('[data-sp-close]')) closeStickyPanel();
   });
   canvas.addEventListener('click', (e) => {
-    if (chromeV() !== 'v3') return;
     const n = e.target.closest('.note'); if (!n) return;
     const c = card(n.dataset.id); if (!c) return;
     // String-linking: second click picks the target.
