@@ -1647,14 +1647,25 @@ body {
   border-bottom: 1px solid rgba(24, 24, 27, .06);
 }
 .gn-port-demo { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); vertical-align: middle; margin: 0 1px; }
+.bd-graph-hintline { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-graph-tbr { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
 .ge-legend { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto; }
-.lg-line { display: inline-block; width: 20px; height: 0; margin-left: 8px; }
+.lg-line { display: inline-block; width: 20px; height: 0; margin-left: 8px; vertical-align: middle; }
 .lg-same { border-top: 2px solid #c4c8d0; }
 .lg-cross { border-top: 2.5px solid var(--accent); }
+.lg-dash { border-top: 2.5px dashed var(--accent); }
+.lg-red { border-top: 2.5px solid #dc2626; }
+.lg-diamond { display: inline-block; width: 9px; height: 9px; margin-left: 8px; background: #fff; border: 2px solid #dc2626; transform: rotate(45deg); vertical-align: middle; }
+.bd-graph-ver { display: flex; gap: 2px; background: #f4f4f5; border-radius: 8px; padding: 2px; }
+.bd-graph-ver button { border: 0; background: transparent; color: #71717a; border-radius: 6px; padding: 4px 9px; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+.bd-graph-ver button.on { background: #18181b; color: #fff; }
 .bd-graph-svg { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
 .ge { fill: none; }
 .ge-same { stroke: #c4c8d0; stroke-width: 1.6; }
 .ge-cross { stroke: var(--accent); stroke-width: 2.4; }
+.ge-crossdash { stroke-dasharray: 8 5; }
+.ge-crossred { stroke: #dc2626; stroke-width: 2.6; }
+.ge-diamond { fill: #fff; stroke: #dc2626; stroke-width: 2; }
 .ge-dim { opacity: .12; }
 .ge-lab-bg { fill: #fff; stroke: var(--accent); stroke-width: 1; opacity: .96; }
 .ge-lab { fill: #8a5a06; font-size: 10px; font-weight: 700; }

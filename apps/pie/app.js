@@ -1378,7 +1378,9 @@
     const dx = Math.max(50, Math.abs(x2 - x1) / 2);
     return 'M' + x1 + ',' + y1 + ' C' + (x1 + dx) + ',' + y1 + ' ' + (x2 - dx) + ',' + y2 + ' ' + x2 + ',' + y2;
   }
+  // Four ways (v1–v4) to distinguish a cross-team dependency from a same-team link.
   function graphEdgesSvg(m, pos, focus) {
+    const v = state.navVersion;
     let paths = '', labels = '';
     m.edges.forEach((e) => {
       let ida = e.a, idb = e.b, a = pos[ida], b = pos[idb]; if (!a || !b) return;
@@ -1387,20 +1389,45 @@
       const ta = (card(ida) || {}).teamId, tb = (card(idb) || {}).teamId;
       const cross = ta && tb && ta !== tb; // a link across teams is a dependency
       const dim = focus && ida !== focus && idb !== focus;
-      paths += '<path class="ge ' + (cross ? 'ge-cross' : 'ge-same') + (dim ? ' ge-dim' : '') + '" d="' + graphEdgePath(x1, y1, x2, y2) +
-        '" marker-end="url(#' + (cross ? 'gearrowX' : 'gearrow') + ')"/>';
-      if (cross && !dim) {
-        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-        const lab = ((team(ta) || {}).name || '') + '  →  ' + ((team(tb) || {}).name || '');
-        const w = lab.length * 5.6 + 20;
-        labels += '<rect class="ge-lab-bg" x="' + (mx - w / 2) + '" y="' + (my - 10) + '" width="' + w + '" height="20" rx="10"/>' +
-          '<text class="ge-lab" x="' + mx + '" y="' + (my + 3.5) + '" text-anchor="middle">' + esc(lab) + '</text>';
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      let cls = 'ge ', marker = 'gearrow';
+      if (!cross) {
+        cls += 'ge-same';
+      } else if (v === 'v1') {                 // v1 · color + weight + team-name pill
+        cls += 'ge-cross'; marker = 'gearrowX';
+        if (!dim) {
+          const lab = ((team(ta) || {}).name || '') + '  →  ' + ((team(tb) || {}).name || '');
+          const w = lab.length * 5.6 + 20;
+          labels += '<rect class="ge-lab-bg" x="' + (mx - w / 2) + '" y="' + (my - 10) + '" width="' + w + '" height="20" rx="10"/>' +
+            '<text class="ge-lab" x="' + mx + '" y="' + (my + 3.5) + '" text-anchor="middle">' + esc(lab) + '</text>';
+        }
+      } else if (v === 'v2') {                 // v2 · dashed line = crossing a boundary
+        cls += 'ge-cross ge-crossdash'; marker = 'gearrowX';
+      } else if (v === 'v3') {                 // v3 · neutral lines, a dependency diamond at the midpoint
+        cls += 'ge-same';
+        if (!dim) labels += '<rect class="ge-diamond" x="' + (mx - 7) + '" y="' + (my - 7) + '" width="14" height="14" rx="2" transform="rotate(45 ' + mx + ' ' + my + ')"/>';
+      } else {                                 // v4 · red risk line + diamond arrowhead
+        cls += 'ge-crossred'; marker = 'gearrowD';
       }
+      if (dim) cls += ' ge-dim';
+      paths += '<path class="' + cls + '" d="' + graphEdgePath(x1, y1, x2, y2) + '" marker-end="url(#' + marker + ')"/>';
     });
     return '<defs>' +
       '<marker id="gearrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9aa1ad"/></marker>' +
       '<marker id="gearrowX" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#f59e0b"/></marker>' +
+      '<marker id="gearrowD" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M0,6 L6,0 L12,6 L6,12 z" fill="#dc2626"/></marker>' +
       '</defs>' + paths + labels + '<path class="ge ge-temp" id="ge-temp" d=""/>';
+  }
+  function graphLegend() {
+    const v = state.navVersion;
+    if (v === 'v2') return '<i class="lg-line lg-same"></i>same team<i class="lg-line lg-dash"></i>cross-team dependency';
+    if (v === 'v3') return '<i class="lg-line lg-same"></i>link<i class="lg-diamond"></i>cross-team dependency';
+    if (v === 'v4') return '<i class="lg-line lg-same"></i>same team<i class="lg-line lg-red"></i>cross-team dependency';
+    return '<i class="lg-line lg-same"></i>same team<i class="lg-line lg-cross"></i>cross-team dependency';
+  }
+  function graphVerSeg() {
+    return '<span class="bd-graph-ver">' + ['v1', 'v2', 'v3', 'v4'].map((v) =>
+      '<button type="button" class="' + (state.navVersion === v ? 'on' : '') + '" data-bd-ver="' + v + '">' + v + '</button>').join('') + '</span>';
   }
   function graphNodeHtml(n, p) {
     const top = n.root
@@ -1421,8 +1448,8 @@
     const W = Math.max(maxX + GNW + 200, 1400), H = Math.max(maxY + GNH + 200, 900);
     const hint = m.nodes.length <= 1 ? '<div class="bd-graph-hint">No links yet — use the sticky’s <b>Links</b> action, then they’ll appear here.</div>' : '';
     return '<div class="bd-graph-wrap" id="bd-graph-wrap"><div class="bd-graph-toolbar">' +
-      '<span>Scroll to zoom · drag empty space to pan · click a sticky to focus its links · drag a node’s <span class="gn-port-demo"></span> to link</span>' +
-      '<span class="ge-legend"><i class="lg-line lg-same"></i>same team<i class="lg-line lg-cross"></i>cross-team dependency</span></div>' +
+      '<span class="bd-graph-hintline">Scroll to zoom · drag to pan · click a sticky to focus its links</span>' +
+      '<span class="bd-graph-tbr"><span class="ge-legend">' + graphLegend() + '</span>' + graphVerSeg() + '</span></div>' +
       '<div class="bd-graph-viewport" id="bd-graph-viewport">' +
         '<div class="bd-graph-world" id="bd-graph-world" style="width:' + W + 'px;height:' + H + 'px">' +
           '<svg class="bd-graph-svg" id="bd-graph-svg" width="' + W + '" height="' + H + '">' + graphEdgesSvg(m, pos, focus) + '</svg>' +
@@ -1643,6 +1670,8 @@
     if (e.target === modalEl) return closeModal();
     // Breakdown Rows/Columns configurator + Grid/Graph switch
     if (modalType === 'breakdown') {
+      const ver = e.target.closest('[data-bd-ver]');
+      if (ver) { state.navVersion = ver.dataset.bdVer; save(); renderBoardView(); renderModal(); return; }
       const view = e.target.closest('[data-bd-view]');
       if (view) { bdView = view.dataset.bdView; bdCfgOpen = false; renderModal(); return; }
       const toggle = e.target.closest('[data-bd-cfg-toggle]');
