@@ -1719,10 +1719,46 @@
             '<div class="pm-full-meta">' + linked.length + ' linked ' + (linked.length === 1 ? 'sticky' : 'stickies') + ' across ' + esc(state.st.name) + '</div></div>' +
           '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' +
           '<div class="pm-full-b ov-body">' + (cols || '<div class="sb-empty">No links yet.</div>') + '</div></div>';
+    } else if (modalType === 'objedit') {
+      const o = modalCard || {};
+      modalEl.innerHTML =
+        '<div class="pm-box pm-oe"><div class="pm-h"><span class="pm-kicker">' + (objEditNew ? 'New objective' : 'Edit objective') + '</span>' +
+          '<button class="pm-x" type="button" data-oe="cancel" title="Close">✕</button></div>' +
+          '<label class="pm-oe-l" for="oe-title">Title</label>' +
+          '<input id="oe-title" class="pm-oe-in" type="text" value="' + esc(o.title) + '" placeholder="Objective title" />' +
+          '<label class="pm-oe-l" for="oe-desc">Description</label>' +
+          '<textarea id="oe-desc" class="pm-oe-ta" rows="4" placeholder="Describe this objective…">' + esc(o.desc) + '</textarea>' +
+          '<div class="pm-oe-row">' +
+            '<div class="pm-oe-f"><label class="pm-oe-l" for="oe-bv">Business Value</label>' +
+              '<input id="oe-bv" class="pm-oe-bv" type="text" inputmode="numeric" value="' + esc(String(o.bv)) + '" /></div>' +
+            '<div class="pm-oe-f"><label class="pm-oe-l">Commitment</label><div class="pm-oe-seg">' +
+              '<button type="button" class="' + (o.committed ? 'on' : '') + '" data-oe="commit" data-val="1">Committed</button>' +
+              '<button type="button" class="' + (!o.committed ? 'on' : '') + '" data-oe="commit" data-val="0">Uncommitted</button>' +
+            '</div></div>' +
+          '</div>' +
+          '<div class="pm-oe-foot"><button class="pm-btn" type="button" data-oe="cancel">Cancel</button>' +
+            '<button class="pm-btn pm-primary" type="button" data-oe="save">Save objective</button></div>' +
+        '</div>';
+      const ti = document.getElementById('oe-title');
+      if (ti) ti.addEventListener('input', () => { if (modalCard) { modalCard.title = ti.value; save(); } });
+      const de = document.getElementById('oe-desc');
+      if (de) de.addEventListener('input', () => { if (modalCard) { modalCard.desc = de.value; save(); } });
+      const bv = document.getElementById('oe-bv');
+      if (bv) bv.addEventListener('input', () => { bv.value = bv.value.replace(/[^0-9]/g, '').slice(0, 4); if (modalCard) { modalCard.bv = Number(bv.value) || 0; save(); } });
+      if (ti && objEditNew) ti.focus();
     }
   }
   modalEl.addEventListener('click', (e) => {
-    if (e.target === modalEl) return closeModal();
+    if (e.target === modalEl) return modalType === 'objedit' ? closeObjEditModal(false) : closeModal();
+    if (modalType === 'objedit') {
+      const oe = e.target.closest('[data-oe]');
+      if (oe) {
+        if (oe.dataset.oe === 'save') return closeObjEditModal(true);
+        if (oe.dataset.oe === 'cancel') return closeObjEditModal(false);
+        if (oe.dataset.oe === 'commit' && modalCard) { modalCard.committed = oe.dataset.val === '1'; save(); renderModal(); return; }
+      }
+      return;
+    }
     // Breakdown Rows/Columns configurator + Grid/Graph switch
     if (modalType === 'breakdown') {
       const ver = e.target.closest('[data-bd-ver]');
@@ -2128,15 +2164,18 @@
   let objPanelOpen = true;
   let asMenu = null;                 // id of the objective whose "…" menu is open
   let asEditing = null;              // id of the objective being inline-edited (title/desc)
+  let asEditMode = null;             // 'form' (v1) | 'quick' (v2) — inline edit style
+  let asEditSnap = null;             // pre-edit snapshot for Cancel/Escape revert
+  let asNewId = null;                // id of a just-added objective (discarded if left blank)
   const asExpanded = {};             // ids whose description is expanded
   let asDragId = null;               // id of the objective being dragged
   const AS_TRUNC = 96;               // description length past which "See more" appears
   const objById = (id) => state.artObjectives.find((x) => x.id === id);
   // A card's rank is its 1-based position WITHIN its own group (committed vs not).
   function asGroupOf(o) { return state.artObjectives.filter((x) => !!x.committed === !!o.committed); }
-  // v3 is the always-inline-edit variant; any card can also be put in edit mode
-  // transiently (e.g. right after "Add objective") via asEditing, in any version.
-  function objEditing(o) { return state.navVersion === 'v3' || asEditing === o.id; }
+  // v3 edits inline always; v1/v2 flip a single card into inline edit via asEditing
+  // (v4 edits in a modal, so it never uses asEditing).
+  function objEditing(o) { return state.navVersion === 'v3' || (asEditing === o.id && state.navVersion !== 'v4'); }
   function objCard(o, rank) {
     const v = state.navVersion, editing = objEditing(o);
     const open = !!asExpanded[o.id], truncatable = !editing && (o.desc || '').length > AS_TRUNC;
@@ -2144,6 +2183,7 @@
     const canUp = gi > 0, canDown = gi < group.length - 1;
     const menu = asMenu === o.id
       ? '<div class="as-menu" data-obj-menu="' + o.id + '">' +
+          (v !== 'v3' ? '<button class="as-mi" type="button" data-obj-act="edit" data-id="' + o.id + '">' + bIcon('edit', 'as-mico') + 'Edit' + (v === 'v4' ? '…' : '') + '</button>' : '') +
           '<button class="as-mi" type="button" data-obj-act="commit" data-id="' + o.id + '">' + bIcon('statusdot', 'as-mico') +
             (o.committed ? 'Mark as Uncommitted' : 'Mark as Committed') + '</button>' +
           (canUp ? '<button class="as-mi" type="button" data-obj-act="up" data-id="' + o.id + '">' + bIcon('chevup', 'as-mico') + 'Move Up</button>' : '') +
@@ -2159,14 +2199,22 @@
       ? '<textarea class="as-desc-in" data-obj-desc="' + o.id + '" rows="2" placeholder="Describe this objective…" aria-label="Description">' + esc(o.desc) + '</textarea>'
       : '<div class="as-desc' + (open ? ' open' : '') + '">' + esc(o.desc) + '</div>' +
         (truncatable ? '<button class="as-more" type="button" data-obj-toggle="' + o.id + '">' + (open ? 'See less' : 'See more') + '</button>' : '');
+    // v2's quick-edit shows a pencil in the (hover-revealed) action row.
+    const pencil = (v === 'v2' && !editing)
+      ? '<button class="as-ico" type="button" data-obj-act="edit" data-id="' + o.id + '" title="Edit">' + bIcon('edit') + '</button>' : '';
+    // v1's roomy form commits explicitly with Save / Cancel.
+    const formFoot = (editing && asEditMode === 'form' && asEditing === o.id)
+      ? '<div class="as-editrow"><button class="as-eb" type="button" data-obj-act="cancel" data-id="' + o.id + '">Cancel</button>' +
+        '<button class="as-eb as-eb-primary" type="button" data-obj-act="save" data-id="' + o.id + '">Save</button></div>' : '';
     const cls = 'as-card as-' + v + (o.committed ? ' as-committed' : ' as-uncommitted') +
-      (editing ? ' as-editing' : '') + (asDragId === o.id ? ' as-dragging' : '');
+      (editing ? ' as-editing' + (asEditMode && asEditing === o.id ? ' as-mode-' + asEditMode : '') : '') +
+      (asDragId === o.id ? ' as-dragging' : '');
     return '<div class="' + cls + '" data-obj-card="' + o.id + '">' +
       '<div class="as-top">' +
         '<span class="as-grip" data-obj-grip="' + o.id + '" draggable="true" title="Drag to reorder">' +
           '<span class="as-rank">' + rank + '</span>' + bIcon('grip', 'as-gico') + '</span>' +
         titleHtml +
-        '<div class="as-acts">' +
+        '<div class="as-acts">' + pencil +
           '<button class="as-ico" type="button" data-obj-bd="' + o.id + '" title="Breakdown">' + bIcon('breakdown') + '</button>' +
           '<button class="as-ico' + (asMenu === o.id ? ' on' : '') + '" type="button" data-obj-more="' + o.id + '" title="More options">' + bIcon('dots') + '</button>' +
         '</div>' + menu +
@@ -2175,7 +2223,7 @@
       '<div class="as-foot">' +
         '<label class="as-bv"><input class="as-bv-box" type="text" inputmode="numeric" data-obj-bv="' + o.id + '" value="' + esc(String(o.bv)) + '" aria-label="Business Value" />Business Value</label>' +
         '<button class="as-lk" type="button" data-obj-links="' + o.id + '" title="View links">' + bIcon('link', 'as-lkico') + (Array.isArray(o.links) ? o.links.length : o.links) + '</button>' +
-      '</div>' + '</div>';
+      '</div>' + formFoot + '</div>';
   }
   function renderArtSide() {
     if (mode !== 'board' || railActive !== 'objectives') { artSide.innerHTML = ''; return; }
@@ -2189,22 +2237,47 @@
         '<button class="as-add" type="button" title="Add objective" data-obj-add>' + bIcon('plus') + '<span class="as-add-t">Add objective</span></button></div>' +
       '<div class="as-body as-body-' + state.navVersion + '">' + grp('Committed', com) + grp('Uncommitted', unc) + '</div>';
   }
-  // Add a new objective to the top of the Committed group and drop it into inline edit.
+  // Each version edits in its own idiom: v1 roomy inline form (Save/Cancel), v2
+  // quick inline (live, click-away saves), v3 always live, v4 a focused modal.
+  function startObjEdit(id, isNew) {
+    const o = objById(id); if (!o) return;
+    const hadMenu = asMenu; asMenu = null;
+    const v = state.navVersion;
+    if (v === 'v4') { if (hadMenu) renderArtSide(); openObjEditModal(o, !!isNew); return; }
+    if (v === 'v3') {                       // already live — just surface & focus it
+      asExpanded[id] = true; renderArtSide();
+      const inp = artSide.querySelector('[data-obj-title="' + id + '"]');
+      if (inp) { inp.focus(); inp.scrollIntoView({ block: 'nearest' }); }
+      return;
+    }
+    asEditing = id;
+    asEditMode = v === 'v1' ? 'form' : 'quick';
+    asEditSnap = { title: o.title, desc: o.desc, bv: o.bv };
+    asNewId = isNew ? id : null;
+    asExpanded[id] = true; save(); renderArtSide();
+    const inp = artSide.querySelector('[data-obj-title="' + id + '"]');
+    if (inp) { inp.focus(); if (inp.select) inp.select(); inp.scrollIntoView({ block: 'nearest' }); }
+  }
+  // Leave inline edit. commit=false reverts to the snapshot (Cancel / Escape).
+  function finishObjEdit(commit) {
+    if (!asEditing) return;
+    const o = objById(asEditing);
+    if (o && !commit && asEditSnap) { o.title = asEditSnap.title; o.desc = asEditSnap.desc; o.bv = asEditSnap.bv; }
+    if (o && !(o.title || '').trim()) {
+      if (asNewId === o.id && !(o.desc || '').trim()) state.artObjectives = state.artObjectives.filter((x) => x.id !== o.id);
+      else o.title = 'Untitled objective';
+    }
+    asEditing = null; asEditMode = null; asEditSnap = null; asNewId = null;
+    save(); renderArtSide();
+  }
+  // Add a new objective to the end of Committed, then edit it in the active idiom.
   function addObjective() {
     const o = { id: uid(), title: '', desc: '', bv: 0, links: 0, committed: true };
     const arr = state.artObjectives;
     let idx = arr.findIndex((x) => !x.committed); if (idx < 0) idx = arr.length;
     arr.splice(idx, 0, o);
-    asEditing = o.id; asMenu = null; asExpanded[o.id] = true; save(); renderArtSide();
-    const inp = artSide.querySelector('[data-obj-title="' + o.id + '"]');
-    if (inp) { inp.focus(); inp.scrollIntoView({ block: 'nearest' }); }
-  }
-  // Leave inline-edit mode; blank titles fall back to a default so nothing is nameless.
-  function exitObjEdit() {
-    if (!asEditing) return;
-    const o = objById(asEditing);
-    if (o && !(o.title || '').trim()) o.title = 'Untitled objective';
-    asEditing = null; save(); renderArtSide();
+    asMenu = null; save(); renderArtSide();
+    startObjEdit(o.id, true);
   }
   // Seeded set of stickies an objective "links" to — used by the links overlay.
   function objLinkedCards(o) {
@@ -2221,6 +2294,23 @@
     return out;
   }
   function openObjLinks(o) { modalCard = o; modalType = 'objlinks'; modalEl.classList.add('pm-wide'); renderModal(); }
+  // v4's editor — a focused modal sheet with explicit Save / Cancel.
+  let objEditSnap = null, objEditNew = false;
+  function openObjEditModal(o, isNew) {
+    modalCard = o; objEditNew = !!isNew;
+    objEditSnap = { title: o.title, desc: o.desc, bv: o.bv, committed: o.committed };
+    modalType = 'objedit'; renderModal();
+  }
+  function closeObjEditModal(commit) {
+    const o = modalCard;
+    if (o && !commit && objEditSnap) { o.title = objEditSnap.title; o.desc = objEditSnap.desc; o.bv = objEditSnap.bv; o.committed = objEditSnap.committed; }
+    if (o && !(o.title || '').trim()) {
+      if (objEditNew && !(o.desc || '').trim()) state.artObjectives = state.artObjectives.filter((x) => x.id !== o.id);
+      else o.title = 'Untitled objective';
+    }
+    objEditSnap = null; objEditNew = false;
+    closeModal(); save(); renderArtSide();
+  }
   function moveObj(id, dir) {
     const arr = state.artObjectives, o = arr.find((x) => x.id === id); if (!o) return;
     const group = asGroupOf(o), gi = group.indexOf(o), target = group[gi + dir]; if (!target) return;
@@ -2246,12 +2336,15 @@
     if (more) { e.stopPropagation(); asMenu = asMenu === more.dataset.objMore ? null : more.dataset.objMore; renderArtSide(); return; }
     const act = e.target.closest('[data-obj-act]');
     if (act) {
-      const id = act.dataset.id, o = objById(id); if (!o) return;
+      const id = act.dataset.id, o = objById(id), a = act.dataset.objAct; if (!o) return;
+      if (a === 'edit') { startObjEdit(id); return; }
+      if (a === 'save') { finishObjEdit(true); return; }
+      if (a === 'cancel') { finishObjEdit(false); return; }
       asMenu = null;
-      if (act.dataset.objAct === 'commit') { o.committed = !o.committed; save(); renderArtSide(); }
-      else if (act.dataset.objAct === 'up') moveObj(id, -1);
-      else if (act.dataset.objAct === 'down') moveObj(id, 1);
-      else if (act.dataset.objAct === 'del') { if (asEditing === id) asEditing = null; state.artObjectives = state.artObjectives.filter((x) => x.id !== id); save(); renderArtSide(); }
+      if (a === 'commit') { o.committed = !o.committed; save(); renderArtSide(); }
+      else if (a === 'up') moveObj(id, -1);
+      else if (a === 'down') moveObj(id, 1);
+      else if (a === 'del') { if (asEditing === id) { asEditing = null; asEditMode = null; asEditSnap = null; asNewId = null; } state.artObjectives = state.artObjectives.filter((x) => x.id !== id); save(); renderArtSide(); }
       return;
     }
     const tog = e.target.closest('[data-obj-toggle]');
@@ -2277,9 +2370,9 @@
     const bv = e.target.closest('[data-obj-bv]');
     if (bv) { if (e.key === 'Enter') { e.preventDefault(); bv.blur(); } return; }
     const ti = e.target.closest('[data-obj-title]');
-    if (ti) { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); if (asEditing) exitObjEdit(); else ti.blur(); } return; }
+    if (ti) { if (e.key === 'Enter') { e.preventDefault(); asEditing ? finishObjEdit(true) : ti.blur(); } else if (e.key === 'Escape') { e.preventDefault(); asEditing ? finishObjEdit(false) : ti.blur(); } return; }
     const de = e.target.closest('[data-obj-desc]');
-    if (de) { if (e.key === 'Escape') { e.preventDefault(); if (asEditing) exitObjEdit(); else de.blur(); } return; }
+    if (de) { if (e.key === 'Escape') { e.preventDefault(); asEditing ? finishObjEdit(false) : de.blur(); } return; }
   });
   // Drag to reorder (grip is the only draggable handle).
   artSide.addEventListener('dragstart', (e) => {
@@ -2968,7 +3061,7 @@
     if ((utilPanel || btPanel) && !e.target.closest('.btools')) { utilPanel = null; btPanel = null; if (!boardScreen.hidden) renderBtools(); }
     if (dockPanel && !e.target.closest('.dock')) { dockPanel = null; if (!boardScreen.hidden) renderDock(); }
     if (asMenu && !e.target.closest('.as-menu') && !e.target.closest('[data-obj-more]')) { asMenu = null; renderArtSide(); }
-    if (asEditing && !e.target.closest('[data-obj-card="' + asEditing + '"]')) exitObjEdit();
+    if (asEditing && !e.target.closest('[data-obj-card="' + asEditing + '"]')) finishObjEdit(true);
     // click away from the sticky action bar (but not onto a note — that reopens it)
     if (sbCard && !e.target.closest('.stickybar') && !e.target.closest('.note')) closeStickyBar();
   });
@@ -3345,6 +3438,7 @@
       return;
     }
     if (e.key === 'Escape') {
+      if (modalType === 'objedit') { closeObjEditModal(false); return; }
       if (modalType) { closeModal(); return; }
       if (hubOpen) { closeHub(); return; }
       if (paletteOpen) { closePalette(); return; }

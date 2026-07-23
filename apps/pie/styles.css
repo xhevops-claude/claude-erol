@@ -304,6 +304,31 @@ body {
 .as-card.as-v4 .as-bv-box:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .16); }
 .as-card.as-v4 .as-lk { border-radius: 999px; }
 
+/* v1 · explicit Save / Cancel row for the roomy inline form */
+.as-editrow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--r-line); }
+.as-eb { height: 30px; padding: 0 14px; border: 1px solid var(--r-line); border-radius: 8px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 600; color: #44505f; cursor: pointer; }
+.as-eb:hover { background: #fafafb; }
+.as-eb-primary { background: #18181b; border-color: #18181b; color: #fff; }
+.as-eb-primary:hover { background: #000; }
+/* v2 · quick-edit is chromeless — drop the form's heavy focus frame */
+.as-card.as-v2.as-mode-quick.as-editing { box-shadow: none; border-bottom-color: var(--accent); }
+.as-card.as-v2 .as-desc-in { min-height: 40px; }
+
+/* v4 · focused modal editor */
+.pm-oe { width: min(440px, 100%); }
+.pm-oe .pm-h { margin-bottom: 12px; }
+.pm-oe-l { display: block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #6b7480; margin: 12px 0 5px; }
+.pm-oe-in, .pm-oe-ta, .pm-oe-bv { width: 100%; box-sizing: border-box; border: 1px solid var(--r-line); border-radius: 9px; padding: 9px 11px; font: inherit; font-size: 13.5px; color: #18181b; background: #fff; }
+.pm-oe-ta { resize: vertical; line-height: 1.45; }
+.pm-oe-in:focus, .pm-oe-ta:focus, .pm-oe-bv:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .16); }
+.pm-oe-row { display: flex; gap: 14px; }
+.pm-oe-f { flex: 1 1 0; min-width: 0; }
+.pm-oe-bv { text-align: center; font-weight: 700; }
+.pm-oe-seg { display: flex; gap: 4px; background: #f4f4f5; border-radius: 9px; padding: 3px; }
+.pm-oe-seg button { flex: 1 1 0; border: 0; background: transparent; color: #6b7480; border-radius: 6px; padding: 7px 6px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.pm-oe-seg button.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(24, 24, 27, .12); }
+.pm-oe-foot { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
+
 .obj-fit { width: 100%; height: 100%; overflow: hidden; border-radius: 16px; }
 .obj-sheet { position: relative; display: flex; align-items: stretch; height: 100%; background: #fff; border: 1px solid #dfe2e9; border-radius: 16px; box-shadow: 0 12px 44px rgba(20,30,50,.12); overflow: hidden; }
 .obj-col { flex: 1 1 0; min-width: 0; border-right: 1px solid #ebedf2; }
