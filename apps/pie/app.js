@@ -2127,13 +2127,19 @@
   // ART Objectives side panel (collapsible)
   let objPanelOpen = true;
   let asMenu = null;                 // id of the objective whose "…" menu is open
+  let asEditing = null;              // id of the objective being inline-edited (title/desc)
   const asExpanded = {};             // ids whose description is expanded
   let asDragId = null;               // id of the objective being dragged
   const AS_TRUNC = 96;               // description length past which "See more" appears
+  const objById = (id) => state.artObjectives.find((x) => x.id === id);
   // A card's rank is its 1-based position WITHIN its own group (committed vs not).
   function asGroupOf(o) { return state.artObjectives.filter((x) => !!x.committed === !!o.committed); }
+  // v3 is the always-inline-edit variant; any card can also be put in edit mode
+  // transiently (e.g. right after "Add objective") via asEditing, in any version.
+  function objEditing(o) { return state.navVersion === 'v3' || asEditing === o.id; }
   function objCard(o, rank) {
-    const open = !!asExpanded[o.id], truncatable = (o.desc || '').length > AS_TRUNC;
+    const v = state.navVersion, editing = objEditing(o);
+    const open = !!asExpanded[o.id], truncatable = !editing && (o.desc || '').length > AS_TRUNC;
     const group = asGroupOf(o), gi = group.indexOf(o);
     const canUp = gi > 0, canDown = gi < group.length - 1;
     const menu = asMenu === o.id
@@ -2146,18 +2152,26 @@
           '<button class="as-mi as-danger" type="button" data-obj-act="del" data-id="' + o.id + '">' + bIcon('trash', 'as-mico') + 'Delete</button>' +
         '</div>'
       : '';
-    return '<div class="as-card' + (asDragId === o.id ? ' as-dragging' : '') + '" data-obj-card="' + o.id + '">' +
+    const titleHtml = editing
+      ? '<input class="as-title-in" type="text" data-obj-title="' + o.id + '" value="' + esc(o.title) + '" placeholder="Objective title" aria-label="Objective title" />'
+      : '<div class="as-title">' + esc(o.title || 'Untitled objective') + '</div>';
+    const descHtml = editing
+      ? '<textarea class="as-desc-in" data-obj-desc="' + o.id + '" rows="2" placeholder="Describe this objective…" aria-label="Description">' + esc(o.desc) + '</textarea>'
+      : '<div class="as-desc' + (open ? ' open' : '') + '">' + esc(o.desc) + '</div>' +
+        (truncatable ? '<button class="as-more" type="button" data-obj-toggle="' + o.id + '">' + (open ? 'See less' : 'See more') + '</button>' : '');
+    const cls = 'as-card as-' + v + (o.committed ? ' as-committed' : ' as-uncommitted') +
+      (editing ? ' as-editing' : '') + (asDragId === o.id ? ' as-dragging' : '');
+    return '<div class="' + cls + '" data-obj-card="' + o.id + '">' +
       '<div class="as-top">' +
         '<span class="as-grip" data-obj-grip="' + o.id + '" draggable="true" title="Drag to reorder">' +
           '<span class="as-rank">' + rank + '</span>' + bIcon('grip', 'as-gico') + '</span>' +
-        '<div class="as-title">' + esc(o.title) + '</div>' +
+        titleHtml +
         '<div class="as-acts">' +
           '<button class="as-ico" type="button" data-obj-bd="' + o.id + '" title="Breakdown">' + bIcon('breakdown') + '</button>' +
           '<button class="as-ico' + (asMenu === o.id ? ' on' : '') + '" type="button" data-obj-more="' + o.id + '" title="More options">' + bIcon('dots') + '</button>' +
         '</div>' + menu +
       '</div>' +
-      '<div class="as-desc' + (open ? ' open' : '') + '">' + esc(o.desc) + '</div>' +
-      (truncatable ? '<button class="as-more" type="button" data-obj-toggle="' + o.id + '">' + (open ? 'See less' : 'See more') + '</button>' : '') +
+      descHtml +
       '<div class="as-foot">' +
         '<label class="as-bv"><input class="as-bv-box" type="text" inputmode="numeric" data-obj-bv="' + o.id + '" value="' + esc(String(o.bv)) + '" aria-label="Business Value" />Business Value</label>' +
         '<button class="as-lk" type="button" data-obj-links="' + o.id + '" title="View links">' + bIcon('link', 'as-lkico') + (Array.isArray(o.links) ? o.links.length : o.links) + '</button>' +
@@ -2171,9 +2185,26 @@
       '<div class="as-grp"><span>' + label + '</span><span class="as-n">' + arr.length + '</span></div>' +
       (arr.length ? arr.map((o, i) => objCard(o, i + 1)).join('') : '<div class="as-empty">Nothing here yet.</div>');
     artSide.innerHTML =
-      '<div class="as-head"><span class="as-art">' + esc(ctxArt().name) + '</span>' +
-        '<button class="as-add" type="button" title="Add objective" disabled>' + bIcon('plus') + '</button></div>' +
-      '<div class="as-body">' + grp('Committed', com) + grp('Uncommitted', unc) + '</div>';
+      '<div class="as-head as-head-' + state.navVersion + '"><span class="as-art">' + esc(ctxArt().name) + '</span>' +
+        '<button class="as-add" type="button" title="Add objective" data-obj-add>' + bIcon('plus') + '<span class="as-add-t">Add objective</span></button></div>' +
+      '<div class="as-body as-body-' + state.navVersion + '">' + grp('Committed', com) + grp('Uncommitted', unc) + '</div>';
+  }
+  // Add a new objective to the top of the Committed group and drop it into inline edit.
+  function addObjective() {
+    const o = { id: uid(), title: '', desc: '', bv: 0, links: 0, committed: true };
+    const arr = state.artObjectives;
+    let idx = arr.findIndex((x) => !x.committed); if (idx < 0) idx = arr.length;
+    arr.splice(idx, 0, o);
+    asEditing = o.id; asMenu = null; asExpanded[o.id] = true; save(); renderArtSide();
+    const inp = artSide.querySelector('[data-obj-title="' + o.id + '"]');
+    if (inp) { inp.focus(); inp.scrollIntoView({ block: 'nearest' }); }
+  }
+  // Leave inline-edit mode; blank titles fall back to a default so nothing is nameless.
+  function exitObjEdit() {
+    if (!asEditing) return;
+    const o = objById(asEditing);
+    if (o && !(o.title || '').trim()) o.title = 'Untitled objective';
+    asEditing = null; save(); renderArtSide();
   }
   // Seeded set of stickies an objective "links" to — used by the links overlay.
   function objLinkedCards(o) {
@@ -2205,40 +2236,50 @@
     arr.splice(before ? ti : ti + 1, 0, o);
     save(); renderArtSide();
   }
-  // Card interactions: breakdown / more-menu / see-more / editable BV / links / drag-reorder
+  // Card interactions: add / breakdown / more-menu / see-more / editable BV / links / drag-reorder
   artSide.addEventListener('click', (e) => {
+    const addb = e.target.closest('[data-obj-add]');
+    if (addb) { e.stopPropagation(); addObjective(); return; }
     const bd = e.target.closest('[data-obj-bd]');
-    if (bd) { asMenu = null; openBreakdown(state.artObjectives.find((o) => o.id === bd.dataset.objBd)); return; }
+    if (bd) { asMenu = null; openBreakdown(objById(bd.dataset.objBd)); return; }
     const more = e.target.closest('[data-obj-more]');
     if (more) { e.stopPropagation(); asMenu = asMenu === more.dataset.objMore ? null : more.dataset.objMore; renderArtSide(); return; }
     const act = e.target.closest('[data-obj-act]');
     if (act) {
-      const id = act.dataset.id, o = state.artObjectives.find((x) => x.id === id); if (!o) return;
+      const id = act.dataset.id, o = objById(id); if (!o) return;
       asMenu = null;
       if (act.dataset.objAct === 'commit') { o.committed = !o.committed; save(); renderArtSide(); }
       else if (act.dataset.objAct === 'up') moveObj(id, -1);
       else if (act.dataset.objAct === 'down') moveObj(id, 1);
-      else if (act.dataset.objAct === 'del') { state.artObjectives = state.artObjectives.filter((x) => x.id !== id); save(); renderArtSide(); }
+      else if (act.dataset.objAct === 'del') { if (asEditing === id) asEditing = null; state.artObjectives = state.artObjectives.filter((x) => x.id !== id); save(); renderArtSide(); }
       return;
     }
     const tog = e.target.closest('[data-obj-toggle]');
     if (tog) { const id = tog.dataset.objToggle; asExpanded[id] = !asExpanded[id]; renderArtSide(); return; }
     const lk = e.target.closest('[data-obj-links]');
-    if (lk) { asMenu = null; openObjLinks(state.artObjectives.find((o) => o.id === lk.dataset.objLinks)); return; }
+    if (lk) { asMenu = null; openObjLinks(objById(lk.dataset.objLinks)); return; }
   });
-  // Editable Business Value — commit on blur / Enter, keep digits only.
+  // Live-edit fields: Business Value (digits only), inline title & description.
   artSide.addEventListener('input', (e) => {
-    const bv = e.target.closest('[data-obj-bv]'); if (!bv) return;
-    bv.value = bv.value.replace(/[^0-9]/g, '').slice(0, 4);
+    const bv = e.target.closest('[data-obj-bv]');
+    if (bv) { bv.value = bv.value.replace(/[^0-9]/g, '').slice(0, 4); return; }
+    const ti = e.target.closest('[data-obj-title]');
+    if (ti) { const o = objById(ti.dataset.objTitle); if (o) { o.title = ti.value; save(); } return; }
+    const de = e.target.closest('[data-obj-desc]');
+    if (de) { const o = objById(de.dataset.objDesc); if (o) { o.desc = de.value; save(); } return; }
   });
   const commitBv = (bv) => {
-    const o = state.artObjectives.find((x) => x.id === bv.dataset.objBv); if (!o) return;
+    const o = objById(bv.dataset.objBv); if (!o) return;
     o.bv = Number(bv.value) || 0; bv.value = String(o.bv); save();
   };
   artSide.addEventListener('blur', (e) => { const bv = e.target.closest('[data-obj-bv]'); if (bv) commitBv(bv); }, true);
   artSide.addEventListener('keydown', (e) => {
-    const bv = e.target.closest('[data-obj-bv]'); if (!bv) return;
-    if (e.key === 'Enter') { e.preventDefault(); bv.blur(); }
+    const bv = e.target.closest('[data-obj-bv]');
+    if (bv) { if (e.key === 'Enter') { e.preventDefault(); bv.blur(); } return; }
+    const ti = e.target.closest('[data-obj-title]');
+    if (ti) { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); if (asEditing) exitObjEdit(); else ti.blur(); } return; }
+    const de = e.target.closest('[data-obj-desc]');
+    if (de) { if (e.key === 'Escape') { e.preventDefault(); if (asEditing) exitObjEdit(); else de.blur(); } return; }
   });
   // Drag to reorder (grip is the only draggable handle).
   artSide.addEventListener('dragstart', (e) => {
@@ -2927,6 +2968,7 @@
     if ((utilPanel || btPanel) && !e.target.closest('.btools')) { utilPanel = null; btPanel = null; if (!boardScreen.hidden) renderBtools(); }
     if (dockPanel && !e.target.closest('.dock')) { dockPanel = null; if (!boardScreen.hidden) renderDock(); }
     if (asMenu && !e.target.closest('.as-menu') && !e.target.closest('[data-obj-more]')) { asMenu = null; renderArtSide(); }
+    if (asEditing && !e.target.closest('[data-obj-card="' + asEditing + '"]')) exitObjEdit();
     // click away from the sticky action bar (but not onto a note — that reopens it)
     if (sbCard && !e.target.closest('.stickybar') && !e.target.closest('.note')) closeStickyBar();
   });

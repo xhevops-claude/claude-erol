@@ -212,9 +212,9 @@ body {
 
 .as-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; border-bottom: 1px solid var(--r-line); flex: 0 0 auto; }
 .as-art { font-size: 15px; font-weight: 800; flex: 1 1 auto; }
-.as-add { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--r-line); background: #fff; color: #6b7480; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.as-add { height: 30px; padding: 0 11px 0 8px; border-radius: 8px; border: 1px solid var(--r-line); background: #fff; color: #44505f; cursor: pointer; display: flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px; font-weight: 600; }
 .as-add svg { width: 16px; height: 16px; stroke: currentColor; }
-.as-add:hover { border-color: var(--accent); color: var(--accent); }
+.as-add:hover { border-color: var(--accent); color: var(--accent); background: #fff8ee; }
 .as-body { flex: 1 1 auto; overflow: auto; padding: 4px 14px 20px; }
 .as-grp { display: flex; align-items: center; padding: 14px 4px 8px; font-size: 13px; font-weight: 700; color: #44505f; }
 .as-grp .as-n { margin-left: auto; color: var(--r-faint); }
@@ -258,6 +258,51 @@ body {
 .as-lk svg { width: 15px; height: 15px; stroke: currentColor; }
 .as-lk:hover { border-color: var(--accent); color: var(--accent); }
 .ov-tile.ov-static { cursor: default; }
+
+/* Inline-edit fields (v3 always, or any card added via "Add objective") */
+.as-title-in { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 13.5px; font-weight: 600; line-height: 1.35; color: #1b1f27; border: 1px solid transparent; background: transparent; padding: 3px 6px; margin: -1px 0; border-radius: 7px; }
+.as-title-in::placeholder { color: var(--r-faint); font-weight: 500; }
+.as-title-in:hover { background: #f4f4f6; }
+.as-title-in:focus { outline: none; background: #fff; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .14); }
+.as-desc-in { display: block; width: 100%; box-sizing: border-box; margin-top: 9px; resize: vertical; min-height: 46px; font: inherit; font-size: 12.5px; line-height: 1.45; color: var(--r-dim); border: 1px solid var(--r-line); border-radius: 8px; padding: 7px 9px; background: #fff; }
+.as-desc-in::placeholder { color: var(--r-faint); }
+.as-desc-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .14); }
+.as-card.as-editing { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .12); }
+
+/* v2 · Compact list — no card chrome, hover-revealed actions, dense rows */
+.as-body-v2 .as-card.as-v2 { border: 0; border-radius: 0; margin-bottom: 0; padding: 11px 6px; border-bottom: 1px solid var(--r-line); box-shadow: none; }
+.as-body-v2 .as-card.as-v2:hover { box-shadow: none; background: #fafafb; }
+.as-card.as-v2 .as-top { align-items: center; gap: 8px; }
+.as-card.as-v2 .as-title { font-size: 13px; font-weight: 600; }
+.as-card.as-v2 .as-grip { width: 18px; height: 20px; }
+.as-card.as-v2 .as-acts { opacity: 0; transition: opacity .12s; }
+.as-card.as-v2:hover .as-acts, .as-card.as-v2 .as-ico.on { opacity: 1; }
+.as-card.as-v2 .as-desc { margin-top: 6px; -webkit-line-clamp: 1; line-clamp: 1; }
+.as-card.as-v2 .as-more { margin-top: 3px; }
+.as-card.as-v2 .as-foot { margin-top: 9px; gap: 10px; }
+.as-card.as-v2 .as-bv-box { width: 40px; height: 25px; font-size: 12px; }
+.as-card.as-v2 .as-bv { font-size: 11.5px; }
+.as-card.as-v2 .as-lk { height: 25px; padding: 0 8px; border-color: transparent; background: #f4f4f6; }
+.as-card.as-v2 .as-lk:hover { background: #eef0f3; }
+
+/* v3 · Inline-edit — softer card, clear editable affordances (fields styled above) */
+.as-card.as-v3 { border-color: #e4e6eb; background: #fcfcfd; }
+.as-card.as-v3 .as-foot { margin-top: 11px; }
+
+/* v4 · Accent & badge — commitment stripe, rank medallion, bold title, BV pill */
+.as-card.as-v4 { padding-left: 15px; overflow: hidden; }
+.as-card.as-v4::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.as-card.as-v4.as-committed::before { background: #46b16a; }
+.as-card.as-v4.as-uncommitted::before { background: #f5a623; }
+.as-card.as-v4 .as-top { align-items: center; }
+.as-card.as-v4 .as-grip { width: 26px; height: 26px; border-radius: 50%; background: #f1f2f6; color: #44505f; }
+.as-card.as-v4 .as-grip .as-rank { font-size: 12px; font-weight: 800; }
+.as-card.as-v4 .as-title { font-size: 14px; font-weight: 700; padding-top: 0; }
+.as-card.as-v4 .as-foot { margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--r-line); }
+.as-card.as-v4 .as-bv { flex-direction: row-reverse; gap: 7px; font-weight: 600; color: #44505f; }
+.as-card.as-v4 .as-bv-box { height: 26px; min-width: 40px; background: #eef7f1; border-color: #cbe6d4; color: #2f8f4e; }
+.as-card.as-v4 .as-bv-box:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .16); }
+.as-card.as-v4 .as-lk { border-radius: 999px; }
 
 .obj-fit { width: 100%; height: 100%; overflow: hidden; border-radius: 16px; }
 .obj-sheet { position: relative; display: flex; align-items: stretch; height: 100%; background: #fff; border: 1px solid #dfe2e9; border-radius: 16px; box-shadow: 0 12px 44px rgba(20,30,50,.12); overflow: hidden; }
