@@ -2208,6 +2208,12 @@
     const formFoot = (editing && asEditMode === 'form' && asEditing === o.id)
       ? '<div class="as-editrow"><button class="as-eb" type="button" data-obj-act="cancel" data-id="' + o.id + '">Cancel</button>' +
         '<button class="as-eb as-eb-primary" type="button" data-obj-act="save" data-id="' + o.id + '">Save</button></div>' : '';
+    // v2 · a one-click commitment checkbox (checked = committed) for fast triage.
+    const commitBox = v === 'v2'
+      ? '<button class="as-check" type="button" data-obj-act="commit" data-id="' + o.id + '" title="' + (o.committed ? 'Committed' : 'Uncommitted') + '" aria-pressed="' + o.committed + '"></button>' : '';
+    // v4 · a visible Edit button (opens the modal editor) for discoverability.
+    const editCta = v === 'v4'
+      ? '<button class="as-editcta" type="button" data-obj-act="edit" data-id="' + o.id + '">' + bIcon('edit', 'as-ecico') + 'Edit</button>' : '';
     // "as-editing" is the transient inline-edit chrome (v1/v2). v3 renders fields
     // always but styles itself, so it doesn't take the transient chrome.
     const transient = asEditing === o.id && v !== 'v4';
@@ -2215,7 +2221,7 @@
       (transient ? ' as-editing as-mode-' + asEditMode : '') +
       (asDragId === o.id ? ' as-dragging' : '');
     return '<div class="' + cls + '" data-obj-card="' + o.id + '">' +
-      '<div class="as-top">' +
+      '<div class="as-top">' + commitBox +
         '<span class="as-grip" data-obj-grip="' + o.id + '" draggable="true" title="Drag to reorder">' +
           '<span class="as-rank">' + rank + '</span>' + bIcon('grip', 'as-gico') + '</span>' +
         titleHtml +
@@ -2228,7 +2234,7 @@
       descHtml +
       '<div class="as-foot">' +
         '<label class="as-bv"><input class="as-bv-box" type="text" inputmode="numeric" data-obj-bv="' + o.id + '" value="' + esc(String(o.bv)) + '" aria-label="Business Value" /><span class="as-bv-l">Business Value</span></label>' +
-        '<button class="as-lk" type="button" data-obj-links="' + o.id + '" title="View links">' + bIcon('link', 'as-lkico') + (Array.isArray(o.links) ? o.links.length : o.links) + '</button>' +
+        '<button class="as-lk" type="button" data-obj-links="' + o.id + '" title="View links">' + bIcon('link', 'as-lkico') + (Array.isArray(o.links) ? o.links.length : o.links) + '</button>' + editCta +
       '</div>' + formFoot + '</div>';
   }
   function renderArtSide() {
