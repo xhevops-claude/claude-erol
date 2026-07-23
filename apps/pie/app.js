@@ -2219,6 +2219,7 @@
         '<span class="as-grip" data-obj-grip="' + o.id + '" draggable="true" title="Drag to reorder">' +
           '<span class="as-rank">' + rank + '</span>' + bIcon('grip', 'as-gico') + '</span>' +
         titleHtml +
+        '<span class="as-flag" aria-hidden="true"></span>' +
         '<div class="as-acts">' + pencil +
           '<button class="as-ico" type="button" data-obj-bd="' + o.id + '" title="Breakdown">' + bIcon('breakdown') + '</button>' +
           '<button class="as-ico' + (asMenu === o.id ? ' on' : '') + '" type="button" data-obj-more="' + o.id + '" title="More options">' + bIcon('dots') + '</button>' +
