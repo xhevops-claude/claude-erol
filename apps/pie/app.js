@@ -2208,8 +2208,11 @@
     const formFoot = (editing && asEditMode === 'form' && asEditing === o.id)
       ? '<div class="as-editrow"><button class="as-eb" type="button" data-obj-act="cancel" data-id="' + o.id + '">Cancel</button>' +
         '<button class="as-eb as-eb-primary" type="button" data-obj-act="save" data-id="' + o.id + '">Save</button></div>' : '';
+    // "as-editing" is the transient inline-edit chrome (v1/v2). v3 renders fields
+    // always but styles itself, so it doesn't take the transient chrome.
+    const transient = asEditing === o.id && v !== 'v4';
     const cls = 'as-card as-' + v + (o.committed ? ' as-committed' : ' as-uncommitted') +
-      (editing ? ' as-editing' + (asEditMode && asEditing === o.id ? ' as-mode-' + asEditMode : '') : '') +
+      (transient ? ' as-editing as-mode-' + asEditMode : '') +
       (asDragId === o.id ? ' as-dragging' : '');
     return '<div class="' + cls + '" data-obj-card="' + o.id + '">' +
       '<div class="as-top">' +
@@ -2223,7 +2226,7 @@
       '</div>' +
       descHtml +
       '<div class="as-foot">' +
-        '<label class="as-bv"><input class="as-bv-box" type="text" inputmode="numeric" data-obj-bv="' + o.id + '" value="' + esc(String(o.bv)) + '" aria-label="Business Value" />Business Value</label>' +
+        '<label class="as-bv"><input class="as-bv-box" type="text" inputmode="numeric" data-obj-bv="' + o.id + '" value="' + esc(String(o.bv)) + '" aria-label="Business Value" /><span class="as-bv-l">Business Value</span></label>' +
         '<button class="as-lk" type="button" data-obj-links="' + o.id + '" title="View links">' + bIcon('link', 'as-lkico') + (Array.isArray(o.links) ? o.links.length : o.links) + '</button>' +
       '</div>' + formFoot + '</div>';
   }

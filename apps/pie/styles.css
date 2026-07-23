@@ -269,50 +269,79 @@ body {
 .as-desc-in:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .14); }
 .as-card.as-editing { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .12); }
 
-/* v2 · Compact list — no card chrome, hover-revealed actions, dense rows */
-.as-body-v2 .as-card.as-v2 { border: 0; border-radius: 0; margin-bottom: 0; padding: 11px 6px; border-bottom: 1px solid var(--r-line); box-shadow: none; }
-.as-body-v2 .as-card.as-v2:hover { box-shadow: none; background: #fafafb; }
-.as-card.as-v2 .as-top { align-items: center; gap: 8px; }
-.as-card.as-v2 .as-title { font-size: 13px; font-weight: 600; }
-.as-card.as-v2 .as-grip { width: 18px; height: 20px; }
+/* ===== v1 · Timeline rail — numbered nodes threaded on a connector line ===== */
+.as-body-v1 .as-card.as-v1 { border: 0; border-radius: 10px; margin-bottom: 10px; padding: 6px 10px 12px 42px; box-shadow: none; }
+.as-body-v1 .as-card.as-v1:hover { background: #fafbfc; box-shadow: none; }
+.as-card.as-v1::before { content: ""; position: absolute; left: 18px; top: 30px; bottom: -12px; width: 2px; background: var(--r-line); }
+.as-body-v1 .as-card.as-v1:last-child::before { display: none; }
+.as-card.as-v1 .as-grip { position: absolute; left: 8px; top: 8px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #cfd4dd; background: #fff; color: #6b7480; z-index: 1; }
+.as-card.as-v1.as-committed .as-grip { border-color: #46b16a; background: #46b16a; color: #fff; }
+.as-card.as-v1 .as-grip .as-rank { font-size: 11px; font-weight: 800; }
+.as-card.as-v1 .as-grip .as-gico { width: 14px; height: 14px; }
+.as-card.as-v1 .as-title { padding-top: 4px; }
+.as-card.as-v1.as-editing { background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px var(--accent), 0 8px 22px rgba(24, 24, 27, .09); }
+
+/* ===== v2 · Minimal row — status dot, meta chips, actions on hover ===== */
+.as-body-v2 .as-card.as-v2 { border: 0; border-radius: 8px; margin-bottom: 1px; padding: 9px 8px 9px 22px; box-shadow: none; }
+.as-body-v2 .as-card.as-v2:hover { background: #f6f7f9; box-shadow: none; }
+.as-card.as-v2::before { content: ""; position: absolute; left: 7px; top: 15px; width: 7px; height: 7px; border-radius: 50%; box-sizing: border-box; }
+.as-card.as-v2.as-committed::before { background: #46b16a; }
+.as-card.as-v2.as-uncommitted::before { background: #fff; border: 1.5px solid #e79a2b; }
+.as-card.as-v2 .as-top { align-items: center; gap: 6px; }
+.as-card.as-v2 .as-grip { width: 15px; height: 18px; }
+.as-card.as-v2 .as-grip .as-rank { font-size: 11px; color: var(--r-faint); }
+.as-card.as-v2 .as-title { font-size: 13px; font-weight: 600; padding-top: 0; }
 .as-card.as-v2 .as-acts { opacity: 0; transition: opacity .12s; }
 .as-card.as-v2:hover .as-acts, .as-card.as-v2 .as-ico.on { opacity: 1; }
-.as-card.as-v2 .as-desc { margin-top: 6px; }
-.as-card.as-v2 .as-more { margin-top: 3px; }
-.as-card.as-v2 .as-foot { margin-top: 9px; gap: 10px; }
-.as-card.as-v2 .as-bv-box { width: 40px; height: 25px; font-size: 12px; }
-.as-card.as-v2 .as-bv { font-size: 11.5px; }
-.as-card.as-v2 .as-lk { height: 25px; padding: 0 8px; border-color: transparent; background: #f4f4f6; }
-.as-card.as-v2 .as-lk:hover { background: #eef0f3; }
+.as-card.as-v2 .as-ico { width: 24px; height: 24px; }
+.as-card.as-v2 .as-desc { margin: 5px 0 0 21px; font-size: 12px; }
+.as-card.as-v2 .as-more { margin: 3px 0 0 21px; }
+.as-card.as-v2 .as-foot { margin: 8px 0 0 21px; gap: 6px; }
+.as-card.as-v2 .as-bv { gap: 4px; font-size: 11px; }
+.as-card.as-v2 .as-bv-l { display: none; }
+.as-card.as-v2 .as-bv::before { content: "BV"; font-size: 10px; font-weight: 700; color: var(--r-faint); }
+.as-card.as-v2 .as-bv-box { width: auto; min-width: 30px; height: 23px; padding: 0 8px; font-size: 11.5px; border-radius: 999px; border-color: transparent; background: #eef0f3; }
+.as-card.as-v2 .as-lk { height: 23px; margin-left: 0; padding: 0 9px; font-size: 11.5px; border-radius: 999px; border-color: transparent; background: #eef0f3; }
+.as-card.as-v2 .as-lk:hover { background: #e6e9ee; }
+.as-card.as-v2.as-mode-quick.as-editing { box-shadow: inset 2px 0 0 var(--accent); background: #fff; }
+.as-card.as-v2 .as-desc-in { min-height: 40px; }
 
-/* v3 · Inline-edit — softer card, clear editable affordances (fields styled above) */
-.as-card.as-v3 { border-color: #e4e6eb; background: #fcfcfd; }
+/* ===== v3 · Live edit surface — always-editable fields, indigo edit accent ===== */
+.as-card.as-v3 { border-color: #e2e4ee; background: #f8f9fd; padding-left: 15px; }
+.as-card.as-v3::before { content: ""; position: absolute; left: 0; top: 11px; bottom: 11px; width: 3px; border-radius: 0 3px 3px 0; background: #6366f1; }
+.as-card.as-v3 .as-grip { color: #8b8fb5; }
+.as-card.as-v3 .as-title-in { background: #fff; border-color: #dcdef0; }
+.as-card.as-v3 .as-title-in:hover { border-color: #c4c8e6; }
+.as-card.as-v3 .as-title-in:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, .16); }
+.as-card.as-v3 .as-desc-in { background: #fff; border-color: #dcdef0; }
+.as-card.as-v3 .as-desc-in:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, .16); }
 .as-card.as-v3 .as-foot { margin-top: 11px; }
+.as-card.as-v3 .as-bv-box:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, .16); }
 
-/* v4 · Accent & badge — commitment stripe, rank medallion, bold title, BV pill */
-.as-card.as-v4 { padding-left: 15px; overflow: hidden; }
-.as-card.as-v4::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
-.as-card.as-v4.as-committed::before { background: #46b16a; }
-.as-card.as-v4.as-uncommitted::before { background: #f5a623; }
-.as-card.as-v4 .as-top { align-items: center; }
-.as-card.as-v4 .as-grip { width: 26px; height: 26px; border-radius: 50%; background: #f1f2f6; color: #44505f; }
+/* ===== v4 · Header band — tinted commitment header over a white body ===== */
+.as-card.as-v4 { padding: 0; overflow: hidden; }
+.as-card.as-v4 .as-top { align-items: center; gap: 8px; padding: 9px 10px; border-bottom: 1px solid var(--r-line); }
+.as-card.as-v4.as-committed .as-top { background: #edf7f0; border-bottom-color: #d6ecdd; }
+.as-card.as-v4.as-uncommitted .as-top { background: #fdf3e6; border-bottom-color: #f3e2c8; }
+.as-card.as-v4 .as-grip { width: 24px; height: 24px; border-radius: 7px; color: #fff; }
+.as-card.as-v4.as-committed .as-grip { background: #46b16a; }
+.as-card.as-v4.as-uncommitted .as-grip { background: #e79a2b; }
 .as-card.as-v4 .as-grip .as-rank { font-size: 12px; font-weight: 800; }
-.as-card.as-v4 .as-title { font-size: 14px; font-weight: 700; padding-top: 0; }
-.as-card.as-v4 .as-foot { margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--r-line); }
-.as-card.as-v4 .as-bv { flex-direction: row-reverse; gap: 7px; font-weight: 600; color: #44505f; }
-.as-card.as-v4 .as-bv-box { height: 26px; min-width: 40px; background: #eef7f1; border-color: #cbe6d4; color: #2f8f4e; }
-.as-card.as-v4 .as-bv-box:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .16); }
-.as-card.as-v4 .as-lk { border-radius: 999px; }
+.as-card.as-v4 .as-grip .as-gico { width: 14px; height: 14px; }
+.as-card.as-v4 .as-grip:hover { color: #fff; filter: brightness(.94); }
+.as-card.as-v4 .as-title { font-size: 13.5px; font-weight: 700; padding-top: 0; }
+.as-card.as-v4 .as-ico { color: #57606f; }
+.as-card.as-v4 .as-ico:hover, .as-card.as-v4 .as-ico.on { background: rgba(255, 255, 255, .65); color: #1b1f27; }
+.as-card.as-v4 .as-desc { margin: 10px 12px 0; }
+.as-card.as-v4 .as-more { margin: 5px 0 0 12px; }
+.as-card.as-v4 .as-foot { margin: 11px 12px 12px; }
 
-/* v1 · explicit Save / Cancel row for the roomy inline form */
+/* Explicit Save / Cancel row for v1's roomy inline form */
 .as-editrow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--r-line); }
 .as-eb { height: 30px; padding: 0 14px; border: 1px solid var(--r-line); border-radius: 8px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 600; color: #44505f; cursor: pointer; }
 .as-eb:hover { background: #fafafb; }
 .as-eb-primary { background: #18181b; border-color: #18181b; color: #fff; }
 .as-eb-primary:hover { background: #000; }
-/* v2 · quick-edit is chromeless — drop the form's heavy focus frame */
-.as-card.as-v2.as-mode-quick.as-editing { box-shadow: none; border-bottom-color: var(--accent); }
-.as-card.as-v2 .as-desc-in { min-height: 40px; }
 
 /* v4 · focused modal editor */
 .pm-oe { width: min(440px, 100%); }
