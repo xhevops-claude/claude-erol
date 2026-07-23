@@ -381,6 +381,8 @@
       bookmark: '<path d="M6 4h12v16l-6-4-6 4z"/>',
       cols: '<rect x="4" y="5" width="6" height="14" rx="1"/><rect x="14" y="5" width="6" height="14" rx="1"/>',
       dots: '<circle cx="12" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+      grip: '<circle cx="9" cy="6" r="1.35" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.35" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.35" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.35" fill="currentColor" stroke="none"/>',
+      chevup: '<path d="M6 15l6-6 6 6"/>',
       expand: '<path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4"/>',
       // zoom
       plus: '<path d="M12 5v14M5 12h14"/>',
@@ -1698,6 +1700,25 @@
             '<div class="pm-full-meta">' + linked.size + ' linked · pick stickies across ' + esc(state.st.name) + '</div></div>' +
           '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' +
           '<div class="pm-full-b ov-body">' + (cols || '<div class="sb-empty">No stickies to link.</div>') + '</div></div>';
+    } else if (modalType === 'objlinks') {
+      const o = modalCard || {};
+      const linked = objLinkedCards(o);
+      let cols = '';
+      state.arts.forEach((a) => {
+        let inner = '';
+        state.teams.filter((t) => a.teamIds.includes(t.id)).forEach((t) => {
+          const cs = linked.filter((x) => x.teamId === t.id);
+          if (cs.length) inner += '<div class="ov-grp">' + esc(t.name) + '</div><div class="ov-tiles">' +
+            cs.map((x) => '<div class="ov-tile ov-static"><i class="sb-swatch s-' + stypeOf(x) + '"></i><span>' + esc(x.title) + '</span></div>').join('') + '</div>';
+        });
+        if (inner) cols += '<div class="ov-art"><div class="ov-art-h">' + esc(a.name) + '</div>' + inner + '</div>';
+      });
+      modalEl.innerHTML =
+        '<div class="pm-full"><div class="pm-full-h">' +
+          '<div class="pm-full-t"><span class="pm-kicker">Objective links</span><h2>' + esc(o.title || '') + '</h2>' +
+            '<div class="pm-full-meta">' + linked.length + ' linked ' + (linked.length === 1 ? 'sticky' : 'stickies') + ' across ' + esc(state.st.name) + '</div></div>' +
+          '<button class="pm-x" type="button" data-pm="close" title="Close">✕</button></div>' +
+          '<div class="pm-full-b ov-body">' + (cols || '<div class="sb-empty">No links yet.</div>') + '</div></div>';
     }
   }
   modalEl.addEventListener('click', (e) => {
@@ -2105,26 +2126,148 @@
 
   // ART Objectives side panel (collapsible)
   let objPanelOpen = true;
+  let asMenu = null;                 // id of the objective whose "…" menu is open
+  const asExpanded = {};             // ids whose description is expanded
+  let asDragId = null;               // id of the objective being dragged
+  const AS_TRUNC = 96;               // description length past which "See more" appears
+  // A card's rank is its 1-based position WITHIN its own group (committed vs not).
+  function asGroupOf(o) { return state.artObjectives.filter((x) => !!x.committed === !!o.committed); }
+  function objCard(o, rank) {
+    const open = !!asExpanded[o.id], truncatable = (o.desc || '').length > AS_TRUNC;
+    const group = asGroupOf(o), gi = group.indexOf(o);
+    const canUp = gi > 0, canDown = gi < group.length - 1;
+    const menu = asMenu === o.id
+      ? '<div class="as-menu" data-obj-menu="' + o.id + '">' +
+          '<button class="as-mi" type="button" data-obj-act="commit" data-id="' + o.id + '">' + bIcon('statusdot', 'as-mico') +
+            (o.committed ? 'Mark as Uncommitted' : 'Mark as Committed') + '</button>' +
+          (canUp ? '<button class="as-mi" type="button" data-obj-act="up" data-id="' + o.id + '">' + bIcon('chevup', 'as-mico') + 'Move Up</button>' : '') +
+          (canDown ? '<button class="as-mi" type="button" data-obj-act="down" data-id="' + o.id + '">' + bIcon('chev', 'as-mico') + 'Move Down</button>' : '') +
+          '<div class="as-msep"></div>' +
+          '<button class="as-mi as-danger" type="button" data-obj-act="del" data-id="' + o.id + '">' + bIcon('trash', 'as-mico') + 'Delete</button>' +
+        '</div>'
+      : '';
+    return '<div class="as-card' + (asDragId === o.id ? ' as-dragging' : '') + '" data-obj-card="' + o.id + '">' +
+      '<div class="as-top">' +
+        '<span class="as-grip" data-obj-grip="' + o.id + '" draggable="true" title="Drag to reorder">' +
+          '<span class="as-rank">' + rank + '</span>' + bIcon('grip', 'as-gico') + '</span>' +
+        '<div class="as-title">' + esc(o.title) + '</div>' +
+        '<div class="as-acts">' +
+          '<button class="as-ico" type="button" data-obj-bd="' + o.id + '" title="Breakdown">' + bIcon('breakdown') + '</button>' +
+          '<button class="as-ico' + (asMenu === o.id ? ' on' : '') + '" type="button" data-obj-more="' + o.id + '" title="More options">' + bIcon('dots') + '</button>' +
+        '</div>' + menu +
+      '</div>' +
+      '<div class="as-desc' + (open ? ' open' : '') + '">' + esc(o.desc) + '</div>' +
+      (truncatable ? '<button class="as-more" type="button" data-obj-toggle="' + o.id + '">' + (open ? 'See less' : 'See more') + '</button>' : '') +
+      '<div class="as-foot">' +
+        '<label class="as-bv"><input class="as-bv-box" type="text" inputmode="numeric" data-obj-bv="' + o.id + '" value="' + esc(String(o.bv)) + '" aria-label="Business Value" />Business Value</label>' +
+        '<button class="as-lk" type="button" data-obj-links="' + o.id + '" title="View links">' + bIcon('link', 'as-lkico') + (Array.isArray(o.links) ? o.links.length : o.links) + '</button>' +
+      '</div>' + '</div>';
+  }
   function renderArtSide() {
     if (mode !== 'board' || railActive !== 'objectives') { artSide.innerHTML = ''; return; }
     const list = state.artObjectives;
     const com = list.filter((o) => o.committed), unc = list.filter((o) => !o.committed);
-    const card = (o, i) =>
-      '<div class="as-card"><div class="as-top"><span class="as-num">' + (i + 1) + '</span>' +
-        '<div class="as-title">' + esc(o.title) + '</div>' +
-        '<button class="as-ico" type="button" disabled>' + bIcon('collab') + '</button>' +
-        '<button class="as-ico" type="button" disabled>' + bIcon('dots') + '</button></div>' +
-      '<div class="as-desc">' + esc(o.desc) + '</div><span class="as-more">See more</span>' +
-      '<div class="as-foot"><span class="as-bv"><span class="as-bv-box">' + o.bv + '</span>Business Value</span>' +
-        '<span class="as-lk">' + bIcon('collab', 'op-lkico') + ' ' + o.links + '</span></div></div>';
     const grp = (label, arr) =>
       '<div class="as-grp"><span>' + label + '</span><span class="as-n">' + arr.length + '</span></div>' +
-      arr.map(card).join('');
+      (arr.length ? arr.map((o, i) => objCard(o, i + 1)).join('') : '<div class="as-empty">Nothing here yet.</div>');
     artSide.innerHTML =
       '<div class="as-head"><span class="as-art">' + esc(ctxArt().name) + '</span>' +
         '<button class="as-add" type="button" title="Add objective" disabled>' + bIcon('plus') + '</button></div>' +
-      '<div class="as-body">' + grp('Commited', com) + grp('Uncommitted', unc) + '</div>';
+      '<div class="as-body">' + grp('Committed', com) + grp('Uncommitted', unc) + '</div>';
   }
+  // Seeded set of stickies an objective "links" to — used by the links overlay.
+  function objLinkedCards(o) {
+    const n = Array.isArray(o.links) ? o.links.length : (o.links || 0);
+    const pool = state.cards.slice();
+    if (!pool.length || !n) return [];
+    const rng = seededRng('objlinks-' + o.id);
+    const used = new Set(), out = [];
+    while (out.length < Math.min(n, pool.length)) {
+      const idx = Math.floor(rng() * pool.length);
+      if (used.has(idx)) continue;
+      used.add(idx); out.push(pool[idx]);
+    }
+    return out;
+  }
+  function openObjLinks(o) { modalCard = o; modalType = 'objlinks'; modalEl.classList.add('pm-wide'); renderModal(); }
+  function moveObj(id, dir) {
+    const arr = state.artObjectives, o = arr.find((x) => x.id === id); if (!o) return;
+    const group = asGroupOf(o), gi = group.indexOf(o), target = group[gi + dir]; if (!target) return;
+    const a = arr.indexOf(o), b = arr.indexOf(target);
+    arr[a] = target; arr[b] = o; save(); renderArtSide();
+  }
+  function reorderObj(dragId, targetId, before) {
+    const arr = state.artObjectives;
+    const o = arr.find((x) => x.id === dragId), t = arr.find((x) => x.id === targetId);
+    if (!o || !t || o === t || !!o.committed !== !!t.committed) return; // reorder within a group
+    arr.splice(arr.indexOf(o), 1);
+    const ti = arr.indexOf(t);
+    arr.splice(before ? ti : ti + 1, 0, o);
+    save(); renderArtSide();
+  }
+  // Card interactions: breakdown / more-menu / see-more / editable BV / links / drag-reorder
+  artSide.addEventListener('click', (e) => {
+    const bd = e.target.closest('[data-obj-bd]');
+    if (bd) { asMenu = null; openBreakdown(state.artObjectives.find((o) => o.id === bd.dataset.objBd)); return; }
+    const more = e.target.closest('[data-obj-more]');
+    if (more) { e.stopPropagation(); asMenu = asMenu === more.dataset.objMore ? null : more.dataset.objMore; renderArtSide(); return; }
+    const act = e.target.closest('[data-obj-act]');
+    if (act) {
+      const id = act.dataset.id, o = state.artObjectives.find((x) => x.id === id); if (!o) return;
+      asMenu = null;
+      if (act.dataset.objAct === 'commit') { o.committed = !o.committed; save(); renderArtSide(); }
+      else if (act.dataset.objAct === 'up') moveObj(id, -1);
+      else if (act.dataset.objAct === 'down') moveObj(id, 1);
+      else if (act.dataset.objAct === 'del') { state.artObjectives = state.artObjectives.filter((x) => x.id !== id); save(); renderArtSide(); }
+      return;
+    }
+    const tog = e.target.closest('[data-obj-toggle]');
+    if (tog) { const id = tog.dataset.objToggle; asExpanded[id] = !asExpanded[id]; renderArtSide(); return; }
+    const lk = e.target.closest('[data-obj-links]');
+    if (lk) { asMenu = null; openObjLinks(state.artObjectives.find((o) => o.id === lk.dataset.objLinks)); return; }
+  });
+  // Editable Business Value — commit on blur / Enter, keep digits only.
+  artSide.addEventListener('input', (e) => {
+    const bv = e.target.closest('[data-obj-bv]'); if (!bv) return;
+    bv.value = bv.value.replace(/[^0-9]/g, '').slice(0, 4);
+  });
+  const commitBv = (bv) => {
+    const o = state.artObjectives.find((x) => x.id === bv.dataset.objBv); if (!o) return;
+    o.bv = Number(bv.value) || 0; bv.value = String(o.bv); save();
+  };
+  artSide.addEventListener('blur', (e) => { const bv = e.target.closest('[data-obj-bv]'); if (bv) commitBv(bv); }, true);
+  artSide.addEventListener('keydown', (e) => {
+    const bv = e.target.closest('[data-obj-bv]'); if (!bv) return;
+    if (e.key === 'Enter') { e.preventDefault(); bv.blur(); }
+  });
+  // Drag to reorder (grip is the only draggable handle).
+  artSide.addEventListener('dragstart', (e) => {
+    const grip = e.target.closest('[data-obj-grip]'); if (!grip) return;
+    asDragId = grip.dataset.objGrip; asMenu = null;
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', asDragId); } catch (_) {}
+    const cardEl = grip.closest('[data-obj-card]'); if (cardEl) requestAnimationFrame(() => cardEl.classList.add('as-dragging'));
+  });
+  artSide.addEventListener('dragover', (e) => {
+    if (!asDragId) return;
+    const cardEl = e.target.closest('[data-obj-card]'); if (!cardEl) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    const r = cardEl.getBoundingClientRect(), before = e.clientY < r.top + r.height / 2;
+    artSide.querySelectorAll('.as-drop-before,.as-drop-after').forEach((el) => el.classList.remove('as-drop-before', 'as-drop-after'));
+    if (cardEl.dataset.objCard !== asDragId) cardEl.classList.add(before ? 'as-drop-before' : 'as-drop-after');
+  });
+  artSide.addEventListener('drop', (e) => {
+    if (!asDragId) return;
+    const cardEl = e.target.closest('[data-obj-card]'); if (!cardEl) return;
+    e.preventDefault();
+    const r = cardEl.getBoundingClientRect(), before = e.clientY < r.top + r.height / 2;
+    const drag = asDragId; asDragId = null;
+    reorderObj(drag, cardEl.dataset.objCard, before);
+  });
+  artSide.addEventListener('dragend', () => {
+    asDragId = null;
+    artSide.querySelectorAll('.as-drop-before,.as-drop-after,.as-dragging').forEach((el) => el.classList.remove('as-drop-before', 'as-drop-after', 'as-dragging'));
+  });
 
   // ---------- Conversation panel (contextual — it follows where you are) ----------
   function convoContext() {
@@ -2783,6 +2926,7 @@
     if (menuOpen && !e.target.closest('.bn-dd')) closeNavMenus();
     if ((utilPanel || btPanel) && !e.target.closest('.btools')) { utilPanel = null; btPanel = null; if (!boardScreen.hidden) renderBtools(); }
     if (dockPanel && !e.target.closest('.dock')) { dockPanel = null; if (!boardScreen.hidden) renderDock(); }
+    if (asMenu && !e.target.closest('.as-menu') && !e.target.closest('[data-obj-more]')) { asMenu = null; renderArtSide(); }
     // click away from the sticky action bar (but not onto a note — that reopens it)
     if (sbCard && !e.target.closest('.stickybar') && !e.target.closest('.note')) closeStickyBar();
   });
