@@ -2169,7 +2169,6 @@
   let asNewId = null;                // id of a just-added objective (discarded if left blank)
   const asExpanded = {};             // ids whose description is expanded
   let asDragId = null;               // id of the objective being dragged
-  const AS_TRUNC = 96;               // description length past which "See more" appears
   const objById = (id) => state.artObjectives.find((x) => x.id === id);
   // A card's rank is its 1-based position WITHIN its own group (committed vs not).
   function asGroupOf(o) { return state.artObjectives.filter((x) => !!x.committed === !!o.committed); }
@@ -2178,7 +2177,7 @@
   function objEditing(o) { return state.navVersion === 'v3' || (asEditing === o.id && state.navVersion !== 'v4'); }
   function objCard(o, rank) {
     const v = state.navVersion, editing = objEditing(o);
-    const open = !!asExpanded[o.id], truncatable = !editing && (o.desc || '').length > AS_TRUNC;
+    const open = !!asExpanded[o.id];
     const group = asGroupOf(o), gi = group.indexOf(o);
     const canUp = gi > 0, canDown = gi < group.length - 1;
     const menu = asMenu === o.id
@@ -2195,10 +2194,13 @@
     const titleHtml = editing
       ? '<input class="as-title-in" type="text" data-obj-title="' + o.id + '" value="' + esc(o.title) + '" placeholder="Objective title" aria-label="Objective title" />'
       : '<div class="as-title">' + esc(o.title || 'Untitled objective') + '</div>';
+    // Titles never truncate (they wrap). Descriptions clamp to two lines with a
+    // "See more" — always rendered, then hidden after render for descriptions
+    // that actually fit within two lines (measured in renderArtSide).
     const descHtml = editing
       ? '<textarea class="as-desc-in" data-obj-desc="' + o.id + '" rows="2" placeholder="Describe this objective…" aria-label="Description">' + esc(o.desc) + '</textarea>'
       : '<div class="as-desc' + (open ? ' open' : '') + '">' + esc(o.desc) + '</div>' +
-        (truncatable ? '<button class="as-more" type="button" data-obj-toggle="' + o.id + '">' + (open ? 'See less' : 'See more') + '</button>' : '');
+        ((o.desc || '').trim() ? '<button class="as-more" type="button" data-obj-toggle="' + o.id + '">' + (open ? 'See less' : 'See more') + '</button>' : '');
     // v2's quick-edit shows a pencil in the (hover-revealed) action row.
     const pencil = (v === 'v2' && !editing)
       ? '<button class="as-ico" type="button" data-obj-act="edit" data-id="' + o.id + '" title="Edit">' + bIcon('edit') + '</button>' : '';
@@ -2236,6 +2238,12 @@
       '<div class="as-head as-head-' + state.navVersion + '"><span class="as-art">' + esc(ctxArt().name) + '</span>' +
         '<button class="as-add" type="button" title="Add objective" data-obj-add>' + bIcon('plus') + '<span class="as-add-t">Add objective</span></button></div>' +
       '<div class="as-body as-body-' + state.navVersion + '">' + grp('Committed', com) + grp('Uncommitted', unc) + '</div>';
+    // "See more" belongs only on descriptions that actually overflow two lines.
+    artSide.querySelectorAll('.as-desc').forEach((d) => {
+      const more = d.nextElementSibling;
+      if (!more || !more.classList.contains('as-more') || d.classList.contains('open')) return;
+      if (d.scrollHeight <= d.clientHeight + 1) more.style.display = 'none';
+    });
   }
   // Each version edits in its own idiom: v1 roomy inline form (Save/Cancel), v2
   // quick inline (live, click-away saves), v3 always live, v4 a focused modal.

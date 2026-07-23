@@ -232,7 +232,7 @@ body {
 .as-grip:hover { background: #f1f2f6; color: #1b1f27; }
 .as-grip:hover .as-rank { opacity: 0; }
 .as-grip:hover .as-gico { opacity: 1; }
-.as-title { flex: 1 1 auto; font-size: 13.5px; font-weight: 600; line-height: 1.35; padding-top: 2px; }
+.as-title { flex: 1 1 auto; min-width: 0; font-size: 13.5px; font-weight: 600; line-height: 1.35; padding-top: 2px; overflow-wrap: anywhere; }
 .as-acts { display: flex; gap: 2px; flex: 0 0 auto; }
 .as-ico { width: 26px; height: 26px; border-radius: 7px; border: 1px solid transparent; background: transparent; color: #9aa1ad; cursor: pointer; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 .as-ico svg { width: 15px; height: 15px; stroke: currentColor; }
@@ -277,7 +277,7 @@ body {
 .as-card.as-v2 .as-grip { width: 18px; height: 20px; }
 .as-card.as-v2 .as-acts { opacity: 0; transition: opacity .12s; }
 .as-card.as-v2:hover .as-acts, .as-card.as-v2 .as-ico.on { opacity: 1; }
-.as-card.as-v2 .as-desc { margin-top: 6px; -webkit-line-clamp: 1; line-clamp: 1; }
+.as-card.as-v2 .as-desc { margin-top: 6px; }
 .as-card.as-v2 .as-more { margin-top: 3px; }
 .as-card.as-v2 .as-foot { margin-top: 9px; gap: 10px; }
 .as-card.as-v2 .as-bv-box { width: 40px; height: 25px; font-size: 12px; }
