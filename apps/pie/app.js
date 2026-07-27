@@ -603,6 +603,11 @@
         ddWrap('boards', '<button class="bn-ico' + (menuOpen === 'boards' ? ' on' : '') + '" type="button" data-dd="boards" title="Boards">' + bIcon('board') + '</button>', boardMenu()) +
         '<button class="bn-ico" type="button" title="History" disabled>' + bIcon('history') + '</button>';
     }
+    left +=
+      '<span class="bn-seg" title="Work mode">' +
+        '<button class="' + (state.workMode === 'planning' ? 'on' : '') + '" type="button" data-mode="planning">Planning</button>' +
+        '<button class="' + (state.workMode === 'execution' ? 'on' : '') + '" type="button" data-mode="execution">Execution</button>' +
+      '</span>';
     if (obj) {
       left += '<button class="bn-chip" type="button" data-nav="toggle-art">' + bIcon('objectives', 'bn-cico') +
         '<span>' + (objPanelOpen ? 'Hide' : 'Show') + ' ART Objectives</span></button>';
@@ -2876,6 +2881,8 @@
   bnav.addEventListener('click', (e) => {
     const dd = e.target.closest('[data-dd]');
     if (dd) { e.stopPropagation(); menuOpen = menuOpen === dd.dataset.dd ? null : dd.dataset.dd; renderTopNav(); return; }
+    const md = e.target.closest('[data-mode]');
+    if (md) { state.workMode = md.dataset.mode; save(); renderBoardView(); return; }
     const b = e.target.closest('[data-nav],[data-plane],[data-go-board],[data-go-page],[data-go-session],[data-go-ctx],[data-go-shell]');
     if (!b) return;
     menuOpen = null;
