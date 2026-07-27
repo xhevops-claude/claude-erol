@@ -48,7 +48,8 @@
     return out;
   }
   function genArtObjectives() {
-    return ART_OBJ.map((o, i) => ({ id: uid(), title: o.title, desc: o.desc, bv: 0, links: [7, 5, 5, 5, 3][i] || 4, committed: i < 3 }));
+    const rags = ['green', 'amber', 'green', 'red', 'amber'];
+    return ART_OBJ.map((o, i) => ({ id: uid(), title: o.title, desc: o.desc, bv: 0, av: 0, rag: rags[i] || 'green', links: [7, 5, 5, 5, 3][i] || 4, committed: i < 3 }));
   }
   // A heavy objective load (9 committed + 5 uncommitted) for crowding tests.
   function genManyObjectives(i) {
@@ -224,6 +225,9 @@
     if (!Array.isArray(s.objectives)) s.objectives = [];
     s.teams.forEach((tm, i) => { if (!Array.isArray(tm.objectives)) tm.objectives = genTeamObjectives(i); });
     if (!Array.isArray(s.artObjectives)) s.artObjectives = genArtObjectives();
+    s.artObjectives.forEach((o) => { if (typeof o.av !== 'number') o.av = 0; if (!o.rag) o.rag = 'green'; });
+    // Seed a realistic To Do / In Progress / Done spread so execution progress bars mean something.
+    if (Array.isArray(s.cards)) s.cards.forEach((c, i) => { if (!c.status) c.status = ['done', 'doing', 'todo', 'todo', 'doing', 'done', 'todo', 'doing'][i % 8]; });
     s.context = Object.assign({ board: 'Team Board', program: 'Terra', team: 'Zürich', dates: '13 Jan - 13 Feb' }, s.context);
     // Shell / dashboard data (illustrative — distinct from the reference app)
     s.plan = Object.assign({ name: 'Team', teamLimit: 60, renews: '92d' }, s.plan);
@@ -2219,6 +2223,15 @@
     // v4 · a visible Edit button (opens the modal editor) for discoverability.
     const editCta = v === 'v4'
       ? '<button class="as-editcta" type="button" data-obj-act="edit" data-id="' + o.id + '">' + bIcon('edit', 'as-ecico') + 'Edit</button>' : '';
+    // Execution mode adds Actual Value, a RAG status control and a progress bar.
+    const exec = state.workMode === 'execution';
+    const bvLabel = exec ? 'BV' : 'Business Value';
+    const execMeta = exec
+      ? '<label class="as-av"><input class="as-av-box" type="text" inputmode="numeric" data-obj-av="' + o.id + '" value="' + esc(String(o.av || 0)) + '" aria-label="Actual Value" /><span class="as-av-l">AV</span></label>' +
+        '<span class="as-div"></span>' +
+        '<button class="as-rag rag-' + (o.rag || 'green') + '" type="button" data-obj-rag="' + o.id + '" title="RAG status: ' + ragLabel(o.rag) + ' — click to change" aria-label="RAG status"><i class="as-rag-dot"></i></button>' +
+        '<span class="as-div"></span>' : '';
+    const progPart = exec ? objProgressHtml(o) : '';
     // "as-editing" is the transient inline-edit chrome (v1/v2). v3 renders fields
     // always but styles itself, so it doesn't take the transient chrome.
     const transient = asEditing === o.id && v !== 'v4';
@@ -2237,10 +2250,11 @@
         '</div>' + menu +
       '</div>' +
       descHtml +
-      '<div class="as-foot">' +
-        '<label class="as-bv"><input class="as-bv-box" type="text" inputmode="numeric" data-obj-bv="' + o.id + '" value="' + esc(String(o.bv)) + '" aria-label="Business Value" /><span class="as-bv-l">Business Value</span></label>' +
+      '<div class="as-foot' + (exec ? ' as-foot-exec' : '') + '">' +
+        '<label class="as-bv"><input class="as-bv-box" type="text" inputmode="numeric" data-obj-bv="' + o.id + '" value="' + esc(String(o.bv)) + '" aria-label="Business Value" /><span class="as-bv-l">' + bvLabel + '</span></label>' +
+        execMeta +
         '<button class="as-lk" type="button" data-obj-links="' + o.id + '" title="View links">' + bIcon('link', 'as-lkico') + (Array.isArray(o.links) ? o.links.length : o.links) + '</button>' + editCta +
-      '</div>' + formFoot + '</div>';
+      '</div>' + progPart + formFoot + '</div>';
   }
   function renderArtSide() {
     if (mode !== 'board' || railActive !== 'objectives') { artSide.innerHTML = ''; return; }
@@ -2317,6 +2331,23 @@
     return out;
   }
   function openObjLinks(o) { modalCard = o; modalType = 'objlinks'; modalEl.classList.add('pm-wide'); renderModal(); }
+  // Execution helpers: RAG cycle + progress across the objective's linked stickies.
+  const RAG_ORDER = ['red', 'amber', 'green'];
+  const ragLabel = (r) => ({ red: 'Red', amber: 'Amber', green: 'Green' })[r] || 'Green';
+  const ragNext = (r) => RAG_ORDER[(RAG_ORDER.indexOf(r) + 1) % RAG_ORDER.length];
+  function objProgress(o) {
+    const cards = objLinkedCards(o), b = { todo: 0, doing: 0, done: 0 };
+    cards.forEach((c) => { b[statusOf(c)] = (b[statusOf(c)] || 0) + 1; });
+    return { todo: b.todo, doing: b.doing, done: b.done, total: cards.length };
+  }
+  function objProgressHtml(o) {
+    const p = objProgress(o), t = p.total || 1;
+    const seg = (n, cls) => (n ? '<span class="pr-seg pr-' + cls + '" style="width:' + (n / t * 100) + '%"></span>' : '');
+    const tip = p.done + ' done · ' + p.doing + ' in progress · ' + p.todo + ' to do';
+    return '<div class="as-prog" title="' + tip + '"><div class="pr-track">' +
+      seg(p.done, 'done') + seg(p.doing, 'doing') + seg(p.todo, 'todo') +
+      '</div><span class="pr-cap">' + p.done + '/' + p.total + '</span></div>';
+  }
   // v4's editor — a focused modal sheet with explicit Save / Cancel.
   let objEditSnap = null, objEditNew = false;
   function openObjEditModal(o, isNew) {
@@ -2370,6 +2401,8 @@
       else if (a === 'del') { if (asEditing === id) { asEditing = null; asEditMode = null; asEditSnap = null; asNewId = null; } state.artObjectives = state.artObjectives.filter((x) => x.id !== id); save(); renderArtSide(); }
       return;
     }
+    const rag = e.target.closest('[data-obj-rag]');
+    if (rag) { const o = objById(rag.dataset.objRag); if (o) { o.rag = ragNext(o.rag || 'green'); save(); renderArtSide(); } return; }
     const tog = e.target.closest('[data-obj-toggle]');
     if (tog) { const id = tog.dataset.objToggle; asExpanded[id] = !asExpanded[id]; renderArtSide(); return; }
     const lk = e.target.closest('[data-obj-links]');
@@ -2379,6 +2412,8 @@
   artSide.addEventListener('input', (e) => {
     const bv = e.target.closest('[data-obj-bv]');
     if (bv) { bv.value = bv.value.replace(/[^0-9]/g, '').slice(0, 4); return; }
+    const av = e.target.closest('[data-obj-av]');
+    if (av) { av.value = av.value.replace(/[^0-9]/g, '').slice(0, 4); return; }
     const ti = e.target.closest('[data-obj-title]');
     if (ti) { const o = objById(ti.dataset.objTitle); if (o) { o.title = ti.value; save(); } return; }
     const de = e.target.closest('[data-obj-desc]');
@@ -2388,10 +2423,19 @@
     const o = objById(bv.dataset.objBv); if (!o) return;
     o.bv = Number(bv.value) || 0; bv.value = String(o.bv); save();
   };
-  artSide.addEventListener('blur', (e) => { const bv = e.target.closest('[data-obj-bv]'); if (bv) commitBv(bv); }, true);
+  const commitAv = (av) => {
+    const o = objById(av.dataset.objAv); if (!o) return;
+    o.av = Number(av.value) || 0; av.value = String(o.av); save();
+  };
+  artSide.addEventListener('blur', (e) => {
+    const bv = e.target.closest('[data-obj-bv]'); if (bv) { commitBv(bv); return; }
+    const av = e.target.closest('[data-obj-av]'); if (av) commitAv(av);
+  }, true);
   artSide.addEventListener('keydown', (e) => {
     const bv = e.target.closest('[data-obj-bv]');
     if (bv) { if (e.key === 'Enter') { e.preventDefault(); bv.blur(); } return; }
+    const av = e.target.closest('[data-obj-av]');
+    if (av) { if (e.key === 'Enter') { e.preventDefault(); av.blur(); } return; }
     const ti = e.target.closest('[data-obj-title]');
     if (ti) { if (e.key === 'Enter') { e.preventDefault(); asEditing ? finishObjEdit(true) : ti.blur(); } else if (e.key === 'Escape') { e.preventDefault(); asEditing ? finishObjEdit(false) : ti.blur(); } return; }
     const de = e.target.closest('[data-obj-desc]');

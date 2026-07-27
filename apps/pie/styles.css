@@ -304,7 +304,7 @@ body {
 .as-card.as-v2 .as-bv { gap: 6px; font-size: 11.5px; color: var(--r-dim); }
 .as-card.as-v2 .as-bv-l { display: none; }
 .as-card.as-v2 .as-bv::before { content: "BV"; font-size: 10px; font-weight: 700; color: var(--r-faint); }
-.as-card.as-v2 .as-bv-box { width: auto; min-width: 16px; height: 22px; padding: 0 5px; font-size: 12px; font-weight: 700; text-align: left; border-color: transparent; background: transparent; border-radius: 5px; }
+.as-card.as-v2 .as-bv-box { width: 34px; min-width: 16px; height: 22px; padding: 0 5px; font-size: 12px; font-weight: 700; text-align: left; border-color: transparent; background: transparent; border-radius: 5px; }
 .as-card.as-v2 .as-bv-box:hover { background: #eceef1; }
 .as-card.as-v2 .as-bv-box:focus { background: #fff; box-shadow: 0 0 0 2px var(--accent); }
 .as-card.as-v2 .as-lk { height: 22px; margin-left: 0; padding: 0 8px; font-size: 11.5px; border-radius: 6px; border-color: transparent; background: #f1f2f6; color: var(--r-dim); }
@@ -355,6 +355,49 @@ body {
 .as-editcta { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 13px; border: 1px solid #18181b; border-radius: 8px; background: #18181b; color: #fff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .as-editcta:hover { background: #000; }
 .as-ecico { width: 14px; height: 14px; stroke: currentColor; }
+
+/* ===== Execution mode · extra objective footer (Actual Value, RAG, progress) ===== */
+.as-foot-exec { flex-wrap: wrap; gap: 10px; row-gap: 8px; }
+.as-foot-exec .as-lk { margin-left: 0; }
+.as-av { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--r-dim); }
+.as-av-box { width: 46px; height: 28px; padding: 0 8px; border: 1px solid var(--r-line); border-radius: 7px; background: #fff; font: inherit; font-size: 13px; font-weight: 700; color: #1b1f27; text-align: center; }
+.as-av-box:hover { border-color: #cbd0d8; }
+.as-av-box:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 158, 11, .16); }
+.as-div { width: 1px; height: 16px; background: var(--r-line); flex: 0 0 auto; }
+.as-rag { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 26px; padding: 0; border: 1px solid var(--r-line); border-radius: 7px; background: #fff; cursor: pointer; }
+.as-rag:hover { border-color: #cbd0d8; background: #fafafb; }
+.as-rag-dot { width: 12px; height: 12px; border-radius: 50%; }
+.as-rag.rag-red .as-rag-dot { background: #e5484d; }
+.as-rag.rag-amber .as-rag-dot { background: #f5a623; }
+.as-rag.rag-green .as-rag-dot { background: #46b16a; }
+.as-prog { display: flex; align-items: center; gap: 9px; margin-top: 11px; }
+.pr-track { flex: 1 1 auto; display: flex; height: 7px; border-radius: 5px; overflow: hidden; background: #e9ebef; }
+.pr-seg { height: 100%; }
+.pr-done { background: #46b16a; }
+.pr-doing { background: #3b82f6; }
+.pr-todo { background: #cbd0d8; }
+.pr-cap { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--r-dim); font-variant-numeric: tabular-nums; }
+
+/* v2 · compact AV chip + aligned progress, matching its typographic meta */
+.as-card.as-v2 .as-av-l { display: none; }
+.as-card.as-v2 .as-av { gap: 5px; font-size: 11.5px; }
+.as-card.as-v2 .as-av::before { content: "AV"; font-size: 10px; font-weight: 700; color: var(--r-faint); }
+.as-card.as-v2 .as-av-box { width: 34px; min-width: 16px; height: 22px; padding: 0 5px; font-size: 12px; font-weight: 700; text-align: left; border-color: transparent; background: transparent; border-radius: 5px; }
+.as-card.as-v2 .as-av-box:hover { background: #eceef1; }
+.as-card.as-v2 .as-av-box:focus { background: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.as-card.as-v2 .as-rag { width: 34px; height: 22px; }
+.as-card.as-v2 .as-foot-exec { margin-left: 4px; gap: 8px; }
+.as-card.as-v2 .as-prog { margin-left: 4px; }
+
+/* v3 · green focus rings on the actual-value field */
+.as-card.as-v3 .as-av-box:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, .16); }
+
+/* v4 · in execution the hero BV capsule steps down to a normal field so the row fits */
+.board-screen.mode-exec .as-card.as-v4 .as-foot { padding-top: 11px; border-top: 1px solid var(--r-line); }
+.board-screen.mode-exec .as-card.as-v4 .as-bv { flex: 0 0 auto; flex-direction: row; align-items: center; gap: 8px; padding: 0; background: transparent; }
+.board-screen.mode-exec .as-card.as-v4 .as-bv-l { order: 0; font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--r-dim); }
+.board-screen.mode-exec .as-card.as-v4 .as-bv-box { order: 0; width: 46px; height: 28px; padding: 0 8px; border: 1px solid var(--r-line); background: #fff; font-size: 13px; text-align: center; }
+.board-screen.mode-exec .as-card.as-v4 .as-lk { height: 28px; }
 
 /* Explicit Save / Cancel row for v1's roomy inline form */
 .as-editrow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--r-line); }
