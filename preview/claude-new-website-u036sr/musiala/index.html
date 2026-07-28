@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Musiala</title>
+  <meta name="description" content="Musiala — mit Verstand und Verständnis." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=1da608b" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="pill home-pill" href="#top" aria-label="Home">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 11.5 12 4l8 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M6 10v8.5a1 1 0 0 0 1 1h3v-5h4v5h3a1 1 0 0 0 1-1V10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span>Home</span>
+    </a>
+
+    <a class="logo" href="#top" aria-label="Musiala">
+      <svg viewBox="0 0 40 26" fill="none" aria-hidden="true">
+        <circle cx="20" cy="3" r="2.4" fill="currentColor" />
+        <rect x="2" y="10" width="4" height="14" rx="2" fill="currentColor" />
+        <rect x="9" y="6" width="4" height="18" rx="2" fill="currentColor" />
+        <rect x="16" y="2" width="4" height="22" rx="2" fill="currentColor" />
+        <rect x="23" y="6" width="4" height="18" rx="2" fill="currentColor" />
+        <rect x="30" y="10" width="4" height="14" rx="2" fill="#ff3b30" />
+      </svg>
+    </a>
+
+    <div class="lang-switch">
+      <button class="pill lang-pill" id="langBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
+        <span id="langLabel">EN</span>
+        <svg class="chevron" viewBox="0 0 12 8" fill="none" aria-hidden="true">
+          <path d="M1 1.5 6 6.5 11 1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <ul class="lang-menu" id="langMenu" role="listbox" hidden>
+        <li role="option" data-lang="en" aria-selected="true">EN</li>
+        <li role="option" data-lang="de" aria-selected="false">DE</li>
+      </ul>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <h1 class="hero-title">
+        <span class="line">Mit Verstand</span>
+        <span class="line">und Verständnis</span>
+      </h1>
+
+      <div class="marquee" aria-hidden="true">
+        <div class="marquee-track">
+          <span class="marquee-set">
+            <span>MENSCHLICHKEIT</span><i class="dot"></i>
+            <span>LEIDENSCHAFT</span><i class="dot"></i>
+            <span>INTEGRITÄT</span><i class="dot"></i>
+            <span>FLEXIBILITÄT</span><i class="dot"></i>
+            <span>ERGEBNIS</span><i class="dot"></i>
+            <span>PERFEKTION</span><i class="dot"></i>
+          </span>
+          <span class="marquee-set">
+            <span>MENSCHLICHKEIT</span><i class="dot"></i>
+            <span>LEIDENSCHAFT</span><i class="dot"></i>
+            <span>INTEGRITÄT</span><i class="dot"></i>
+            <span>FLEXIBILITÄT</span><i class="dot"></i>
+            <span>ERGEBNIS</span><i class="dot"></i>
+            <span>PERFEKTION</span><i class="dot"></i>
+          </span>
+        </div>
+      </div>
+
+      <div class="tiles">
+        <a class="tile tile-about" href="#about">
+          <div class="tile-art ruler" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <span class="tile-label">About Us</span>
+        </a>
+
+        <div class="tile tile-split">
+          <a class="tile-half" href="#offer"><span>What Do We Offer?</span></a>
+          <a class="tile-half" href="#how"><span>How Do We Do It?</span></a>
+        </div>
+
+        <a class="tile tile-contact" href="#contact">
+          <span class="tile-contact-label">Get In Touch</span>
+          <div class="avatars" aria-hidden="true">
+            <span class="avatar"></span>
+            <span class="avatar"></span>
+          </div>
+        </a>
+
+        <a class="tile tile-cases" href="#cases">
+          <div class="case-photos" aria-hidden="true">
+            <span class="case-photo p1"></span>
+            <span class="case-photo p2"></span>
+            <span class="case-photo p3"></span>
+            <span class="case-photo p4"></span>
+          </div>
+          <svg class="folder-shape" viewBox="0 -22 250 222" preserveAspectRatio="none" aria-hidden="true">
+            <path class="folder-fill" fill-rule="evenodd" d="M0,26 A26,26 0 0 1 26,0 L109,0 A26,26 0 0 1 135,26 L135,60 C135,78 155,88 190,88 L222,88 A28,28 0 0 1 250,116 L250,172 A28,28 0 0 1 222,200 L28,200 A28,28 0 0 1 0,172 Z M0,26 A26,26 0 0 1 26,0 L109,0 A26,26 0 0 1 135,26 L135,60 L0,60 Z" />
+            <path class="folder-stroke" d="M0,26 A26,26 0 0 1 26,0 L109,0 A26,26 0 0 1 135,26 L135,60 C135,78 155,88 190,88 L222,88 A28,28 0 0 1 250,116 L250,172 A28,28 0 0 1 222,200 L28,200 A28,28 0 0 1 0,172 Z" />
+          </svg>
+          <span class="tile-label">Case Studies</span>
+        </a>
+
+        <a class="tile tile-careers" href="#careers">
+          <div class="careers-stack" aria-hidden="true">
+            <span class="sheet s1"></span>
+            <span class="sheet s2"></span>
+            <span class="sheet s3"></span>
+          </div>
+          <span class="tile-label">Careers</span>
+          <span class="tile-sub">2 Open Positions <i class="dot-badge" aria-hidden="true"></i></span>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js?v=1da608b"></script>
+</body>
+</html>
