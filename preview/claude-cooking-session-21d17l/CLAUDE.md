@@ -82,7 +82,7 @@ Every sub-experience's `index.html` ships an `#app-loading` element painted by a
 | `main` | `/` |
 | any other | `/preview/<slug>/` where `<slug>` = branch name with `/`, `_`, ` ` → `-` and lowercased |
 
-So pushing to e.g. `claude/foo-bar` deploys to `https://zlore-claude.github.io/claude-apps/preview/claude-foo-bar/`. Production and previews coexist on `gh-pages` because of `keep_files: true`.
+So pushing to e.g. `claude/foo-bar` deploys to `https://xhevops-claude.github.io/claude-erol/preview/claude-foo-bar/`. Production and previews coexist on `gh-pages` because of `keep_files: true`.
 
 The `exclude_assets` list in `pages.yml` controls what gets excluded from the deploy. If you add a new top-level dev-only file/dir (lockfiles, configs, docs), append it there.
 
@@ -94,7 +94,7 @@ Don't add `?v=` query strings manually to source HTML — they'd be redundant wi
 
 ### Always end with a clickable preview link
 
-After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://zlore-claude.github.io/claude-apps/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/apps/pie/`). If pushed to `main`, link to the corresponding production path under `https://zlore-claude.github.io/claude-apps/`.
+After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://xhevops-claude.github.io/claude-erol/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/apps/pie/`). If pushed to `main`, link to the corresponding production path under `https://xhevops-claude.github.io/claude-erol/`.
 
 ### Branch names — match the work
 
