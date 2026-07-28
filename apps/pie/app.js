@@ -420,6 +420,10 @@
       share: '<circle cx="6" cy="12" r="2.4"/><circle cx="17" cy="6" r="2.4"/><circle cx="17" cy="18" r="2.4"/><path d="M8.2 11l6.6-3.6M8.2 13l6.6 3.6"/>',
       breakdown: '<rect x="9" y="3" width="6" height="5" rx="1.2"/><rect x="3" y="16" width="6" height="5" rx="1.2"/><rect x="15" y="16" width="6" height="5" rx="1.2"/><path d="M6 16v-2h12v2M12 8v6"/>',
       activity: '<path d="M3 12h4l2.5 6 4-13 2.5 7H21"/>',
+      // Sightline (AI assistant)
+      spark: '<path d="M12 3.2l1.75 4.55L18.3 9.5l-4.55 1.75L12 15.8l-1.75-4.55L5.7 9.5l4.55-1.75z"/><path d="M18.4 15.1l.75 1.95 1.95.75-1.95.75-.75 1.95-.75-1.95-1.95-.75 1.95-.75z"/>',
+      send: '<path d="M4.5 11.9L20 5l-6.9 15.5-2.4-6.2z"/><path d="M10.7 14.3L20 5"/>',
+      restart: '<path d="M20 12a8 8 0 11-2.4-5.7"/><path d="M20 3.5V8h-4.5"/>',
     };
     return '<svg class="' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (P[name] || '') + '</svg>';
   }
@@ -792,7 +796,7 @@
     else if (nav === 'people' || nav === 'boardtalk') {
       const m = nav === 'people' ? 'people' : 'board';
       if (convoOpen && panelMode === m) convoOpen = false;
-      else { convoOpen = true; panelMode = m; }
+      else { convoOpen = true; panelMode = m; slOpen = false; }
       renderBoardView();
     }
   });
@@ -1096,7 +1100,7 @@
     if (a === 'add') addSticky();
     else if (a === 'boardtalk') {
       if (convoOpen && panelMode === 'board') convoOpen = false;
-      else { convoOpen = true; panelMode = 'board'; }
+      else { convoOpen = true; panelMode = 'board'; slOpen = false; }
       renderBoardView();
     }
     else if (a === 'magnify') { magnify = !magnify; boardScreen.classList.toggle('magnify', magnify); renderBtools(); }
@@ -2562,6 +2566,439 @@
     convoOpen = false; renderBoardView();
   });
 
+  // ---------- Sightline: floating AI assistant for the board ----------
+  // Boards only — the button never shows on the dashboard shell or on pages.
+  // Every answer is computed from the plan held in this browser: no network call,
+  // no model, no data leaving the tab. Swap slAnswer() for a real completion later.
+  const slEl = document.getElementById('sightline');
+  const slFab = document.getElementById('sl-fab');
+  let slOpen = false;     // side-panel open?
+  let slMsgs = [];        // [{ role: 'you' | 'ai', html }]
+  let slThinking = false; // typing indicator showing?
+  let slDraft = '';       // composer text, kept across re-renders
+  let slSeenCtx = '';     // board context the last greeting was written for
+  let slTimer = 0;
+
+  // *emphasis* becomes <b> — safe because everything is escaped first.
+  const slInline = (s) => esc(String(s)).replace(/\*([^*]+)\*/g, '<b>$1</b>');
+  const slP = (t) => '<p class="sl-p">' + slInline(t) + '</p>';
+  const slGrp = (t) => '<div class="sl-grp">' + esc(t) + '</div>';
+  const slList = (items) => (items.length
+    ? '<ul class="sl-ul">' + items.map((i) => '<li>' + slInline(i) + '</li>').join('') + '</ul>' : '');
+  const slStats = (pairs) => '<div class="sl-stats">' + pairs.map((p) =>
+    '<div class="sl-stat"><b>' + esc(String(p[1])) + '</b><small>' + esc(p[0]) + '</small></div>').join('') + '</div>';
+  function slActs(list) {
+    const items = (list || []).filter(Boolean);
+    if (!items.length) return '';
+    return '<div class="sl-acts">' + items.map((a) => {
+      const attr = a.go ? 'data-sl-go="' + esc(a.go) + '"' : 'data-sl-ask="' + esc(a.ask) + '"';
+      return '<button class="sl-act" type="button" ' + attr + '>' +
+        bIcon(a.ico || 'spark', 'sl-aico') + esc(a.label || a.ask) + '</button>';
+    }).join('') + '</div>';
+  }
+
+  // ---- What Sightline can see: the plan, narrowed to the current context ----
+  const slPts = (cards) => cards.reduce((a, c) => a + (Number(c.points) || 0), 0);
+  const slPct = (load, cap) => (cap ? Math.round((load / cap) * 100) : 0);
+  const slPlural = (n, one, many) => n + ' ' + (n === 1 ? one : many || one + 's');
+  function slScope() {
+    const teams = ctxTeams();
+    const ids = teams.map((t) => t.id);
+    return { teams, ids, cards: state.cards.filter((c) => ids.includes(c.teamId)) };
+  }
+  function slIterRows() {
+    const sc = slScope();
+    const cap = sc.teams.reduce((a, t) => a + (Number(t.capacity) || 0), 0);
+    return state.sprints.map((name, idx) => {
+      const cards = sc.cards.filter((c) => c.sprintIdx === idx);
+      const load = slPts(cards);
+      return { name, idx, cards, load, cap, pct: slPct(load, cap) };
+    });
+  }
+  function slTeamRows() {
+    const n = state.sprints.length;
+    return slScope().teams.map((t) => {
+      const cards = state.cards.filter((c) => c.teamId === t.id);
+      const load = slPts(cards), cap = (Number(t.capacity) || 0) * n;
+      const objs = t.objectives || [];
+      return { team: t, cards, load, cap, pct: slPct(load, cap), objs: objs.length,
+        committed: objs.filter((o) => o.committed).length };
+    });
+  }
+  function slCrossLinks() {
+    const seen = new Set(), out = [];
+    slScope().cards.forEach((c) => {
+      linkedIdsFor(c).forEach((id) => {
+        const o = card(id);
+        if (!o || o.teamId === c.teamId) return;
+        const key = [c.id, id].sort().join('|');
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push({ a: c, b: o });
+      });
+    });
+    return out;
+  }
+  const slTeamName = (c) => { const t = team(c.teamId); return t ? t.name : 'Unassigned'; };
+
+  // ---- Answers ----
+  function slOverview(q) {
+    const sc = slScope();
+    const rows = slIterRows();
+    const load = slPts(sc.cards);
+    const cap = rows.reduce((a, r) => a + r.cap, 0);
+    const hot = rows.slice().sort((a, b) => b.pct - a.pct)[0];
+    const objs = ctx.type === 'team'
+      ? sc.teams.reduce((a, t) => a + (t.objectives || []).length, 0)
+      : state.artObjectives.length;
+    const done = sc.cards.filter((c) => statusOf(c) === 'done').length;
+    return (q ? slP('Here is *' + boardName(railActive) + '* for *' + ctxName() + '*, as I read it:') : '') +
+      slStats([['Stickies', sc.cards.length], ['Points', load], ['Capacity', cap + ' pts'], ['Utilisation', slPct(load, cap) + '%']]) +
+      slList([
+        'Teams in scope: ' + (sc.teams.length > 3 ? sc.teams.length : sc.teams.map((t) => t.name).join(', ')) + '.',
+        'Heaviest slot: *' + hot.name + '* at ' + hot.load + '/' + hot.cap + ' pts (' + hot.pct + '%).',
+        'Objectives: ' + objs + ' · risks: ' + state.risks.length + ' · cross-team links: ' + slCrossLinks().length + '.',
+        state.workMode === 'execution' ? 'Delivery: ' + done + ' of ' + sc.cards.length + ' stickies done.' :
+          'You are in *Planning* mode — no actuals tracked yet.',
+      ]) +
+      slActs([{ ask: 'Are we over capacity?', label: 'Capacity check' },
+        { ask: 'What are the risks?', ico: 'risk', label: 'Risks' },
+        { ask: 'Draft a plan readout', ico: 'present', label: 'Draft readout' }]);
+  }
+  function slCapacityAnswer() {
+    const rows = slIterRows();
+    const over = rows.filter((r) => r.load > r.cap);
+    const sorted = rows.slice().sort((a, b) => a.pct - b.pct);
+    const light = sorted[0], heavy = sorted[sorted.length - 1];
+    const load = rows.reduce((a, r) => a + r.load, 0), cap = rows.reduce((a, r) => a + r.cap, 0);
+    return slP('*' + ctxName() + '* is carrying *' + load + ' pts* against *' + cap + ' pts* of capacity — ' + slPct(load, cap) + '% utilised.') +
+      slList(rows.map((r) => '*' + r.name + '* — ' + r.load + '/' + r.cap + ' pts (' + r.pct + '%)' +
+        (r.load > r.cap ? ' ⚠ over by ' + (r.load - r.cap) : ''))) +
+      (over.length
+        ? slP('*' + over.map((r) => r.name).join(', ') + '* ' + (over.length > 1 ? 'are' : 'is') + ' past capacity. ' +
+          '*' + light.name + '* is the lightest slot at ' + light.pct + '% — shifting one large sticky right would even the wall out.')
+        : slP('Nothing is over capacity. *' + heavy.name + '* is the tightest at ' + heavy.pct + '%, so that is where a late scope change would hurt first.')) +
+      slActs([{ ask: 'What should we split?', label: 'What to split' },
+        { ask: 'Show cross-team dependencies', ico: 'collab', label: 'Dependencies' }]);
+  }
+  function slTeamAnswer(t) {
+    const cards = state.cards.filter((c) => c.teamId === t.id);
+    const load = slPts(cards), cap = (Number(t.capacity) || 0) * state.sprints.length;
+    const per = state.sprints.map((n, i) => ({ n, load: slPts(cards.filter((c) => c.sprintIdx === i)) }));
+    const worst = per.slice().sort((a, b) => b.load - a.load)[0] || { n: '—', load: 0 };
+    const objs = t.objectives || [];
+    const done = cards.filter((c) => statusOf(c) === 'done').length;
+    const links = slCrossLinks().filter((l) => l.a.teamId === t.id || l.b.teamId === t.id);
+    return slP('*' + t.name + '* — ' + slPlural(cards.length, 'sticky', 'stickies') + ', *' + load + ' pts* against ' + cap + ' pts of capacity (' + slPct(load, cap) + '%).') +
+      slStats([['Points', load], ['Capacity', cap + ' pts'], ['Done', done + '/' + cards.length], ['Links out', links.length]]) +
+      slList([
+        'Heaviest iteration: *' + worst.n + '* at ' + worst.load + ' pts against ' + (t.capacity || 0) + ' per iteration.',
+        objs.length ? 'Objectives: ' + objs.length + ' (' + objs.filter((o) => o.committed).length + ' committed).'
+          : 'No objectives written yet — that is the gap I would close first.',
+        links.length ? 'Depends on other teams in ' + slPlural(links.length, 'place') + '.' : 'No cross-team dependencies recorded.',
+      ]) +
+      slActs([{ go: 'team:' + t.id, ico: 'teamrail', label: 'Work as ' + t.name },
+        { ask: 'Are we over capacity?', label: 'Capacity check' }]);
+  }
+  function slRiskAnswer() {
+    const rs = state.risks || [];
+    const label = (c) => (ROAM.find((r) => r.cat === c) || ROAM[0]).label;
+    const un = rs.filter((r) => !r.cat || r.cat === 'U');
+    if (!rs.length) {
+      return slP('No risks captured for *' + ctxName() + '* yet. An empty risk board usually means the board has not been worked — not that the plan is safe.') +
+        slActs([{ go: 'board:risk', ico: 'risk', label: 'Open Risk Board' }]);
+    }
+    return slP('*' + slPlural(rs.length, 'risk') + '* on the board for *' + ctxName() + '*:') +
+      slList(rs.map((r) => '*' + label(r.cat) + '* — ' + r.text)) +
+      (un.length
+        ? slP(slPlural(un.length, 'risk') + ' still ' + (un.length > 1 ? 'sit' : 'sits') + ' outside ROAM. Get an owner named before the confidence vote, or ' + (un.length > 1 ? 'they' : 'it') + ' will resurface mid-PI.')
+        : slP('Everything is ROAMed. Worth re-reading the *Owned* ones in the ART Sync — owners drift once execution starts.')) +
+      slActs([{ go: 'board:risk', ico: 'risk', label: 'Open Risk Board' },
+        { ask: 'Draft a plan readout', ico: 'present', label: 'Draft readout' }]);
+  }
+  function slObjAnswer() {
+    if (ctx.type !== 'team') {
+      const os = state.artObjectives || [];
+      const committed = os.filter((o) => o.committed);
+      const rag = (k) => os.filter((o) => o.rag === k).length;
+      const bare = slTeamRows().filter((r) => !r.objs).map((r) => r.team.name);
+      const exec = state.workMode === 'execution';
+      return slP('*' + ctxArt().name + '* is carrying *' + slPlural(os.length, 'ART objective') + '* — ' + committed.length + ' committed, ' + (os.length - committed.length) + ' stretch.') +
+        slList(os.slice(0, 5).map((o) => '*' + o.title + '* — ' + (exec
+          ? o.rag.toUpperCase() + ', ' + (o.av || 0) + ' of ' + (o.bv || 0) + ' BV delivered'
+          : (o.bv || 0) + ' BV planned') + ', ' + slPlural(o.links || 0, 'linked item'))) +
+        (exec ? slP('RAG spread: *' + rag('red') + ' red*, ' + rag('amber') + ' amber, ' + rag('green') + ' green.') : '') +
+        (bare.length ? slP('No team objectives yet from *' + bare.join(', ') + '* — chase those before the draft plan review.') : '') +
+        slActs([{ go: 'board:objectives', ico: 'objectives', label: 'Open ART Objectives' },
+          { ask: 'Are we over capacity?', label: 'Capacity check' }]);
+    }
+    const rows = slTeamRows();
+    const all = rows.reduce((a, r) => a.concat(r.team.objectives || []), []);
+    const committed = all.filter((o) => o.committed);
+    const bv = all.reduce((a, o) => a + (Number(o.bv) || 0), 0);
+    if (!all.length) {
+      return slP('*' + ctxName() + '* has no objectives written yet. With ' + slPlural(slScope().cards.length, 'sticky', 'stickies') + ' already on the wall, the plan exists — it just is not stated as outcomes anywhere.') +
+        slActs([{ ask: 'Draft a plan readout', ico: 'present', label: 'Draft readout' }]);
+    }
+    return slP('*' + ctxName() + '* has *' + slPlural(all.length, 'objective') + '* — ' + committed.length + ' committed, ' + (all.length - committed.length) + ' uncommitted, ' + bv + ' BV in total.') +
+      slGrp('Committed') +
+      slList(committed.slice(0, 4).map((o) => o.text + ' — *' + (o.bv || 0) + ' BV*')) +
+      slP('Uncommitted work is where the honesty lives: ' + (all.length - committed.length) + ' of these carry ' +
+        (all.filter((o) => !o.committed).reduce((a, o) => a + (Number(o.bv) || 0), 0)) + ' BV that nobody is promising yet.') +
+      slActs([{ go: 'board:objectives', ico: 'objectives', label: 'Open ART Objectives' }]);
+  }
+  function slDepAnswer() {
+    const links = slCrossLinks();
+    if (!links.length) {
+      return slP('No cross-team links inside *' + ctxName() + '*. Either this scope is genuinely self-contained, or the hand-offs live in people’s heads instead of on the board.') +
+        slActs([{ go: 'board:artplan', ico: 'artplan', label: 'Open ART Planning Board' }]);
+    }
+    const byPair = {};
+    links.forEach((l) => {
+      const k = [slTeamName(l.a), slTeamName(l.b)].sort().join(' ↔ ');
+      byPair[k] = (byPair[k] || 0) + 1;
+    });
+    const pairs = Object.keys(byPair).sort((a, b) => byPair[b] - byPair[a]);
+    return slP('*' + slPlural(links.length, 'cross-team link') + '* inside *' + ctxName() + '*, across ' + slPlural(pairs.length, 'team pair') + '.') +
+      slGrp('Busiest pairs') +
+      slList(pairs.slice(0, 4).map((k) => '*' + k + '* — ' + slPlural(byPair[k], 'hand-off'))) +
+      slGrp('Examples') +
+      slList(links.slice(0, 3).map((l) => '“' + l.a.title + '” (' + slTeamName(l.a) + ') ↔ “' + l.b.title + '” (' + slTeamName(l.b) + ')')) +
+      slP('Each of these needs an agreed iteration on both sides — that is what the ART Planning Board is for.') +
+      slActs([{ go: 'board:artplan', ico: 'artplan', label: 'Open ART Planning Board' },
+        { ask: 'What are the risks?', ico: 'risk', label: 'Risks' }]);
+  }
+  function slProgressAnswer() {
+    const cards = slScope().cards;
+    const by = (k) => cards.filter((c) => statusOf(c) === k);
+    const done = by('done'), doing = by('doing'), todo = by('todo');
+    const pts = slPts(cards), donePts = slPts(done);
+    return slP('*' + ctxName() + '* — ' + slPct(donePts, pts) + '% of the points are done (' + donePts + ' of ' + pts + ').') +
+      slStats([['Done', done.length], ['In progress', doing.length], ['To do', todo.length], ['Stickies', cards.length]]) +
+      slGrp('Most work left') +
+      slList(slIterRows()
+        .map((r) => Object.assign({}, r, { left: slPts(r.cards.filter((c) => statusOf(c) !== 'done')) }))
+        .filter((r) => r.cards.length)
+        .sort((a, b) => b.left - a.left).slice(0, 3)
+        .map((r) => '*' + r.name + '* — ' + r.left + ' pts still open of ' + r.load +
+          ' (' + r.cards.filter((c) => statusOf(c) === 'done').length + ' of ' + r.cards.length + ' stickies done)')) +
+      (state.workMode === 'execution'
+        ? slP('Actuals only mean something next to the objectives — check the RAG on *' + ctxArt().name + '*’s objectives too.')
+        : slP('You are in *Planning* mode, so these statuses are seeded, not tracked. Switch to *Execution* in the top navigation to work with actuals.')) +
+      slActs([{ ask: 'Summarise our objectives', ico: 'objectives', label: 'Objectives' }]);
+  }
+  function slSplitAnswer() {
+    const cards = slScope().cards;
+    const big = cards.filter((c) => (Number(c.points) || 0) >= 13).slice(0, 5);
+    const none = cards.filter((c) => !Number(c.points));
+    const rows = slIterRows().filter((r) => r.load > r.cap);
+    return slP(big.length
+      ? '*' + slPlural(big.length, 'sticky', 'stickies') + '* at 13 points or more — those are the ones that hide risk:'
+      : 'Nothing is bigger than 8 points, so sizing is not what is hurting this plan.') +
+      slList(big.map((c) => '“' + c.title + '” — ' + c.points + ' pts, ' + slTeamName(c) + ', ' + (state.sprints[c.sprintIdx] || 'unscheduled'))) +
+      (none.length ? slP('*' + slPlural(none.length, 'sticky', 'stickies') + '* carry no estimate at all — they still consume the iteration.') : '') +
+      (rows.length
+        ? slP('Splitting one of these out of *' + rows[0].name + '* is the cheapest way to get that iteration back under capacity.')
+        : slP('Capacity is fine everywhere, so split for flow and feedback rather than to fit the wall.')) +
+      slActs([{ ask: 'Are we over capacity?', label: 'Capacity check' }]);
+  }
+  function slReadoutAnswer() {
+    const sc = slScope();
+    const rows = slIterRows();
+    const load = rows.reduce((a, r) => a + r.load, 0), cap = rows.reduce((a, r) => a + r.cap, 0);
+    const over = rows.filter((r) => r.load > r.cap);
+    const un = (state.risks || []).filter((r) => !r.cat || r.cat === 'U');
+    const objs = ctx.type === 'team'
+      ? sc.teams.reduce((a, t) => a + (t.objectives || []).length, 0)
+      : (state.artObjectives || []).length;
+    return slGrp('Draft readout · ' + state.piName) +
+      slP('*' + ctxName() + '* brings ' + slPlural(objs, 'objective') + ' into ' + state.piName + ', planned as ' +
+        slPlural(sc.cards.length, 'sticky', 'stickies') + ' worth ' + load + ' points against ' + cap + ' points of capacity (' + slPct(load, cap) + '%).') +
+      slP(over.length
+        ? 'The plan is not flat: *' + over.map((r) => r.name).join(' and ') + '* ' + (over.length > 1 ? 'run' : 'runs') + ' over capacity, and we are asking for help to move scope right.'
+        : 'Load sits inside capacity in every iteration, with the tightest slot at ' + rows.slice().sort((a, b) => b.pct - a.pct)[0].pct + '%.') +
+      slP('We carry ' + slPlural(slCrossLinks().length, 'cross-team dependency', 'cross-team dependencies') + ' and ' +
+        slPlural((state.risks || []).length, 'risk') + (un.length ? ', of which ' + un.length + ' still ' + (un.length > 1 ? 'need' : 'needs') + ' an owner.' : ', all ROAMed.')) +
+      slP('Confidence hinges on the dependencies landing in the iteration both sides agreed to.') +
+      slActs([{ ask: 'Show cross-team dependencies', ico: 'collab', label: 'Dependencies' },
+        { ask: 'What are the risks?', ico: 'risk', label: 'Risks' }]);
+  }
+  function slConvoAnswer() {
+    const th = state.threads.filter((t) => t.board === railActive);
+    const open = th.filter((t) => !(t.replies || []).length);
+    if (!th.length) {
+      return slP('No conversations attached to *' + boardName(railActive) + '* yet.') +
+        slActs([{ go: 'convo', ico: 'chat', label: 'Open board conversation' }]);
+    }
+    return slP('*' + slPlural(th.length, 'thread') + '* on *' + boardName(railActive) + '*, ' + open.length + ' with no reply yet.') +
+      slList(th.slice(0, 4).map((t) => '*' + t.who + '* (' + t.ago + ') — ' + t.text)) +
+      (open.length ? slP(slPlural(open.length, 'thread') + ' ' + (open.length > 1 ? 'are' : 'is') + ' still waiting on someone. Unanswered board threads are usually decisions, not chat.') : '') +
+      slActs([{ go: 'convo', ico: 'chat', label: 'Open board conversation' }]);
+  }
+  function slHelpAnswer() {
+    return slP('I read this board directly — stickies and their points, team capacity, objectives, risks, cross-team links and the threads attached to them. Things worth asking:') +
+      slList([
+        '*Capacity* — “are we over capacity?”, “which iteration is heaviest?”',
+        '*Scope* — “what should we split?”, “what is unestimated?”',
+        '*Objectives* — “summarise our objectives”, “who has none yet?”',
+        '*Risk* — “what are the risks?”, “what is still unROAMed?”',
+        '*Dependencies* — “show cross-team dependencies”',
+        '*Writing* — “draft a plan readout”',
+      ]) +
+      slP('Everything stays in this browser — I answer from the plan, not from a server.') +
+      slActs(slSuggestions().slice(0, 3).map((q) => ({ ask: q, label: q })));
+  }
+  function slAnswer(q) {
+    const s = String(q).toLowerCase();
+    const has = (...w) => w.some((x) => s.indexOf(x) >= 0);
+    const named = state.teams.filter((t) => s.indexOf(t.name.toLowerCase()) >= 0);
+    const t = named.find((x) => inScope(x.id)) || named[0];
+    if (has('help', 'what can you', 'who are you', 'what do you')) return slHelpAnswer();
+    if (t && has('capacity', 'load', 'over', 'room', 'busy', 'how is', 'how are', 'tell me about')) return slTeamAnswer(t);
+    if (has('capacity', 'load', 'overload', 'utilis', 'utiliz', 'balance', 'room', 'iteration', 'sprint')) return slCapacityAnswer();
+    if (has('risk', 'roam', 'blocked', 'blocker', 'impedim')) return slRiskAnswer();
+    if (has('objective', 'okr', 'business value', ' bv', 'commit')) return slObjAnswer();
+    if (has('depend', 'cross-team', 'cross team', 'hand-off', 'handoff', 'link')) return slDepAnswer();
+    if (has('split', 'estimate', 'points', 'biggest', 'heavy', 'too big', 'sizing')) return slSplitAnswer();
+    if (has('progress', 'done', 'on track', 'burndown', 'execution', 'actual')) return slProgressAnswer();
+    if (has('readout', 'summarise', 'summarize', 'draft', 'write', 'report', 'standup', 'stand-up', 'update')) return slReadoutAnswer();
+    if (has('conversation', 'comment', 'thread', 'unanswered', 'discuss', 'said', 'saying', 'talk', 'chat')) return slConvoAnswer();
+    if (t) return slTeamAnswer(t);
+    return slOverview(q);
+  }
+
+  // ---- Panel ----
+  const SL_SUGG = {
+    team: ['Are we over capacity?', 'Which iteration is heaviest?', 'What should we split?'],
+    objectives: ['Summarise our objectives', 'Who has no objectives yet?', 'Draft a plan readout'],
+    risk: ['What are the risks?', 'What is still unROAMed?', 'Draft a plan readout'],
+    artplan: ['Show cross-team dependencies', 'Are we over capacity?', 'Draft a plan readout'],
+    solplan: ['Show cross-team dependencies', 'Are we over capacity?', 'Summarise our objectives'],
+  };
+  function slSuggestions() {
+    const base = SL_SUGG[railActive] || ['Show cross-team dependencies', 'Are we over capacity?', 'Summarise our objectives'];
+    return base.concat(['What am I looking at?']);
+  }
+  const slBoardPlane = () => !boardScreen.hidden && mode === 'board';
+  function slGreet() {
+    const key = railActive + '|' + ctxName() + '|' + state.workMode;
+    if (slSeenCtx === key) return;
+    const first = !slMsgs.length;
+    slSeenCtx = key;
+    slMsgs.push({ role: 'ai', html: first
+      ? slP('Hi ' + (state.user.name || '').split(' ')[0] + ' — I’m *Sightline*. I can see everything on *' + boardName(railActive) +
+          '* for *' + ctxName() + '*: stickies, points, capacity, objectives, risks and the threads attached to them. Ask me anything, or start here:') +
+        slActs(slSuggestions().slice(0, 3).map((q) => ({ ask: q, label: q })))
+      : slP('You moved to *' + boardName(railActive) + '* — I’m reading that board now (*' + ctxName() + '*, ' +
+          (state.workMode === 'execution' ? 'Execution' : 'Planning') + ').') });
+  }
+  function slMsgHtml(m) {
+    if (m.role === 'you') return '<div class="sl-msg you"><div class="sl-bub">' + m.html + '</div></div>';
+    return '<div class="sl-msg ai"><span class="sl-av">' + bIcon('spark') + '</span><div class="sl-bub">' + m.html + '</div></div>';
+  }
+  function renderSightline() {
+    if (!slBoardPlane()) {
+      slFab.hidden = true; slFab.innerHTML = '';
+      slEl.hidden = true; slEl.innerHTML = '';
+      return;
+    }
+    slFab.hidden = slOpen;
+    if (!slOpen) {
+      slFab.innerHTML = '<span class="sl-fab-mark">' + bIcon('spark') + '</span><span class="sl-fab-l">Sightline</span>';
+      slEl.hidden = true; slEl.innerHTML = '';
+      return;
+    }
+    slFab.innerHTML = '';
+    slEl.hidden = false;
+    slGreet();
+    const wasTyping = document.activeElement && document.activeElement.id === 'sl-input';
+    slEl.innerHTML =
+      '<div class="sl-head">' +
+        '<span class="sl-mark">' + bIcon('spark') + '</span>' +
+        '<span class="sl-title"><b>Sightline</b><small>AI assistant · reads this board</small></span>' +
+        '<button class="sl-ico" type="button" data-sl-reset title="Start a new chat">' + bIcon('restart') + '</button>' +
+        '<button class="sl-ico" type="button" data-sl-close title="Close Sightline">✕</button>' +
+      '</div>' +
+      '<div class="sl-ctx">' +
+        '<span class="sl-chip">' + bIcon(boardIcon(railActive)) + esc(boardName(railActive)) + '</span>' +
+        '<span class="sl-chip">' + bIcon('teamrail') + esc(ctxName()) + '</span>' +
+        '<span class="sl-chip">' + esc(state.workMode === 'execution' ? 'Execution' : 'Planning') + '</span>' +
+      '</div>' +
+      '<div class="sl-body" id="sl-body">' +
+        slMsgs.map(slMsgHtml).join('') +
+        (slThinking ? '<div class="sl-msg ai"><span class="sl-av">' + bIcon('spark') +
+          '</span><div class="sl-bub"><span class="sl-dots"><i></i><i></i><i></i></span></div></div>' : '') +
+      '</div>' +
+      // the opening message already offers starters — only repeat them once the chat is going
+      (slThinking || !slMsgs.some((m) => m.role === 'you') ? '' : '<div class="sl-sugg">' + slSuggestions().map((q) =>
+        '<button class="sl-act" type="button" data-sl-ask="' + esc(q) + '">' + esc(q) + '</button>').join('') + '</div>') +
+      '<form class="sl-foot" id="sl-form">' +
+        '<div class="sl-in">' +
+          '<textarea id="sl-input" rows="1" placeholder="Ask about this board…" aria-label="Ask Sightline"></textarea>' +
+          '<button class="sl-send" type="submit" title="Send">' + bIcon('send') + '</button>' +
+        '</div>' +
+        '<p class="sl-note">Sightline answers from the plan in this browser — nothing is sent anywhere.</p>' +
+      '</form>';
+    const body = document.getElementById('sl-body');
+    if (body) body.scrollTop = body.scrollHeight;
+    const ta = document.getElementById('sl-input');
+    if (ta) {
+      ta.value = slDraft;
+      slGrow(ta);
+      ta.addEventListener('input', () => { slDraft = ta.value; slGrow(ta); });
+      ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); slSend(ta.value); }
+      });
+      if (wasTyping) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    }
+    const form = document.getElementById('sl-form');
+    if (form) form.addEventListener('submit', (e) => { e.preventDefault(); slSend(ta ? ta.value : ''); });
+  }
+  function slGrow(ta) {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(108, ta.scrollHeight) + 'px';
+  }
+  function slSend(text) {
+    text = String(text || '').trim();
+    if (!text || slThinking) return;
+    slMsgs.push({ role: 'you', html: slP(text) });
+    slDraft = '';
+    slThinking = true;
+    renderSightline();
+    const ta = document.getElementById('sl-input');
+    if (ta) ta.focus();
+    clearTimeout(slTimer);
+    slTimer = setTimeout(() => {
+      slThinking = false;
+      slMsgs.push({ role: 'ai', html: slAnswer(text) });
+      renderSightline();
+    }, 480 + Math.min(700, text.length * 14));
+  }
+  function slToggle(on) {
+    slOpen = on == null ? !slOpen : !!on;
+    if (slOpen) convoOpen = false; // one right-hand panel at a time
+    renderBoardView();
+    if (slOpen) { const ta = document.getElementById('sl-input'); if (ta) ta.focus(); }
+  }
+  slFab.addEventListener('click', () => slToggle(true));
+  slEl.addEventListener('click', (e) => {
+    if (e.target.closest('[data-sl-close]')) { slToggle(false); return; }
+    if (e.target.closest('[data-sl-reset]')) {
+      slMsgs = []; slSeenCtx = ''; slThinking = false; clearTimeout(slTimer);
+      renderSightline(); return;
+    }
+    const ask = e.target.closest('[data-sl-ask]');
+    if (ask) { slSend(ask.dataset.slAsk); return; }
+    const go = e.target.closest('[data-sl-go]');
+    if (!go) return;
+    const p = go.dataset.slGo.split(':');
+    if (p[0] === 'board') gotoBoard(p[1]);
+    else if (p[0] === 'team') setCtx('team', p[1]);
+    else if (p[0] === 'convo') { convoOpen = true; panelMode = 'board'; slOpen = false; }
+    renderBoardView();
+    updateHash();
+  });
+
   // Sticky conversations open ON the note — a popover anchored to the sticky.
   const stickyEl = document.getElementById('stickypanel');
   let stickyAnchor = null; // screen rect of the note the panel is anchored to
@@ -2935,7 +3372,7 @@
     if (d.nav === 'toggle-art') { objPanelOpen = !objPanelOpen; renderBoardView(); return; }
     if (d.nav === 'palette') { openPalette(); renderTopNav(); return; }
     if (d.nav === 'tree') { navOpen = !navOpen; renderBoardView(); return; }
-    if (d.nav === 'convo') { convoOpen = !convoOpen; renderBoardView(); return; }
+    if (d.nav === 'convo') { convoOpen = !convoOpen; if (convoOpen) slOpen = false; renderBoardView(); return; }
     if (d.plane) {
       if (d.plane === 'page') { const ps = pagesFor(); if (!ps.some((p) => p.id === activePage)) activePage = ps[0] ? ps[0].id : null; if (!activePage) return; }
       mode = d.plane; renderBoardView(); updateHash(); return;
@@ -2962,6 +3399,7 @@
     boardScreen.classList.toggle('obj-open', obj && objPanelOpen);
     boardScreen.classList.toggle('page-mode', mode === 'page');
     boardScreen.classList.toggle('convo-open', convoOpen);
+    boardScreen.classList.toggle('sl-open', slOpen && mode === 'board');
     boardScreen.classList.toggle('nav-v2', v2);
     boardScreen.classList.toggle('nav-open', v2 && navOpen);
     boardScreen.classList.toggle('nav-v3', chromeV() === 'v3');
@@ -2977,6 +3415,7 @@
     renderSideRail();
     renderArtSide();
     renderConvo();
+    renderSightline();
     renderBtools();
     renderStickyPanel();
     renderStickyBar();
@@ -3276,7 +3715,13 @@
     state.sessions.forEach((sn) => items.push({ g: 'PI Sessions', ico: 'folder', label: sn.name, hint: sn.updated, go: () => enterBoard(sn.name) }));
     [['home', 'Home dashboard'], ['sessions', 'PI Sessions'], ['connections', 'ALM Connections'], ['settings', 'PIE Recipe']].forEach((pgd) =>
       items.push({ g: 'App', ico: 'apps', label: pgd[1], go: () => { exitBoard(); navigate(pgd[0]); } }));
-    items.push({ g: 'Actions', ico: 'chat', label: 'Toggle conversation panel', go: () => { convoOpen = !convoOpen; if (!boardScreen.hidden) renderBoardView(); } });
+    items.push({ g: 'Actions', ico: 'chat', label: 'Toggle conversation panel', go: () => { convoOpen = !convoOpen; if (convoOpen) slOpen = false; if (!boardScreen.hidden) renderBoardView(); } });
+    items.push({ g: 'Actions', ico: 'spark', label: 'Ask Sightline about this board', go: () => {
+      if (boardScreen.hidden) enterBoard();
+      if (mode !== 'board') mode = 'board';
+      slToggle(true);
+      updateHash();
+    } });
     return items;
   }
   function renderPalList(q) {
@@ -3514,6 +3959,7 @@
       if (linkMode) { linkMode = null; setLinkHint(''); return; }
       if (sbSub) { sbSub = null; renderStickyBar(); requestAnimationFrame(placeStickyBar); return; }
       if (sbCard) { closeStickyBar(); return; }
+      if (slOpen && !boardScreen.hidden) { slToggle(false); return; }
       if (pinned) { togglePin(card(pinned) || {}); return; }
       if (stickyOpen) { closeStickyPanel(); return; }
       if (dockPanel) { dockPanel = null; if (!boardScreen.hidden) renderDock(); return; }
