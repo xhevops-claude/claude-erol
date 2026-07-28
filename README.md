@@ -1,12 +1,12 @@
-# claude-apps
+# claude-erol
 
-[![CI](https://github.com/zlore-claude/claude-apps/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zlore-claude/claude-apps/actions/workflows/ci.yml)
-[![Deploy](https://github.com/zlore-claude/claude-apps/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/zlore-claude/claude-apps/actions/workflows/pages.yml)
-[![Live](https://img.shields.io/badge/live-arcade-22d3ee?style=flat&labelColor=18181b)](https://zlore-claude.github.io/claude-apps/)
+[![CI](https://github.com/xhevops-claude/claude-erol/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/xhevops-claude/claude-erol/actions/workflows/ci.yml)
+[![Deploy](https://github.com/xhevops-claude/claude-erol/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/xhevops-claude/claude-erol/actions/workflows/pages.yml)
+[![Live](https://img.shields.io/badge/live-arcade-22d3ee?style=flat&labelColor=18181b)](https://xhevops-claude.github.io/claude-erol/)
 
 A static shell that hosts the **Pie** PI-planning app. The first screen shows the app tile; tap it and the card morphs into the app, tap back and the app morphs back into the card. Deployed to GitHub Pages.
 
-**Live**: https://zlore-claude.github.io/claude-apps/
+**Live**: https://xhevops-claude.github.io/claude-erol/
 
 ## Layout
 
@@ -81,8 +81,8 @@ npm run lint:css
 
 | Branch | Path on Pages | URL |
 |---|---|---|
-| `main` | `/` (root) | `https://zlore-claude.github.io/claude-apps/` |
-| any other | `/preview/<slug>/` | `https://zlore-claude.github.io/claude-apps/preview/<slug>/` |
+| `main` | `/` (root) | `https://xhevops-claude.github.io/claude-erol/` |
+| any other | `/preview/<slug>/` | `https://xhevops-claude.github.io/claude-erol/preview/<slug>/` |
 
 `<slug>` is the branch name lowercased with `/`, `_`, and spaces turned into `-`. So pushing `claude/foo-bar` deploys to `…/preview/claude-foo-bar/`.
 

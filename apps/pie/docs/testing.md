@@ -163,7 +163,7 @@ has produced so far.
 ## 5. Deploy previews
 
 Every push to a non-`main` branch deploys to
-`https://zlore-claude.github.io/claude-apps/preview/<branch-slug>/`
+`https://xhevops-claude.github.io/claude-erol/preview/<branch-slug>/`
 (slug = branch name with `/`, `_`, space → `-`, lowercased). Deep links work
 there too, e.g. `…/preview/<slug>/apps/pie/#b/team`.
 
