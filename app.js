@@ -14,6 +14,13 @@
       icon: '🏫',
       url: 'apps/school/',
     },
+    {
+      slug: 'parking',
+      name: 'Parking Meter',
+      meta: 'Simulator',
+      icon: '🅿️',
+      url: 'apps/parking/',
+    },
   ];
 
   // The morph + deep-link plumbing looks tiles up by url.
