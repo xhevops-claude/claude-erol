@@ -4,7 +4,7 @@
 [![Deploy](https://github.com/xhevops-claude/claude-erol/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/xhevops-claude/claude-erol/actions/workflows/pages.yml)
 [![Live](https://img.shields.io/badge/live-arcade-22d3ee?style=flat&labelColor=18181b)](https://xhevops-claude.github.io/claude-erol/)
 
-A static shell that hosts the **Pie** PI-planning app. The first screen shows the app tile; tap it and the card morphs into the app, tap back and the app morphs back into the card. Deployed to GitHub Pages.
+A static shell that hosts self-contained apps: **Pie** (PI planning) and **School** (school management). The first screen shows the app tiles; tap one and the card morphs into the app, tap back and the app morphs back into the card. Deployed to GitHub Pages.
 
 **Live**: https://xhevops-claude.github.io/claude-erol/
 
@@ -18,12 +18,16 @@ A static shell that hosts the **Pie** PI-planning app. The first screen shows th
 ├── theme.js                Theme picker (shell only)
 ├── themes.css              Theme variables (shell only)
 └── apps/
-    └── pie/                Self-contained PI-planning app
+    ├── pie/                Self-contained PI-planning app
+    │   ├── index.html
+    │   ├── styles.css
+    │   ├── app.js
+    │   ├── CLAUDE.md       Scoped guide for working on Pie
+    │   └── docs/           Deep dives (architecture, state model, …)
+    └── school/             Self-contained school-management app
         ├── index.html
         ├── styles.css
-        ├── app.js
-        ├── CLAUDE.md       Scoped guide for working on Pie
-        └── docs/           Deep dives (architecture, state model, …)
+        └── app.js
 ```
 
 Each embedded app is fully self-contained: it links no shared CSS or JS and ships its own palette. The shell embeds it via an `<iframe>`. The theme picker on the home page only affects the home page.

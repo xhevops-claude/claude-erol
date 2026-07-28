@@ -45,7 +45,7 @@ The site is plain HTML/CSS/JS served as files. There is no bundler, no framework
 
 ### Shell vs. embedded experiences
 
-The repo is a "shell" home page (`index.html`, `styles.css`, `app.js`, `theme.js`, `themes.css`) that hosts independent sub-experiences in `apps/<slug>/`. Each sub-experience is fully self-contained: its own `index.html`, `styles.css`, `app.js`, no shared imports. The shell embeds them via `<iframe>`. That isolation is load-bearing — do not try to pull a sub-experience's JS/CSS into the shell or vice versa. Currently the only sub-experience is `apps/pie/`.
+The repo is a "shell" home page (`index.html`, `styles.css`, `app.js`, `theme.js`, `themes.css`) that hosts independent sub-experiences in `apps/<slug>/`. Each sub-experience is fully self-contained: its own `index.html`, `styles.css`, `app.js`, no shared imports. The shell embeds them via `<iframe>`. That isolation is load-bearing — do not try to pull a sub-experience's JS/CSS into the shell or vice versa. Current sub-experiences: `apps/pie/` (PI planning) and `apps/school/` (school management — students, teachers, classes, attendance, gradebook, all in `localStorage`).
 
 `apps/pie/` is large enough to carry its own scoped guide: read `apps/pie/CLAUDE.md` (and the deep dives in `apps/pie/docs/`) before working in there.
 
