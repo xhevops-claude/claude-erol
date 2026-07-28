@@ -11,6 +11,14 @@ At the start of every session, before writing or changing any code, read the rep
 
 Don't skip this because the task looks small — the conventions below assume you have that context.
 
+## Feature completion — document it
+
+Completing a feature includes documenting it; the work isn't done until the docs reflect it. In the same branch/PR as the feature:
+
+- Update `README.md` when the repo layout, tiles, or user-facing behaviour change.
+- Update the relevant section of this file when a shell convention or architecture described here changes.
+- For `apps/pie/` work, update `apps/pie/CLAUDE.md` and the matching deep dive in `apps/pie/docs/` (add a new doc there if the feature opens a new area).
+
 ## Commands
 
 ```sh
