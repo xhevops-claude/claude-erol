@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Parking Meter · Simulator</title>
+  <title>Parking Meter · Tracker</title>
   <script>
     if (window.self !== window.top) document.documentElement.classList.add('embedded');
   </script>
@@ -49,23 +49,27 @@
         <span class="brand-icon" aria-hidden="true">🅿️</span>
         <div class="brand-text">
           <h1 class="brand-name">Parking Meter</h1>
-          <p class="brand-sub">Bayfront municipal lot</p>
+          <p class="brand-sub">Where I'm parked &amp; what I owe</p>
         </div>
       </div>
       <div class="stats">
         <div class="stat">
           <span class="stat-value" id="stat-active">0</span>
-          <span class="stat-label">Active</span>
+          <span class="stat-label">Parked</span>
         </div>
         <div class="stat">
-          <span class="stat-value" id="stat-revenue">$0.00</span>
-          <span class="stat-label">Revenue</span>
+          <span class="stat-value" id="stat-due">$0.00</span>
+          <span class="stat-label">Due now</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="stat-paid">$0.00</span>
+          <span class="stat-label">Paid</span>
         </div>
       </div>
     </header>
 
     <main class="layout">
-      <section class="meter-panel" aria-label="Selected meter">
+      <section class="meter-panel" aria-label="Selected spot">
         <div class="meter-head" id="meter-head">
           <div class="meter-cap">
             <span class="meter-spot" id="meter-spot">SPOT 1</span>
@@ -78,12 +82,13 @@
             </svg>
             <div class="meter-readout">
               <span class="meter-time" id="meter-time">--:--</span>
+              <span class="meter-cost" id="meter-cost"></span>
               <span class="meter-status" id="meter-status">VACANT</span>
             </div>
           </div>
           <div class="meter-tags">
-            <span class="meter-plate" id="meter-plate">No vehicle</span>
-            <span class="meter-zone" id="meter-zone">—</span>
+            <span class="meter-since" id="meter-since">Not parked</span>
+            <span class="meter-rate" id="meter-rate">—</span>
           </div>
         </div>
 
@@ -96,8 +101,8 @@
           <div class="spots-grid" id="spots-grid"></div>
         </section>
 
-        <section class="history-panel" aria-label="Session history">
-          <h2 class="panel-title">Recent sessions</h2>
+        <section class="history-panel" aria-label="Past stays">
+          <h2 class="panel-title">Past stays</h2>
           <ul class="history-list" id="history-list"></ul>
         </section>
       </aside>

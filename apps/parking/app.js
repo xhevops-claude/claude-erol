@@ -3,26 +3,24 @@
 
   const LOADED_AT = Date.now();
   const MIN_SPLASH_MS = 3000;
-  const STORE_KEY = 'parking-meter-v1';
+  const STORE_KEY = 'parking-meter-v2';
   const SPOT_COUNT = 6;
   const HISTORY_MAX = 12;
-  const LOW_MS = 5 * 60 * 1000;
+  const HOUR_MS = 3600000;
   const DIAL_CIRC = 2 * Math.PI * 52; // matches r=52 in index.html
 
-  const ZONES = [
-    { id: 'downtown', label: 'Downtown', rate: 200, maxMin: 120 },
-    { id: 'mainst', label: 'Main Street', rate: 150, maxMin: 240 },
-    { id: 'riverside', label: 'Riverside', rate: 100, maxMin: 600 },
-  ];
-  const COINS = [25, 100, 200];
+  const RATE_PRESETS = [100, 150, 200, 300]; // cents per hour
 
   // ---------- State ----------
+  // Each spot is either null (vacant) or a stay I started:
+  //   { startedAt (ms), rateCents (per hour), note }
 
   let state = {
     spots: new Array(SPOT_COUNT).fill(null),
     history: [],
-    revenueCents: 0,
+    paidCents: 0,
     selected: 0,
+    lastRate: 200,
   };
 
   function load() {
@@ -32,20 +30,20 @@
       const data = JSON.parse(raw);
       if (!data || !Array.isArray(data.spots)) return;
       state.spots = new Array(SPOT_COUNT).fill(null)
-        .map((_, i) => (data.spots[i] && typeof data.spots[i].expiresAt === 'number' ? data.spots[i] : null));
+        .map((_, i) => {
+          const s = data.spots[i];
+          return s && typeof s.startedAt === 'number' && typeof s.rateCents === 'number' ? s : null;
+        });
       state.history = Array.isArray(data.history) ? data.history.slice(0, HISTORY_MAX) : [];
-      state.revenueCents = typeof data.revenueCents === 'number' ? data.revenueCents : 0;
+      state.paidCents = typeof data.paidCents === 'number' ? data.paidCents : 0;
       state.selected = Number.isInteger(data.selected) && data.selected >= 0 && data.selected < SPOT_COUNT
         ? data.selected : 0;
+      state.lastRate = typeof data.lastRate === 'number' && data.lastRate > 0 ? data.lastRate : 200;
     } catch (_) { /* corrupted storage — start fresh */ }
   }
 
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_) {}
-  }
-
-  function zoneById(id) {
-    return ZONES.find((z) => z.id === id) || ZONES[0];
   }
 
   // ---------- Formatting ----------
@@ -60,8 +58,16 @@
     return '$' + (cents / 100).toFixed(2);
   }
 
+  function elapsedMs(stay, now) {
+    return Math.max(0, now - stay.startedAt);
+  }
+
+  function costCents(stay, now) {
+    return (elapsedMs(stay, now) / HOUR_MS) * stay.rateCents;
+  }
+
   function fmtClock(ms) {
-    const total = Math.max(0, Math.ceil(ms / 1000));
+    const total = Math.max(0, Math.floor(ms / 1000));
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
     const s = total % 60;
@@ -70,7 +76,7 @@
   }
 
   function fmtShort(ms) {
-    const total = Math.max(0, Math.ceil(ms / 1000));
+    const total = Math.max(0, Math.floor(ms / 1000));
     if (total >= 3600) {
       const h = Math.floor(total / 3600);
       const m = Math.floor((total % 3600) / 60);
@@ -79,76 +85,58 @@
     return fmtClock(ms);
   }
 
-  function fmtMins(min) {
-    if (min >= 60) {
-      const h = Math.floor(min / 60);
-      const m = Math.round(min % 60);
-      return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
-    }
-    return Math.round(min) + ' min';
+  function fmtTime(ms) {
+    return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  function coinMinutes(cents, zone) {
-    return (cents / zone.rate) * 60;
+  function fmtWhen(ms) {
+    const d = new Date(ms);
+    const today = new Date();
+    const sameDay = d.toDateString() === today.toDateString();
+    return sameDay ? fmtTime(ms)
+      : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + fmtTime(ms);
   }
 
-  // ---------- Session lifecycle ----------
-
-  function spotStatus(session, now) {
-    if (!session) return 'vacant';
-    if (session.expiresAt <= now) return 'expired';
-    if (session.expiresAt - now <= LOW_MS) return 'low';
-    return 'active';
+  // datetime-local wants local "YYYY-MM-DDTHH:MM"
+  function toLocalInput(ms) {
+    const d = new Date(ms);
+    const pad = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+      + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
 
-  function insertCoin(i, cents) {
-    const now = Date.now();
-    const session = state.spots[i];
-    const zoneSel = document.getElementById('zone-select');
-    const plateInput = document.getElementById('plate-input');
+  function fromLocalInput(value) {
+    const ms = new Date(value).getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
 
-    if (!session) {
-      const zone = zoneById(zoneSel ? zoneSel.value : ZONES[0].id);
-      const plate = plateInput && plateInput.value.trim()
-        ? plateInput.value.trim().toUpperCase().slice(0, 10) : 'GUEST';
-      const mins = Math.min(coinMinutes(cents, zone), zone.maxMin);
-      state.spots[i] = {
-        plate,
-        zone: zone.id,
-        startedAt: now,
-        expiresAt: now + mins * 60000,
-        purchasedMin: mins,
-        paidCents: cents,
-      };
-    } else {
-      const zone = zoneById(session.zone);
-      const capLeft = zone.maxMin - session.purchasedMin;
-      if (capLeft <= 0) return;
-      const mins = Math.min(coinMinutes(cents, zone), capLeft);
-      const base = Math.max(session.expiresAt, now);
-      session.expiresAt = base + mins * 60000;
-      session.purchasedMin += mins;
-      session.paidCents += cents;
-    }
+  // ---------- Stay lifecycle ----------
 
-    state.revenueCents += cents;
+  function startStay(i, startedAt, rateCents, note) {
+    state.spots[i] = { startedAt, rateCents, note: note || '' };
+    state.lastRate = rateCents;
     save();
     renderControls();
     updateAll();
   }
 
-  function endSession(i, reason) {
-    const session = state.spots[i];
-    if (!session) return;
-    state.history.unshift({
-      plate: session.plate,
-      zone: session.zone,
-      paidCents: session.paidCents,
-      startedAt: session.startedAt,
-      endedAt: Date.now(),
-      reason,
-    });
-    state.history = state.history.slice(0, HISTORY_MAX);
+  function endStay(i, paid) {
+    const stay = state.spots[i];
+    if (!stay) return;
+    const now = Date.now();
+    if (paid) {
+      const total = Math.round(costCents(stay, now));
+      state.history.unshift({
+        spot: i,
+        note: stay.note,
+        rateCents: stay.rateCents,
+        startedAt: stay.startedAt,
+        endedAt: now,
+        totalCents: total,
+      });
+      state.history = state.history.slice(0, HISTORY_MAX);
+      state.paidCents += total;
+    }
     state.spots[i] = null;
     save();
     renderControls();
@@ -161,15 +149,17 @@
   const meterHead = document.getElementById('meter-head');
   const meterSpotEl = document.getElementById('meter-spot');
   const meterTimeEl = document.getElementById('meter-time');
+  const meterCostEl = document.getElementById('meter-cost');
   const meterStatusEl = document.getElementById('meter-status');
-  const meterPlateEl = document.getElementById('meter-plate');
-  const meterZoneEl = document.getElementById('meter-zone');
+  const meterSinceEl = document.getElementById('meter-since');
+  const meterRateEl = document.getElementById('meter-rate');
   const dialFill = document.getElementById('dial-fill');
   const controlsEl = document.getElementById('meter-controls');
   const spotsGrid = document.getElementById('spots-grid');
   const historyList = document.getElementById('history-list');
   const statActive = document.getElementById('stat-active');
-  const statRevenue = document.getElementById('stat-revenue');
+  const statDue = document.getElementById('stat-due');
+  const statPaid = document.getElementById('stat-paid');
 
   const spotEls = [];
 
@@ -186,9 +176,9 @@
       num.textContent = 'SPOT ' + (i + 1);
       const time = document.createElement('span');
       time.className = 'spot-time';
-      const plate = document.createElement('span');
-      plate.className = 'spot-plate';
-      btn.append(num, time, plate);
+      const sub = document.createElement('span');
+      sub.className = 'spot-plate';
+      btn.append(num, time, sub);
       btn.addEventListener('click', () => {
         state.selected = i;
         save();
@@ -196,25 +186,23 @@
         updateAll();
       });
       spotsGrid.appendChild(btn);
-      spotEls.push({ btn, time, plate });
+      spotEls.push({ btn, time, sub });
     }
   }
 
   function updateSpots(now) {
     for (let i = 0; i < SPOT_COUNT; i++) {
-      const session = state.spots[i];
-      const status = spotStatus(session, now);
+      const stay = state.spots[i];
       const el = spotEls[i];
-      el.btn.className = 'spot ' + status + (state.selected === i ? ' selected' : '');
-      if (!session) {
+      el.btn.className = 'spot ' + (stay ? 'active' : 'vacant')
+        + (state.selected === i ? ' selected' : '');
+      if (!stay) {
         el.time.textContent = 'Vacant';
-        el.plate.textContent = 'Tap to set up';
-      } else if (status === 'expired') {
-        el.time.textContent = 'EXPIRED';
-        el.plate.textContent = session.plate;
+        el.sub.textContent = 'Tap to park here';
       } else {
-        el.time.textContent = fmtShort(session.expiresAt - now);
-        el.plate.textContent = session.plate;
+        el.time.textContent = fmtShort(elapsedMs(stay, now));
+        el.sub.textContent = money(Math.round(costCents(stay, now)))
+          + (stay.note ? ' · ' + stay.note : '');
       }
     }
   }
@@ -223,147 +211,161 @@
 
   function updateMeter(now) {
     const i = state.selected;
-    const session = state.spots[i];
-    const status = spotStatus(session, now);
+    const stay = state.spots[i];
 
     meterSpotEl.textContent = 'SPOT ' + (i + 1);
-    meterHead.className = 'meter-head is-' + (status === 'low' ? 'active is-low' : status);
+    meterHead.className = 'meter-head ' + (stay ? 'is-active' : 'is-vacant');
 
-    if (!session) {
+    if (!stay) {
       meterTimeEl.textContent = '--:--';
+      meterCostEl.textContent = '';
       meterStatusEl.textContent = 'VACANT';
-      meterPlateEl.textContent = 'No vehicle';
-      meterZoneEl.textContent = '—';
+      meterSinceEl.textContent = 'Not parked';
+      meterRateEl.textContent = '—';
       dialFill.style.strokeDashoffset = DIAL_CIRC;
       return;
     }
 
-    const zone = zoneById(session.zone);
-    const remaining = session.expiresAt - now;
+    const elapsed = elapsedMs(stay, now);
+    meterTimeEl.textContent = fmtClock(elapsed);
+    meterCostEl.textContent = money(Math.round(costCents(stay, now))) + ' due';
+    meterStatusEl.textContent = 'PARKED';
+    meterSinceEl.textContent = 'Since ' + fmtWhen(stay.startedAt)
+      + (stay.note ? ' · ' + stay.note : '');
+    meterRateEl.textContent = money(stay.rateCents) + '/hr';
 
-    meterTimeEl.textContent = status === 'expired' ? 'EXPIRED' : fmtClock(remaining);
-    meterStatusEl.textContent = status === 'expired' ? 'VIOLATION'
-      : status === 'low' ? 'TIME LOW' : 'TIME REMAINING';
-    meterPlateEl.textContent = session.plate;
-    meterZoneEl.textContent = zone.label + ' · ' + money(zone.rate) + '/hr · paid ' + money(session.paidCents);
-
-    const totalMs = session.purchasedMin * 60000;
-    const frac = totalMs > 0 ? Math.min(1, Math.max(0, remaining / totalMs)) : 0;
+    // Dial shows progress through the current hour of the stay.
+    const frac = (elapsed % HOUR_MS) / HOUR_MS;
     dialFill.style.strokeDashoffset = DIAL_CIRC * (1 - frac);
   }
 
   // ---------- Controls (re-rendered on state changes only) ----------
 
-  function coinButtonsHtml(zone, capLeftMin) {
-    return '<div class="coins">' + COINS.map((c) => {
-      const mins = Math.min(coinMinutes(c, zone), capLeftMin);
-      const disabled = capLeftMin <= 0 ? ' disabled' : '';
-      return `<button type="button" class="coin" data-coin="${c}"${disabled}>
-        <span class="coin-value">${money(c)}</span>
-        <span class="coin-mins">+${fmtMins(mins)}</span>
-      </button>`;
-    }).join('') + '</div>';
+  function ratePresetsHtml(selectedCents) {
+    return '<div class="presets">' + RATE_PRESETS.map((r) =>
+      `<button type="button" class="chip${r === selectedCents ? ' on' : ''}" data-rate="${r}">${money(r)}/hr</button>`
+    ).join('') + '</div>';
   }
 
   function renderControls() {
     const i = state.selected;
-    const session = state.spots[i];
-    const now = Date.now();
-    const status = spotStatus(session, now);
+    const stay = state.spots[i];
 
-    if (!session) {
-      const zone = zoneById(document.getElementById('zone-select')
-        ? document.getElementById('zone-select').value : ZONES[0].id);
+    if (!stay) {
       controlsEl.innerHTML = `
         <div class="control-row">
           <div class="field">
-            <label class="field-label" for="plate-input">License plate</label>
-            <input id="plate-input" type="text" maxlength="10" placeholder="ABC-1234"
-              autocomplete="off" spellcheck="false" />
+            <label class="field-label" for="start-input">Parked at</label>
+            <input id="start-input" type="datetime-local" value="${toLocalInput(Date.now())}" />
           </div>
           <div class="field">
-            <label class="field-label" for="zone-select">Zone</label>
-            <select id="zone-select">
-              ${ZONES.map((z) => `<option value="${z.id}"${z.id === zone.id ? ' selected' : ''}>
-                ${esc(z.label)} · ${money(z.rate)}/hr</option>`).join('')}
-            </select>
+            <label class="field-label" for="rate-input">Rate ($ per hour)</label>
+            <input id="rate-input" type="number" min="0" step="0.25"
+              value="${(state.lastRate / 100).toFixed(2)}" inputmode="decimal" />
           </div>
         </div>
-        <p class="zone-note" id="zone-note"></p>
-        ${coinButtonsHtml(zone, zone.maxMin)}
-        <p class="control-hint">Insert a coin to start the meter. Time is priced at the zone's hourly rate.</p>
+        ${ratePresetsHtml(state.lastRate)}
+        <div class="control-row">
+          <div class="field">
+            <label class="field-label" for="note-input">Note (optional)</label>
+            <input id="note-input" type="text" maxlength="24" placeholder="e.g. blue Corolla, level 2"
+              autocomplete="off" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn primary" data-action="start">🅿️ Start parking here</button>
+        </div>
+        <p class="control-hint">Set when you actually parked (backdating is fine) and the meter counts
+          up from there — elapsed time and amount due update live.</p>
       `;
-      updateZoneNote();
       return;
     }
 
-    const zone = zoneById(session.zone);
-    const capLeft = Math.max(0, zone.maxMin - session.purchasedMin);
-    const maxed = capLeft <= 0;
-
     controlsEl.innerHTML = `
-      ${coinButtonsHtml(zone, capLeft)}
-      <p class="control-hint${maxed ? ' maxed' : ''}">${maxed
-        ? 'Zone limit reached — this meter can’t be fed past ' + fmtMins(zone.maxMin) + '.'
-        : 'Top up any time. ' + esc(zone.label) + ' allows up to ' + fmtMins(zone.maxMin)
-          + ' per stay (' + fmtMins(capLeft) + ' left to buy).'}</p>
-      <div class="actions">
-        <button type="button" class="btn" data-action="depart">🚙 Car departs</button>
-        ${status === 'expired'
-          ? '<button type="button" class="btn danger" data-action="ticket">🎫 Issue ticket &amp; clear</button>'
-          : ''}
+      <div class="control-row">
+        <div class="field">
+          <label class="field-label" for="start-edit">Parked at (adjust if needed)</label>
+          <input id="start-edit" type="datetime-local" value="${toLocalInput(stay.startedAt)}" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="rate-edit">Rate ($ per hour)</label>
+          <input id="rate-edit" type="number" min="0" step="0.25"
+            value="${(stay.rateCents / 100).toFixed(2)}" inputmode="decimal" />
+        </div>
       </div>
+      <div class="actions">
+        <button type="button" class="btn primary" data-action="pay">💸 I paid — end stay</button>
+        <button type="button" class="btn danger" data-action="discard">Discard without paying</button>
+      </div>
+      <p class="control-hint">Changes to the start time or rate apply immediately, so the amount due
+        always reflects the real stay.</p>
     `;
   }
 
-  function updateZoneNote() {
-    const sel = document.getElementById('zone-select');
-    const note = document.getElementById('zone-note');
-    if (!sel || !note) return;
-    const zone = zoneById(sel.value);
-    note.textContent = zone.label + ' — ' + money(zone.rate) + ' per hour, '
-      + fmtMins(zone.maxMin) + ' maximum stay.';
-    document.querySelectorAll('.coin .coin-mins').forEach((el, idx) => {
-      const mins = Math.min(coinMinutes(COINS[idx], zone), zone.maxMin);
-      el.textContent = '+' + fmtMins(mins);
-    });
-  }
-
   controlsEl.addEventListener('click', (e) => {
-    const coin = e.target.closest('.coin');
-    if (coin && !coin.disabled) {
-      insertCoin(state.selected, Number(coin.dataset.coin));
+    const chip = e.target.closest('.chip');
+    if (chip) {
+      const rateInput = document.getElementById('rate-input') || document.getElementById('rate-edit');
+      if (rateInput) {
+        rateInput.value = (Number(chip.dataset.rate) / 100).toFixed(2);
+        rateInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      controlsEl.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === chip));
       return;
     }
+
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
-    if (btn.dataset.action === 'depart') endSession(state.selected, 'departed');
-    if (btn.dataset.action === 'ticket') endSession(state.selected, 'expired');
+    const i = state.selected;
+
+    if (btn.dataset.action === 'start') {
+      const startedAt = fromLocalInput(document.getElementById('start-input').value) || Date.now();
+      const rate = Math.round(Number(document.getElementById('rate-input').value) * 100);
+      const note = document.getElementById('note-input').value.trim().slice(0, 24);
+      if (!(rate > 0)) return;
+      startStay(i, Math.min(startedAt, Date.now()), rate, note);
+    }
+    if (btn.dataset.action === 'pay') endStay(i, true);
+    if (btn.dataset.action === 'discard') endStay(i, false);
   });
 
   controlsEl.addEventListener('change', (e) => {
-    if (e.target && e.target.id === 'zone-select') updateZoneNote();
+    const stay = state.spots[state.selected];
+    if (!stay) return;
+    if (e.target.id === 'start-edit') {
+      const ms = fromLocalInput(e.target.value);
+      if (ms !== null) {
+        stay.startedAt = Math.min(ms, Date.now());
+        save();
+        updateAll();
+      }
+    }
+    if (e.target.id === 'rate-edit') {
+      const rate = Math.round(Number(e.target.value) * 100);
+      if (rate > 0) {
+        stay.rateCents = rate;
+        state.lastRate = rate;
+        save();
+        updateAll();
+      }
+    }
   });
 
   // ---------- History ----------
 
   function renderHistory() {
     if (!state.history.length) {
-      historyList.innerHTML = '<li class="history-empty">No sessions yet — feed a meter to get started.</li>';
+      historyList.innerHTML = '<li class="history-empty">No past stays yet — park somewhere and it shows up here.</li>';
       return;
     }
     historyList.innerHTML = state.history.map((h) => {
-      const zone = zoneById(h.zone);
-      const when = new Date(h.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const tag = h.reason === 'expired'
-        ? '<span class="history-tag expired">Ticketed</span>'
-        : '<span class="history-tag departed">Departed</span>';
+      const dur = fmtShort(h.endedAt - h.startedAt);
       return `<li class="history-item">
         <div class="history-main">
-          <span class="history-plate">${esc(h.plate)}</span>
-          <span class="history-sub">${esc(zone.label)} · ${money(h.paidCents)} · ${when}</span>
+          <span class="history-plate">Spot ${h.spot + 1}${h.note ? ' · ' + esc(h.note) : ''}</span>
+          <span class="history-sub">${dur} at ${money(h.rateCents)}/hr · ${fmtWhen(h.startedAt)}–${fmtTime(h.endedAt)}</span>
         </div>
-        ${tag}
+        <span class="history-tag departed">${money(h.totalCents)}</span>
       </li>`;
     }).join('');
   }
@@ -371,25 +373,15 @@
   // ---------- Stats + tick ----------
 
   function updateStats(now) {
-    const active = state.spots.filter((s) => s && spotStatus(s, now) !== 'expired').length;
-    statActive.textContent = String(active);
-    statRevenue.textContent = money(state.revenueCents);
+    const active = state.spots.filter(Boolean);
+    const due = active.reduce((sum, s) => sum + costCents(s, now), 0);
+    statActive.textContent = String(active.length);
+    statDue.textContent = money(Math.round(due));
+    statPaid.textContent = money(state.paidCents);
   }
-
-  let lastStatuses = new Array(SPOT_COUNT).fill('vacant');
 
   function updateAll() {
     const now = Date.now();
-
-    // Re-render controls when the selected spot crosses into/out of expiry,
-    // so the ticket button appears without a click.
-    const selStatus = spotStatus(state.spots[state.selected], now);
-    if (selStatus !== lastStatuses[state.selected]
-      && (selStatus === 'expired' || lastStatuses[state.selected] === 'expired')) {
-      renderControls();
-    }
-    for (let i = 0; i < SPOT_COUNT; i++) lastStatuses[i] = spotStatus(state.spots[i], now);
-
     updateSpots(now);
     updateMeter(now);
     updateStats(now);

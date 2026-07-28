@@ -4,7 +4,7 @@
 [![Deploy](https://github.com/xhevops-claude/claude-erol/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/xhevops-claude/claude-erol/actions/workflows/pages.yml)
 [![Live](https://img.shields.io/badge/live-arcade-22d3ee?style=flat&labelColor=18181b)](https://xhevops-claude.github.io/claude-erol/)
 
-A static shell that hosts self-contained apps: **Pie** (PI planning), **School** (school management), and **Parking Meter** (parking meter simulator). The first screen shows the app tiles; tap one and the card morphs into the app, tap back and the app morphs back into the card. Deployed to GitHub Pages.
+A static shell that hosts self-contained apps: **Pie** (PI planning), **School** (school management), and **Parking Meter** (personal parking tracker). The first screen shows the app tiles; tap one and the card morphs into the app, tap back and the app morphs back into the card. Deployed to GitHub Pages.
 
 **Live**: https://xhevops-claude.github.io/claude-erol/
 
@@ -28,7 +28,7 @@ A static shell that hosts self-contained apps: **Pie** (PI planning), **School**
     │   ├── index.html
     │   ├── styles.css
     │   └── app.js
-    └── parking/            Self-contained parking-meter simulator
+    └── parking/            Self-contained personal parking tracker
         ├── index.html
         ├── styles.css
         └── app.js

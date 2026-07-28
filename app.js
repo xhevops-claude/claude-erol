@@ -17,7 +17,7 @@
     {
       slug: 'parking',
       name: 'Parking Meter',
-      meta: 'Simulator',
+      meta: 'Tracker',
       icon: '🅿️',
       url: 'apps/parking/',
     },
