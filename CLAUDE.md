@@ -45,33 +45,33 @@ The site is plain HTML/CSS/JS served as files. There is no bundler, no framework
 
 ### Shell vs. embedded experiences
 
-The repo is a "shell" home page (`index.html`, `styles.css`, `app.js`, `theme.js`, `themes.css`) that hosts independent sub-experiences in `games/<slug>/` and `apps/<slug>/`. Each sub-experience is fully self-contained: its own `index.html`, `styles.css`, `app.js`, no shared imports. The shell embeds them via `<iframe>`. That isolation is load-bearing — do not try to pull a sub-experience's JS/CSS into the shell or vice versa.
+The repo is a "shell" home page (`index.html`, `styles.css`, `app.js`, `theme.js`, `themes.css`) that hosts independent sub-experiences in `apps/<slug>/`. Each sub-experience is fully self-contained: its own `index.html`, `styles.css`, `app.js`, no shared imports. The shell embeds them via `<iframe>`. That isolation is load-bearing — do not try to pull a sub-experience's JS/CSS into the shell or vice versa. Currently the only sub-experience is `apps/pie/`.
 
 `apps/pie/` is large enough to carry its own scoped guide: read `apps/pie/CLAUDE.md` (and the deep dives in `apps/pie/docs/`) before working in there.
 
 ### Tile registry → grid → iframe morph
 
-`app.js` declares two arrays at the top: `games` and `apps`. Each entry needs `{ slug, name, meta, tagline, icon, url }` (or `comingSoon: true` and no `url`). The arrays drive the rendered grid tiles, the iframe loader, and deep-link resolution. Adding a tile = create `games/<slug>/` (or `apps/<slug>/`) and append one entry to the relevant array.
+`app.js` declares one array at the top: `apps`. Each entry needs `{ slug, name, meta, icon, url }` (or `comingSoon: true` and no `url`). The array drives the rendered grid tiles, the iframe loader, and deep-link resolution. Adding a tile = create `apps/<slug>/` and append one entry to the array.
 
 When a tile is tapped, `openGame` positions `#frame-wrap` over the tapped card's bounding rect with `transform: translate(...) scale(...)`, then transitions to fullscreen. A `.frame-skin` layer paints the card art on top of the loading iframe and crossfades out — `ZOOM_MS` (550ms) is the wrap's size animation, and the skin/frame crossfade is intentionally faster (220ms in CSS) so the morph reads as the card *becoming* the experience. `closeGame` runs the same animation in reverse. If you change the timing in CSS, mirror it in `ZOOM_MS`.
 
-### Section pager (Home / Apps / Tools / Games)
+### Single-screen stage
 
-The IIFE labelled `pager()` in `app.js` is a transform-driven barrel carousel — there is no scroll container and no DOM clones. `pos` is a continuous float; `paint()` places each slide at its visually-nearest copy via `((d % N) + N) % N`. After settle, `pos` is renormalised back into `[0, N)` to stay bounded. Touch uses Pointer Events with axis detection (`DIR_LOCK_PX = 8`) so vertical pans inside a grid still scroll natively. A swipe that ends over a card sets `suppressClickUntil` to swallow the click that would otherwise open the game — preserve this when changing gesture handling.
+The shell is a single screen: `<main class="stage">` holds one `.page` with the app grid, directly between the top bar and the footer. There used to be a swipeable section pager (Home / Apps / Tools / Games); it was removed when the arcade was pared down to just Pie. If sections ever come back, the pager code lives in git history (`app.js` before the pie-only change).
 
 ### Deep linking and embedded close
 
-- The shell pushes `#games/<slug>/` (or `#apps/<slug>/`) to history on open and listens for `popstate` to close. The deep-link IIFE at the bottom of `app.js` opens the matching tile if the page loads with such a hash.
-- Embedded experiences must NOT navigate the parent. Their "Quit" button posts `{ type: 'close-game' }` to `window.parent`; the shell's `message` handler triggers `history.back()` (or `closeGame()` directly). When standalone (`window.self === window.top`), the same button does `location.href = '../../'`. Both games already implement this — copy the pattern.
+- The shell pushes `#apps/<slug>/` to history on open and listens for `popstate` to close. The deep-link IIFE at the bottom of `app.js` opens the matching tile if the page loads with such a hash.
+- Embedded experiences must NOT navigate the parent. Their "Quit" button posts `{ type: 'close-game' }` to `window.parent`; the shell's `message` handler triggers `history.back()` (or `closeGame()` directly). When standalone (`window.self === window.top`), the same button does `location.href = '../../'`. Pie already implements this — copy the pattern.
 - Each sub-experience adds `embedded` to `<html>` when iframed: `if (window.self !== window.top) document.documentElement.classList.add('embedded');`. CSS uses `.embedded` to hide elements that don't belong inside the shell (e.g. back links).
 
 ### Loading screens (mandatory pattern)
 
-Every sub-experience's `index.html` ships a `#game-loading` (or `#app-loading`) element painted by an inline `<style>` block in `<head>`, BEFORE any external `<link rel="stylesheet">`. This guarantees a black/branded splash on the very first frame, before `styles.css` resolves. The sub-experience's `app.js` removes it once ready AND at least 3 seconds have elapsed. Don't move this CSS to `styles.css` — the whole point is that it paints before that file loads.
+Every sub-experience's `index.html` ships an `#app-loading` element painted by an inline `<style>` block in `<head>`, BEFORE any external `<link rel="stylesheet">`. This guarantees a black/branded splash on the very first frame, before `styles.css` resolves. The sub-experience's `app.js` removes it once ready AND at least 3 seconds have elapsed. Don't move this CSS to `styles.css` — the whole point is that it paints before that file loads.
 
 ### Theme system
 
-`themes.css` defines five palettes via `[data-theme="..."]` selectors: `noir`, `bone`, `steel`, `jade`, `ember`. (The README lists older names like `dark`/`light`/`space` — those are stale; use the actual five.) `theme.js` reads `localStorage.getItem('arcade-theme')`, falls back to `prefers-color-scheme`, applies `document.documentElement.dataset.theme`, and dispatches a `themechange` CustomEvent. The shell's `index.html` runs an inlined boot script BEFORE `themes.css` loads to set the attribute pre-paint and avoid a flash. Sub-experiences are NOT themed — they ship their own palette. If you add a theme, update both `themes.css` and the `THEMES` array in `theme.js` and the `valid` array in `index.html`'s boot script.
+`themes.css` defines five palettes via `[data-theme="..."]` selectors: `noir`, `bone`, `steel`, `jade`, `ember`. `theme.js` reads `localStorage.getItem('arcade-theme')`, falls back to `prefers-color-scheme`, applies `document.documentElement.dataset.theme`, and dispatches a `themechange` CustomEvent. The shell's `index.html` runs an inlined boot script BEFORE `themes.css` loads to set the attribute pre-paint and avoid a flash. Sub-experiences are NOT themed — they ship their own palette. If you add a theme, update both `themes.css` and the `THEMES` array in `theme.js` and the `valid` array in `index.html`'s boot script.
 
 ## Deployment
 
@@ -82,7 +82,7 @@ Every sub-experience's `index.html` ships a `#game-loading` (or `#app-loading`) 
 | `main` | `/` |
 | any other | `/preview/<slug>/` where `<slug>` = branch name with `/`, `_`, ` ` → `-` and lowercased |
 
-So pushing to e.g. `claude/foo-bar` deploys to `https://zlore-claude.github.io/claude-apps/preview/claude-foo-bar/`. Production and previews coexist on `gh-pages` because of `keep_files: true`.
+So pushing to e.g. `claude/foo-bar` deploys to `https://xhevops-claude.github.io/claude-erol/preview/claude-foo-bar/`. Production and previews coexist on `gh-pages` because of `keep_files: true`.
 
 The `exclude_assets` list in `pages.yml` controls what gets excluded from the deploy. If you add a new top-level dev-only file/dir (lockfiles, configs, docs), append it there.
 
@@ -94,7 +94,7 @@ Don't add `?v=` query strings manually to source HTML — they'd be redundant wi
 
 ### Always end with a clickable preview link
 
-After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://zlore-claude.github.io/claude-apps/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/games/snake/`). If pushed to `main`, link to the corresponding production path under `https://zlore-claude.github.io/claude-apps/`.
+After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://xhevops-claude.github.io/claude-erol/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/apps/pie/`). If pushed to `main`, link to the corresponding production path under `https://xhevops-claude.github.io/claude-erol/`.
 
 ### Branch names — match the work
 
@@ -107,7 +107,7 @@ Auto-generated names like `claude/add-claude-documentation-0XFkn` get reused acr
 Direct pushes to `main` are blocked. To land changes on production:
 
 1. Open a pull request from the feature branch into `main`.
-2. Wait for CI on the PR to go green — the `lint` and `node --check` jobs in `.github/workflows/ci.yml` plus the preview deploy in `pages.yml`. Inspect any failures and fix them before merging; do not merge a PR with a red or pending check unless the user explicitly tells you to override.
+2. Wait for CI on the PR to go green — the single `lint` job in `.github/workflows/ci.yml` (its steps run `node --check`, htmlhint, and stylelint) plus the preview deploy in `pages.yml`. Inspect any failures and fix them before merging; do not merge a PR with a red or pending check unless the user explicitly tells you to override.
 3. Only then merge the PR (default to a normal merge commit so the feature-branch history stays inspectable; squash if the user asks).
 
 This applies even when the user just says "merge it" — the PR + green-checks loop is the merge mechanism, not an extra step.
@@ -116,5 +116,5 @@ This applies even when the user just says "merge it" — the PR + green-checks l
 
 - `escapeHTML` in `app.js` is used for any user-supplied or registry-supplied string interpolated into innerHTML. Anything that ends up in `cardHtml`/`cardInner` MUST go through it.
 - Prefer adding `comingSoon: true` (with no `url`) over removing entries — the shell renders these as locked tiles with a shake animation on tap.
-- Tile colors come from CSS variables `--tile-<slug>` defined in `themes.css` — these are constant across themes so each card keeps its identity. Add a `--tile-<newslug>` when adding a tile.
+- Tile colors come from CSS variables `--tile-<slug>` defined in `themes.css` — these are constant across themes so each card keeps its identity. When adding a tile, add both the `--tile-<newslug>` variable in `themes.css` and the `.card[data-tile="<newslug>"] { --g1: ... }` mapping in `styles.css`.
 - Don't introduce a build tool, package, or framework just to add one feature. The "no build step" property is what makes preview deploys, deep links, and the static CDN model work.
