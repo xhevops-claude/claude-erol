@@ -45,7 +45,7 @@ The site is plain HTML/CSS/JS served as files. There is no bundler, no framework
 
 ### Shell vs. embedded experiences
 
-The repo is a "shell" home page (`index.html`, `styles.css`, `app.js`, `theme.js`, `themes.css`) that hosts independent sub-experiences in `apps/<slug>/`. Each sub-experience is fully self-contained: its own `index.html`, `styles.css`, `app.js`, no shared imports. The shell embeds them via `<iframe>`. That isolation is load-bearing — do not try to pull a sub-experience's JS/CSS into the shell or vice versa. Currently the only sub-experience is `apps/pie/`.
+The repo is a "shell" home page (`index.html`, `styles.css`, `app.js`, `theme.js`, `themes.css`) that hosts independent sub-experiences in `apps/<slug>/`. Each sub-experience is fully self-contained: its own `index.html`, `styles.css`, `app.js`, no shared imports. The shell embeds them via `<iframe>`. That isolation is load-bearing — do not try to pull a sub-experience's JS/CSS into the shell or vice versa. Current sub-experiences: `apps/pie/` (PI planning) and `apps/school/` (school management — students, teachers, classes, attendance, gradebook, all in `localStorage`).
 
 `apps/pie/` is large enough to carry its own scoped guide: read `apps/pie/CLAUDE.md` (and the deep dives in `apps/pie/docs/`) before working in there.
 
@@ -62,7 +62,7 @@ The shell is a single screen: `<main class="stage">` holds one `.page` with the 
 ### Deep linking and embedded close
 
 - The shell pushes `#apps/<slug>/` to history on open and listens for `popstate` to close. The deep-link IIFE at the bottom of `app.js` opens the matching tile if the page loads with such a hash.
-- Embedded experiences must NOT navigate the parent. Their "Quit" button posts `{ type: 'close-game' }` to `window.parent`; the shell's `message` handler triggers `history.back()` (or `closeGame()` directly). When standalone (`window.self === window.top`), the same button does `location.href = '../../'`. Pie already implements this — copy the pattern.
+- **No exit/quit buttons in apps.** Sub-experiences must not render their own Exit/Quit/"back to arcade" controls — closing is the shell's job: the user presses browser back and the shell's `popstate` handler runs `closeGame()`. Embedded experiences must NOT navigate the parent window either. The shell still listens for a `{ type: 'close-game' }` message and triggers `history.back()`, but that is plumbing for programmatic closes only — no app UI may expose it as a button.
 - Each sub-experience adds `embedded` to `<html>` when iframed: `if (window.self !== window.top) document.documentElement.classList.add('embedded');`. CSS uses `.embedded` to hide elements that don't belong inside the shell (e.g. back links).
 
 ### Loading screens (mandatory pattern)
@@ -80,9 +80,9 @@ Every sub-experience's `index.html` ships an `#app-loading` element painted by a
 | Branch | Path |
 |---|---|
 | `main` | `/` |
-| any other | `/preview/<slug>/` where `<slug>` = branch name with `/`, `_`, ` ` → `-` and lowercased |
+| any other | `/preview/<slug>/<short-sha>/` where `<slug>` = branch name with `/`, `_`, ` ` → `-` and lowercased, and `<short-sha>` = first 7 chars of the pushed commit |
 
-So pushing to e.g. `claude/foo-bar` deploys to `https://xhevops-claude.github.io/claude-erol/preview/claude-foo-bar/`. Production and previews coexist on `gh-pages` because of `keep_files: true`.
+So pushing commit `abc1234` to e.g. `claude/foo-bar` deploys to `https://xhevops-claude.github.io/claude-erol/preview/claude-foo-bar/abc1234/`. Every push gets its own route, so a preview URL is immutable — the browser can never serve a stale cached copy of an updated preview. Production and previews coexist on `gh-pages` because of `keep_files: true`. On every preview deploy the workflow first prunes the branch's whole `/preview/<slug>/` tree from `gh-pages`, so only the newest commit's preview exists per branch — a previously shared preview link 404s once a newer commit lands on that branch.
 
 The `exclude_assets` list in `pages.yml` controls what gets excluded from the deploy. If you add a new top-level dev-only file/dir (lockfiles, configs, docs), append it there.
 
@@ -94,7 +94,12 @@ Don't add `?v=` query strings manually to source HTML — they'd be redundant wi
 
 ### Always end with a clickable preview link
 
-After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://xhevops-claude.github.io/claude-erol/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/apps/pie/`). If pushed to `main`, link to the corresponding production path under `https://xhevops-claude.github.io/claude-erol/`.
+After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://xhevops-claude.github.io/claude-erol/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If pushed to `main`, link to the corresponding production path under `https://xhevops-claude.github.io/claude-erol/`.
+
+Two hard rules for that link:
+
+- **Link straight into the app, not the shell.** If the change targets a sub-experience, the URL must point directly at it (e.g. `.../preview/<slug>/<short-sha>/apps/pie/`), never at the shell home page that loads it in an iframe.
+- **Use the pushed commit's route.** Previews deploy under `/preview/<slug>/<short-sha>/` — the link must include the short SHA of the commit just pushed (`git rev-parse --short HEAD`), e.g. `.../preview/claude-foo-bar/abc1234/apps/pie/`. Each deploy has its own route, so the shared link is unique by construction and the user never has to clear cache. Do not add `?v=` query strings to the shared link — the route already carries the id.
 
 ### Branch names — match the work
 

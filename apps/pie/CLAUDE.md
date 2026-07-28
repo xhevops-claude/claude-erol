@@ -132,11 +132,12 @@ runtime-only and dies on reload — that is usually the correct choice for
 move that CSS, don't shorten the delay — and remember every browser check must
 wait it out.
 
-**8. Don't navigate the parent window.**
-Pie runs inside the arcade shell's iframe. `quit()` posts
-`{ type: 'close-game' }` to `window.parent` when embedded, and only falls back
-to `location.href` when standalone. The hash is written with `replaceState`,
-never `pushState`, so the shell's `popstate` close keeps working.
+**8. Don't navigate the parent window, and don't add exit/quit UI.**
+Pie runs inside the arcade shell's iframe. Closing the app is the shell's job
+(browser back triggers the shell's `popstate` close) — Pie must not render an
+Exit/Quit/"back to arcade" control, and must never navigate `window.parent`.
+The hash is written with `replaceState`, never `pushState`, so the shell's
+`popstate` close keeps working.
 
 **9. No build step, no dependency, no framework.**
 If a feature seems to need one, it doesn't. Plain DOM, plain CSS, plain

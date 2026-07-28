@@ -7,6 +7,13 @@
       icon: '🥧',
       url: 'apps/pie/',
     },
+    {
+      slug: 'school',
+      name: 'School',
+      meta: 'Management',
+      icon: '🏫',
+      url: 'apps/school/',
+    },
   ];
 
   // The morph + deep-link plumbing looks tiles up by url.
