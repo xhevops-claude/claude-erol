@@ -100,8 +100,6 @@ button { font: inherit; color: inherit; }
   background: var(--accent-soft);
 }
 
-.quit-btn { margin-left: auto; }
-
 /* ---------- Buttons & inputs ---------- */
 
 .btn {
