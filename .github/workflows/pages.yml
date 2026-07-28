@@ -1,8 +1,11 @@
 name: Deploy
 
 # Pushes to `main` deploy to the live URL.
-# Pushes to any other branch deploy to /preview/<slug>/ on the same site
-# so you can test the branch on the actual live origin before merging.
+# Pushes to any other branch deploy to /preview/<slug>/<short-sha>/ on
+# the same site so you can test the branch on the actual live origin
+# before merging. The short-sha route segment makes every deploy's URL
+# unique, so a previously visited preview can never be served from the
+# browser cache.
 
 on:
   push:
@@ -34,8 +37,9 @@ jobs:
             echo "label=production" >> "$GITHUB_OUTPUT"
           else
             slug=$(printf '%s' "$GITHUB_REF_NAME" | tr '/_ ' '-' | tr -cd 'a-zA-Z0-9-' | tr 'A-Z' 'a-z')
-            echo "dir=preview/${slug}" >> "$GITHUB_OUTPUT"
-            echo "url_path=/preview/${slug}/" >> "$GITHUB_OUTPUT"
+            sha="${GITHUB_SHA:0:7}"
+            echo "dir=preview/${slug}/${sha}" >> "$GITHUB_OUTPUT"
+            echo "url_path=/preview/${slug}/${sha}/" >> "$GITHUB_OUTPUT"
             echo "label=preview" >> "$GITHUB_OUTPUT"
           fi
 

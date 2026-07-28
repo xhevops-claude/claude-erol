@@ -87,13 +87,13 @@ npm run lint:css
 | Branch | Path on Pages | URL |
 |---|---|---|
 | `main` | `/` (root) | `https://xhevops-claude.github.io/claude-erol/` |
-| any other | `/preview/<slug>/` | `https://xhevops-claude.github.io/claude-erol/preview/<slug>/` |
+| any other | `/preview/<slug>/<short-sha>/` | `https://xhevops-claude.github.io/claude-erol/preview/<slug>/<short-sha>/` |
 
-`<slug>` is the branch name lowercased with `/`, `_`, and spaces turned into `-`. So pushing `claude/foo-bar` deploys to `…/preview/claude-foo-bar/`.
+`<slug>` is the branch name lowercased with `/`, `_`, and spaces turned into `-`, and `<short-sha>` is the first 7 characters of the pushed commit. So pushing commit `abc1234` on `claude/foo-bar` deploys to `…/preview/claude-foo-bar/abc1234/`. Each push gets its own preview route, so preview URLs are immutable and never affected by browser caching.
 
 The workflow uses [`peaceiris/actions-gh-pages`](https://github.com/peaceiris/actions-gh-pages) to publish to the `gh-pages` branch with `keep_files: true`, so production and previews coexist without overwriting each other.
 
-Local `.js`/`.css` references are rewritten at deploy time to `?v=<short-sha>`, and shared preview links carry the same `?v=<short-sha>` query on the page URL itself — every deploy gets unique URLs, so a stale browser cache never hides the latest version.
+Local `.js`/`.css` references are rewritten at deploy time to `?v=<short-sha>` (this matters for production, whose path never changes); previews additionally live under a unique per-commit route, so nothing about a preview deploy can be hidden by a stale browser cache.
 
 ### One-time setup
 
@@ -106,7 +106,7 @@ The first push after this PR merges will create the `gh-pages` branch automatica
 
 ### Cleaning up old previews
 
-Preview folders accumulate on `gh-pages` over time. To remove a stale preview, just delete the folder on the `gh-pages` branch (e.g. via the GitHub web UI) and the URL stops resolving on the next deploy.
+Preview folders accumulate on `gh-pages` over time — one per pushed commit, under `/preview/<slug>/`. To remove stale previews, just delete the folders (or a whole branch's `/preview/<slug>/` directory) on the `gh-pages` branch (e.g. via the GitHub web UI) and the URLs stop resolving on the next deploy.
 
 ## Themes
 

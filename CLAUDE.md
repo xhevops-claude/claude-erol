@@ -80,9 +80,9 @@ Every sub-experience's `index.html` ships an `#app-loading` element painted by a
 | Branch | Path |
 |---|---|
 | `main` | `/` |
-| any other | `/preview/<slug>/` where `<slug>` = branch name with `/`, `_`, ` ` → `-` and lowercased |
+| any other | `/preview/<slug>/<short-sha>/` where `<slug>` = branch name with `/`, `_`, ` ` → `-` and lowercased, and `<short-sha>` = first 7 chars of the pushed commit |
 
-So pushing to e.g. `claude/foo-bar` deploys to `https://xhevops-claude.github.io/claude-erol/preview/claude-foo-bar/`. Production and previews coexist on `gh-pages` because of `keep_files: true`.
+So pushing commit `abc1234` to e.g. `claude/foo-bar` deploys to `https://xhevops-claude.github.io/claude-erol/preview/claude-foo-bar/abc1234/`. Every push gets its own route, so a preview URL is immutable — the browser can never serve a stale cached copy of an updated preview. Production and previews coexist on `gh-pages` because of `keep_files: true`; old per-sha preview folders accumulate and can be deleted from `gh-pages` when stale.
 
 The `exclude_assets` list in `pages.yml` controls what gets excluded from the deploy. If you add a new top-level dev-only file/dir (lockfiles, configs, docs), append it there.
 
@@ -98,8 +98,8 @@ After pushing changes, the final line of every reply must be a clickable Markdow
 
 Two hard rules for that link:
 
-- **Link straight into the app, not the shell.** If the change targets a sub-experience, the URL must point directly at it (e.g. `.../preview/<slug>/apps/pie/`), never at the shell home page that loads it in an iframe.
-- **Every preview link carries a unique id.** Append `?v=<short-sha>` (the short SHA of the commit just pushed) to the URL, e.g. `.../apps/pie/?v=41f1f4d`. The query string makes each shared link unique so the browser never serves a stale cached copy of the page — the user should never have to clear cache to see the latest deploy. (This is separate from the deploy-time asset rewrite in `pages.yml`, which busts `.js`/`.css` caches; the `?v=` on the shared link busts the HTML document itself. Static hosting ignores the query string, so it changes nothing about what's served.)
+- **Link straight into the app, not the shell.** If the change targets a sub-experience, the URL must point directly at it (e.g. `.../preview/<slug>/<short-sha>/apps/pie/`), never at the shell home page that loads it in an iframe.
+- **Use the pushed commit's route.** Previews deploy under `/preview/<slug>/<short-sha>/` — the link must include the short SHA of the commit just pushed (`git rev-parse --short HEAD`), e.g. `.../preview/claude-foo-bar/abc1234/apps/pie/`. Each deploy has its own route, so the shared link is unique by construction and the user never has to clear cache. Do not add `?v=` query strings to the shared link — the route already carries the id.
 
 ### Branch names — match the work
 
