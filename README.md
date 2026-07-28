@@ -89,7 +89,7 @@ npm run lint:css
 | `main` | `/` (root) | `https://xhevops-claude.github.io/claude-erol/` |
 | any other | `/preview/<slug>/<short-sha>/` | `https://xhevops-claude.github.io/claude-erol/preview/<slug>/<short-sha>/` |
 
-`<slug>` is the branch name lowercased with `/`, `_`, and spaces turned into `-`, and `<short-sha>` is the first 7 characters of the pushed commit. So pushing commit `abc1234` on `claude/foo-bar` deploys to `…/preview/claude-foo-bar/abc1234/`. Each push gets its own preview route, so preview URLs are immutable and never affected by browser caching.
+`<slug>` is the branch name lowercased with `/`, `_`, and spaces turned into `-`, and `<short-sha>` is the first 7 characters of the pushed commit. So pushing commit `abc1234` on `claude/foo-bar` deploys to `…/preview/claude-foo-bar/abc1234/`. Each push gets its own preview route, so preview URLs are never affected by browser caching. On each deploy the workflow removes the branch's older preview folders first, so only the latest preview per branch is kept (older preview links 404).
 
 The workflow uses [`peaceiris/actions-gh-pages`](https://github.com/peaceiris/actions-gh-pages) to publish to the `gh-pages` branch with `keep_files: true`, so production and previews coexist without overwriting each other.
 
@@ -106,7 +106,7 @@ The first push after this PR merges will create the `gh-pages` branch automatica
 
 ### Cleaning up old previews
 
-Preview folders accumulate on `gh-pages` over time — one per pushed commit, under `/preview/<slug>/`. To remove stale previews, just delete the folders (or a whole branch's `/preview/<slug>/` directory) on the `gh-pages` branch (e.g. via the GitHub web UI) and the URLs stop resolving on the next deploy.
+Previews of an active branch clean up after themselves — each deploy prunes the branch's older preview folders. What can still linger is the last preview of a branch that stopped pushing (merged or abandoned); delete its `/preview/<slug>/` directory on the `gh-pages` branch (e.g. via the GitHub web UI) when it's no longer needed.
 
 ## Themes
 

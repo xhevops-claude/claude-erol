@@ -82,7 +82,7 @@ Every sub-experience's `index.html` ships an `#app-loading` element painted by a
 | `main` | `/` |
 | any other | `/preview/<slug>/<short-sha>/` where `<slug>` = branch name with `/`, `_`, ` ` → `-` and lowercased, and `<short-sha>` = first 7 chars of the pushed commit |
 
-So pushing commit `abc1234` to e.g. `claude/foo-bar` deploys to `https://xhevops-claude.github.io/claude-erol/preview/claude-foo-bar/abc1234/`. Every push gets its own route, so a preview URL is immutable — the browser can never serve a stale cached copy of an updated preview. Production and previews coexist on `gh-pages` because of `keep_files: true`; old per-sha preview folders accumulate and can be deleted from `gh-pages` when stale.
+So pushing commit `abc1234` to e.g. `claude/foo-bar` deploys to `https://xhevops-claude.github.io/claude-erol/preview/claude-foo-bar/abc1234/`. Every push gets its own route, so a preview URL is immutable — the browser can never serve a stale cached copy of an updated preview. Production and previews coexist on `gh-pages` because of `keep_files: true`. On every preview deploy the workflow first prunes the branch's whole `/preview/<slug>/` tree from `gh-pages`, so only the newest commit's preview exists per branch — a previously shared preview link 404s once a newer commit lands on that branch.
 
 The `exclude_assets` list in `pages.yml` controls what gets excluded from the deploy. If you add a new top-level dev-only file/dir (lockfiles, configs, docs), append it there.
 
