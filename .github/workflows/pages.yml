@@ -1,8 +1,13 @@
 name: Deploy
 
 # Pushes to `main` deploy to the live URL.
-# Pushes to any other branch deploy to /preview/<slug>/ on the same site
-# so you can test the branch on the actual live origin before merging.
+# Pushes to any other branch deploy to /preview/<slug>/<short-sha>/ on
+# the same site so you can test the branch on the actual live origin
+# before merging. The short-sha route segment makes every deploy's URL
+# unique, so a previously visited preview can never be served from the
+# browser cache. Before deploying, the branch's older preview folders
+# are pruned from gh-pages so previews don't accumulate forever — only
+# the newest commit's preview survives per branch.
 
 on:
   push:
@@ -34,9 +39,39 @@ jobs:
             echo "label=production" >> "$GITHUB_OUTPUT"
           else
             slug=$(printf '%s' "$GITHUB_REF_NAME" | tr '/_ ' '-' | tr -cd 'a-zA-Z0-9-' | tr 'A-Z' 'a-z')
-            echo "dir=preview/${slug}" >> "$GITHUB_OUTPUT"
-            echo "url_path=/preview/${slug}/" >> "$GITHUB_OUTPUT"
+            sha="${GITHUB_SHA:0:7}"
+            echo "slug=${slug}" >> "$GITHUB_OUTPUT"
+            echo "dir=preview/${slug}/${sha}" >> "$GITHUB_OUTPUT"
+            echo "url_path=/preview/${slug}/${sha}/" >> "$GITHUB_OUTPUT"
             echo "label=preview" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prune this branch's old previews
+        # Per-commit routes would otherwise pile up one folder per push.
+        # Drop the branch's whole /preview/<slug>/ tree from gh-pages
+        # before deploying; the deploy step then re-adds only the
+        # current commit's folder. Other branches' previews are
+        # untouched. Safe against races: the `pages-deploy` concurrency
+        # group serializes this job.
+        if: steps.target.outputs.label == 'preview'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! git clone --quiet --depth 1 --branch gh-pages \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" /tmp/ghp 2>/dev/null; then
+            echo "No gh-pages branch yet — nothing to prune."
+            exit 0
+          fi
+          cd /tmp/ghp
+          if [ -d "preview/${{ steps.target.outputs.slug }}" ]; then
+            git rm -r --quiet "preview/${{ steps.target.outputs.slug }}"
+            git -c user.name='github-actions[bot]' \
+                -c user.email='github-actions[bot]@users.noreply.github.com' \
+                commit --quiet -m "prune(preview): old previews of ${{ steps.target.outputs.slug }}"
+            git push --quiet origin gh-pages
+          else
+            echo "No previous previews for this branch."
           fi
 
       - name: Cache-bust local assets in deployed HTML

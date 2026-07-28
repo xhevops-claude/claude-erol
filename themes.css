@@ -61,6 +61,7 @@
    identity. Flat solid colors. */
 :root {
   --tile-pie: #f59e0b; /* amber-500 */
+  --tile-school: #6366f1; /* indigo-500 */
 }
 
 /* Hide the in-game back link when the page is rendered inside the
