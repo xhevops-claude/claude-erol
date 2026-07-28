@@ -4,7 +4,6 @@
       slug: 'pie',
       name: 'Pie',
       meta: 'Planning',
-      tagline: 'Run a PI Planning board: teams, sprints & dependencies.',
       icon: '🥧',
       url: 'apps/pie/',
     },
