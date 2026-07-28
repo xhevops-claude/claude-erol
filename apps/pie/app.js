@@ -3485,11 +3485,6 @@
     if (!confirm('Reset the plan to the sample? This clears your changes.')) return;
     state = sampleState(); save(); fullRender();
   }
-  function quit() {
-    if (window.self !== window.top) window.parent.postMessage({ type: 'close-game' }, '*');
-    else location.href = '../../';
-  }
-
   // ---------- Light shell: sidebar + routed pages ----------
   let currentPage = 'home';
 
@@ -3539,8 +3534,6 @@
           '<div class="menu" id="user-menu" role="menu" hidden>' +
             '<button class="menu-item" type="button" data-act="settings"><span>⚙</span> Settings</button>' +
             '<button class="menu-item" type="button" data-act="export"><span>⤓</span> Export plan</button>' +
-            '<div class="menu-sep"></div>' +
-            '<button class="menu-item danger" type="button" data-act="quit"><span>⤴</span> Exit to arcade</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -3557,7 +3550,6 @@
     else if (a === 'user-menu') { e.stopPropagation(); const m = document.getElementById('user-menu'); m.hidden = !m.hidden; }
     else if (a === 'settings') { closeUserMenu(); navigate('settings'); }
     else if (a === 'export') { closeUserMenu(); exportPlan(); }
-    else if (a === 'quit') quit();
   });
   function closeNavMenus() {
     menuOpen = null;

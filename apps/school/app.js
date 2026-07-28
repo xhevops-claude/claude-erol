@@ -250,7 +250,6 @@
   const tabsEl = document.getElementById('tabs');
   const viewEl = document.getElementById('view');
   const modalEl = document.getElementById('modal');
-  const quitBtn = document.getElementById('quit-btn');
 
   // ---------- Views ----------
   function renderTabs() {
@@ -740,11 +739,6 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !modalEl.hidden) closeModal();
-  });
-
-  quitBtn.addEventListener('click', function () {
-    if (window.self !== window.top) window.parent.postMessage({ type: 'close-game' }, '*');
-    else location.href = '../../';
   });
 
   // ---------- Boot ----------

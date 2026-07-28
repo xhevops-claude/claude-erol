@@ -47,6 +47,7 @@ Each embedded app is fully self-contained: it links no shared CSS or JS and ship
    ```
 3. (Optional) Mark it `comingSoon: true` and omit `url` to render the tile as a non-clickable "Coming soon" card.
 4. Add a `--tile-<slug>` color in `themes.css` and a matching `.card[data-tile="<slug>"]` rule in `styles.css` so the card keeps its identity color across themes.
+5. Do **not** add an Exit/Quit button inside the app — closing is the shell's job (browser back closes the embedded app via the shell's `popstate` handler).
 
 ## App loading screen
 

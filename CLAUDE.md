@@ -62,7 +62,7 @@ The shell is a single screen: `<main class="stage">` holds one `.page` with the 
 ### Deep linking and embedded close
 
 - The shell pushes `#apps/<slug>/` to history on open and listens for `popstate` to close. The deep-link IIFE at the bottom of `app.js` opens the matching tile if the page loads with such a hash.
-- Embedded experiences must NOT navigate the parent. Their "Quit" button posts `{ type: 'close-game' }` to `window.parent`; the shell's `message` handler triggers `history.back()` (or `closeGame()` directly). When standalone (`window.self === window.top`), the same button does `location.href = '../../'`. Pie already implements this — copy the pattern.
+- **No exit/quit buttons in apps.** Sub-experiences must not render their own Exit/Quit/"back to arcade" controls — closing is the shell's job: the user presses browser back and the shell's `popstate` handler runs `closeGame()`. Embedded experiences must NOT navigate the parent window either. The shell still listens for a `{ type: 'close-game' }` message and triggers `history.back()`, but that is plumbing for programmatic closes only — no app UI may expose it as a button.
 - Each sub-experience adds `embedded` to `<html>` when iframed: `if (window.self !== window.top) document.documentElement.classList.add('embedded');`. CSS uses `.embedded` to hide elements that don't belong inside the shell (e.g. back links).
 
 ### Loading screens (mandatory pattern)
