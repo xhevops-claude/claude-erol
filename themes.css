@@ -1,6 +1,6 @@
 /* Themes — flat palettes, no gradients. Each theme defines a single
    accent color paired with a bg/ink/surface set. The home page uses
-   these; games are standalone and ignore them. */
+   these; embedded apps are standalone and ignore them. */
 
 :root, [data-theme="noir"] {
   --bg: #08080a;
@@ -60,12 +60,7 @@
 /* Per-tile colors — constant across themes so each card keeps its
    identity. Flat solid colors. */
 :root {
-  --tile-snake: #22c55e;        /* emerald-500 */
-  --tile-tic-tac-toe: #f97316;  /* orange-500 */
-  --tile-memory: #8b5cf6;       /* violet-500 */
---tile-noise-painter: #5eead4; /* teal-300 */
---tile-pie: #f59e0b;          /* amber-500 */
---tile-directions: #38bdf8;   /* sky-400 */
+  --tile-pie: #f59e0b; /* amber-500 */
 }
 
 /* Hide the in-game back link when the page is rendered inside the

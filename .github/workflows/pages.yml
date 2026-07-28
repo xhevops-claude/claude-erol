@@ -75,4 +75,4 @@ jobs:
 
       - name: Print deploy URL
         run: |
-          echo "::notice title=Deployed::https://zlore-claude.github.io/claude-apps${{ steps.target.outputs.url_path }}"
+          echo "::notice title=Deployed::https://xhevops-claude.github.io/claude-erol${{ steps.target.outputs.url_path }}"
