@@ -93,6 +93,8 @@ npm run lint:css
 
 The workflow uses [`peaceiris/actions-gh-pages`](https://github.com/peaceiris/actions-gh-pages) to publish to the `gh-pages` branch with `keep_files: true`, so production and previews coexist without overwriting each other.
 
+Local `.js`/`.css` references are rewritten at deploy time to `?v=<short-sha>`, and shared preview links carry the same `?v=<short-sha>` query on the page URL itself — every deploy gets unique URLs, so a stale browser cache never hides the latest version.
+
 ### One-time setup
 
 GitHub Pages must be configured to serve from the `gh-pages` branch. Go to **Settings → Pages → Build and deployment**:

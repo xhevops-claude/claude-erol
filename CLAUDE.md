@@ -94,7 +94,12 @@ Don't add `?v=` query strings manually to source HTML — they'd be redundant wi
 
 ### Always end with a clickable preview link
 
-After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://xhevops-claude.github.io/claude-erol/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If the change targets a specific sub-experience, deep-link directly into it (e.g. `.../preview/<slug>/apps/pie/`). If pushed to `main`, link to the corresponding production path under `https://xhevops-claude.github.io/claude-erol/`.
+After pushing changes, the final line of every reply must be a clickable Markdown link to the deployed preview, in the form `[Preview](https://xhevops-claude.github.io/claude-erol/preview/<slug>/...)`. No bold, no surrounding `**`, no extra prose on that line — just the link. If pushed to `main`, link to the corresponding production path under `https://xhevops-claude.github.io/claude-erol/`.
+
+Two hard rules for that link:
+
+- **Link straight into the app, not the shell.** If the change targets a sub-experience, the URL must point directly at it (e.g. `.../preview/<slug>/apps/pie/`), never at the shell home page that loads it in an iframe.
+- **Every preview link carries a unique id.** Append `?v=<short-sha>` (the short SHA of the commit just pushed) to the URL, e.g. `.../apps/pie/?v=41f1f4d`. The query string makes each shared link unique so the browser never serves a stale cached copy of the page — the user should never have to clear cache to see the latest deploy. (This is separate from the deploy-time asset rewrite in `pages.yml`, which busts `.js`/`.css` caches; the `?v=` on the shared link busts the HTML document itself. Static hosting ignores the query string, so it changes nothing about what's served.)
 
 ### Branch names — match the work
 
