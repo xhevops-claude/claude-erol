@@ -30,6 +30,8 @@ The site is plain HTML/CSS/JS served as files. There is no bundler, no framework
 
 The repo is a "shell" home page (`index.html`, `styles.css`, `app.js`, `theme.js`, `themes.css`) that hosts independent sub-experiences in `games/<slug>/` and `apps/<slug>/`. Each sub-experience is fully self-contained: its own `index.html`, `styles.css`, `app.js`, no shared imports. The shell embeds them via `<iframe>`. That isolation is load-bearing — do not try to pull a sub-experience's JS/CSS into the shell or vice versa.
 
+`apps/pie/` is large enough to carry its own scoped guide: read `apps/pie/CLAUDE.md` (and the deep dives in `apps/pie/docs/`) before working in there.
+
 ### Tile registry → grid → iframe morph
 
 `app.js` declares two arrays at the top: `games` and `apps`. Each entry needs `{ slug, name, meta, tagline, icon, url }` (or `comingSoon: true` and no `url`). The arrays drive the rendered grid tiles, the iframe loader, and deep-link resolution. Adding a tile = create `games/<slug>/` (or `apps/<slug>/`) and append one entry to the relevant array.
