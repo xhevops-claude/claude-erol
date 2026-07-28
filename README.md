@@ -4,7 +4,7 @@
 [![Deploy](https://github.com/zlore-claude/claude-apps/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/zlore-claude/claude-apps/actions/workflows/pages.yml)
 [![Live](https://img.shields.io/badge/live-arcade-22d3ee?style=flat&labelColor=18181b)](https://zlore-claude.github.io/claude-apps/)
 
-A small static games arcade. Tap a tile, the card morphs into the game; tap home, the game morphs back into the card. Deployed to GitHub Pages.
+A static shell that hosts the **Pie** PI-planning app. The first screen shows the app tile; tap it and the card morphs into the app, tap back and the app morphs back into the card. Deployed to GitHub Pages.
 
 **Live**: https://zlore-claude.github.io/claude-apps/
 
@@ -12,48 +12,46 @@ A small static games arcade. Tap a tile, the card morphs into the game; tap home
 
 ```
 .
-├── index.html              Gallery (home page)
-├── styles.css              Gallery layout + iframe morph
-├── app.js                  Gallery logic — tile rendering, open/close animation
-├── theme.js                Theme picker (gallery only)
-├── themes.css              Theme variables (gallery only)
-└── games/
-    ├── snake/              Self-contained game
-    │   ├── index.html
-    │   ├── styles.css
-    │   └── app.js
-    └── tic-tac-toe/
+├── index.html              Shell (home page)
+├── styles.css              Shell layout + iframe morph
+├── app.js                  Shell logic — tile rendering, open/close animation
+├── theme.js                Theme picker (shell only)
+├── themes.css              Theme variables (shell only)
+└── apps/
+    └── pie/                Self-contained PI-planning app
         ├── index.html
         ├── styles.css
-        └── app.js
+        ├── app.js
+        ├── CLAUDE.md       Scoped guide for working on Pie
+        └── docs/           Deep dives (architecture, state model, …)
 ```
 
-Each game is fully self-contained: it links no shared CSS or JS and ships its own black palette. The gallery embeds it via an `<iframe>`. The theme picker on the home page only affects the home page.
+Each embedded app is fully self-contained: it links no shared CSS or JS and ships its own palette. The shell embeds it via an `<iframe>`. The theme picker on the home page only affects the home page.
 
-## Adding a new game
+## Adding a new app
 
-1. Create `games/<slug>/` with its own `index.html`, `styles.css`, `app.js`.
-2. Append an entry to the `games` array in `app.js`:
+1. Create `apps/<slug>/` with its own `index.html`, `styles.css`, `app.js`.
+2. Append an entry to the `apps` array in `app.js`:
    ```js
    {
      slug: 'pong',
      name: 'Pong',
+     meta: 'Classic',
      tagline: 'Classic two-paddle volley.',
      icon: '🏓',
-     url: 'games/pong/',
+     url: 'apps/pong/',
    }
    ```
 3. (Optional) Mark it `comingSoon: true` and omit `url` to render the tile as a non-clickable "Coming soon" card.
+4. Add a `--tile-<slug>` color in `themes.css` and a matching `.card[data-tile="<slug>"]` rule in `styles.css` so the card keeps its identity color across themes.
 
-The tile gets its colors from the active theme's accents (rotated per `nth-child`) — no per-game color config needed.
+## App loading screen
 
-## Game loading screen
-
-Each game's `index.html` includes a critical inline `<style>` block plus a `#game-loading` element so a black + logo + sliding bar paints on the very first frame, before any external stylesheet loads. The game's `app.js` removes it once the game is ready and at least 3 seconds have elapsed.
+Each embedded app's `index.html` includes a critical inline `<style>` block plus a loading element (`#app-loading`) so a branded splash paints on the very first frame, before any external stylesheet loads. The app's `app.js` removes it once the app is ready and at least 3 seconds have elapsed.
 
 ## Open / close animation
 
-The iframe is wrapped in `#frame-wrap`. On open, the wrap is positioned at the tapped tile's bounding rect with `transform: translate(...) scale(...)` and `border-radius: 16px`, then transitioned to fullscreen. A `.frame-skin` layer carries the tile's gradient + icon + name + tagline so the wrap visually reads as the card at the small end. The skin and iframe crossfade in 220ms — faster than the wrap's 550ms size animation — so the user sees the card design morph into the game smoothly. Close runs the same animation in reverse.
+The iframe is wrapped in `#frame-wrap`. On open, the wrap is positioned at the tapped tile's bounding rect with `transform: translate(...) scale(...)`, then transitioned to fullscreen. A `.frame-skin` layer carries the tile's color + icon + name so the wrap visually reads as the card at the small end. The skin and iframe crossfade in 220ms — faster than the wrap's 550ms size animation — so the user sees the card design morph into the app smoothly. Close runs the same animation in reverse.
 
 ## Local development
 
@@ -107,7 +105,6 @@ Preview folders accumulate on `gh-pages` over time. To remove a stale preview, j
 ## Themes
 
 `themes.css` defines variables per `[data-theme="..."]`:
-- `dark` (default), `light`, `space`, `sunset`
-- `mono`, `solarized`, `gameboy` (classic, gradient-free)
+- `noir` (default dark), `bone` (light), `steel`, `jade`, `ember`
 
-`theme.js` reads `localStorage.getItem('arcade-theme')` and wires the swatch buttons. The choice persists. Games never read this — they're standalone black.
+`theme.js` reads `localStorage.getItem('arcade-theme')` and wires the swatch buttons. The choice persists. Embedded apps never read this — they ship their own palette.
