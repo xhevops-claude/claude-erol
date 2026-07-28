@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session start — read the docs first
+
+At the start of every session, before writing or changing any code, read the repo docs:
+
+1. `README.md` — repo layout and what each sub-experience is.
+2. If the work touches `apps/pie/`, also read `apps/pie/CLAUDE.md` and the deep dives in `apps/pie/docs/` (`architecture.md`, `state-model.md`, `surfaces.md`, `navigation.md`, `sightline.md`, `testing.md`).
+
+Don't skip this because the task looks small — the conventions below assume you have that context.
+
 ## Commands
 
 ```sh
