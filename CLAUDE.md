@@ -51,7 +51,7 @@ The repo is a "shell" home page (`index.html`, `styles.css`, `app.js`, `theme.js
 
 ### Tile registry → grid → iframe morph
 
-`app.js` declares one array at the top: `apps`. Each entry needs `{ slug, name, meta, tagline, icon, url }` (or `comingSoon: true` and no `url`). The array drives the rendered grid tiles, the iframe loader, and deep-link resolution. Adding a tile = create `apps/<slug>/` and append one entry to the array.
+`app.js` declares one array at the top: `apps`. Each entry needs `{ slug, name, meta, icon, url }` (or `comingSoon: true` and no `url`). The array drives the rendered grid tiles, the iframe loader, and deep-link resolution. Adding a tile = create `apps/<slug>/` and append one entry to the array.
 
 When a tile is tapped, `openGame` positions `#frame-wrap` over the tapped card's bounding rect with `transform: translate(...) scale(...)`, then transitions to fullscreen. A `.frame-skin` layer paints the card art on top of the loading iframe and crossfades out — `ZOOM_MS` (550ms) is the wrap's size animation, and the skin/frame crossfade is intentionally faster (220ms in CSS) so the morph reads as the card *becoming* the experience. `closeGame` runs the same animation in reverse. If you change the timing in CSS, mirror it in `ZOOM_MS`.
 
@@ -107,7 +107,7 @@ Auto-generated names like `claude/add-claude-documentation-0XFkn` get reused acr
 Direct pushes to `main` are blocked. To land changes on production:
 
 1. Open a pull request from the feature branch into `main`.
-2. Wait for CI on the PR to go green — the `lint` and `node --check` jobs in `.github/workflows/ci.yml` plus the preview deploy in `pages.yml`. Inspect any failures and fix them before merging; do not merge a PR with a red or pending check unless the user explicitly tells you to override.
+2. Wait for CI on the PR to go green — the single `lint` job in `.github/workflows/ci.yml` (its steps run `node --check`, htmlhint, and stylelint) plus the preview deploy in `pages.yml`. Inspect any failures and fix them before merging; do not merge a PR with a red or pending check unless the user explicitly tells you to override.
 3. Only then merge the PR (default to a normal merge commit so the feature-branch history stays inspectable; squash if the user asks).
 
 This applies even when the user just says "merge it" — the PR + green-checks loop is the merge mechanism, not an extra step.

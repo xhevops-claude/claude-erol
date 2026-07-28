@@ -37,7 +37,6 @@ Each embedded app is fully self-contained: it links no shared CSS or JS and ship
      slug: 'pong',
      name: 'Pong',
      meta: 'Classic',
-     tagline: 'Classic two-paddle volley.',
      icon: '🏓',
      url: 'apps/pong/',
    }
